@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -83,6 +84,19 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Credit-card fields -------------------------------------------------
+    # Data Model section 16: these live directly on Account for MVP and apply
+    # only where account_type = CREDIT_CARD. A CreditCardProfile table is the
+    # documented refactor once card functionality grows.
+    credit_limit: Mapped[Decimal | None] = mapped_column(AMOUNT)
+    statement_balance: Mapped[Decimal | None] = mapped_column(AMOUNT)
+    statement_closing_day: Mapped[int | None] = mapped_column(SmallInteger)
+    payment_due_day: Mapped[int | None] = mapped_column(SmallInteger)
+    minimum_payment: Mapped[Decimal | None] = mapped_column(AMOUNT)
+    interest_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    expiry_month: Mapped[int | None] = mapped_column(SmallInteger)
+    expiry_year: Mapped[int | None] = mapped_column(SmallInteger)
+
     institution: Mapped[Institution | None] = relationship()
 
     __table_args__ = (
@@ -90,6 +104,20 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
         CheckConstraint(
             "(owner_user_id IS NOT NULL) OR (family_id IS NOT NULL)",
             name="owner_or_family_required",
+        ),
+        CheckConstraint(
+            "credit_limit IS NULL OR credit_limit >= 0", name="credit_limit_non_negative"
+        ),
+        CheckConstraint(
+            "statement_closing_day IS NULL OR statement_closing_day BETWEEN 1 AND 31",
+            name="statement_closing_day_range",
+        ),
+        CheckConstraint(
+            "payment_due_day IS NULL OR payment_due_day BETWEEN 1 AND 31",
+            name="payment_due_day_range",
+        ),
+        CheckConstraint(
+            "expiry_month IS NULL OR expiry_month BETWEEN 1 AND 12", name="expiry_month_range"
         ),
     )
 

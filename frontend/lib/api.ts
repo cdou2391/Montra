@@ -74,6 +74,17 @@ export const api = {
 
 export type Money = { amount: string; currency: string };
 
+export type CreditCardFields = {
+  credit_limit: string | null;
+  statement_balance: string | null;
+  statement_closing_day: number | null;
+  payment_due_day: number | null;
+  minimum_payment: string | null;
+  interest_rate: string | null;
+  expiry_month: number | null;
+  expiry_year: number | null;
+};
+
 export type Account = {
   id: string;
   name: string;
@@ -81,12 +92,37 @@ export type Account = {
   account_nature: "ASSET" | "LIABILITY";
   currency: string;
   balance: string;
+  opening_balance: string;
   masked_identifier: string | null;
   visibility: string;
   ownership_type: string;
   status: string;
   can_edit: boolean;
   can_transact: boolean;
+  credit_card: CreditCardFields | null;
+};
+
+export type CardSummary = {
+  account_id: string;
+  currency: string;
+  outstanding_balance: string;
+  available_credit: string | null;
+  credit_limit: string | null;
+  utilization_percentage: string | null;
+  utilization_band: "NORMAL" | "NEUTRAL" | "WARNING" | "HIGH" | null;
+  statement_balance: string | null;
+  minimum_payment: string | null;
+  payment_due_date: string | null;
+  statement_closing_day: number | null;
+  interest_rate: string | null;
+};
+
+export type ReconciliationPreview = {
+  current_balance: string;
+  actual_balance: string;
+  difference: string;
+  direction: "INCREASE" | "DECREASE" | null;
+  currency: string;
 };
 
 export type Transaction = {
@@ -146,6 +182,28 @@ export const montra = {
   createTransaction: (payload: Record<string, unknown>) =>
     api.post<Envelope<Transaction>>("/transactions", payload).then((r) => r.data),
   deleteTransaction: (id: string) => api.delete<void>(`/transactions/${id}`),
+
+  cardSummary: (id: string) =>
+    api.get<Envelope<CardSummary>>(`/credit-cards/${id}/summary`).then((r) => r.data),
+  payCard: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
+    api.post<Envelope<unknown>>(`/credit-cards/${id}/payments`, payload, {
+      "Idempotency-Key": idempotencyKey,
+    }),
+  topUpPrepaid: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
+    api.post<Envelope<unknown>>(`/prepaid-cards/${id}/top-ups`, payload, {
+      "Idempotency-Key": idempotencyKey,
+    }),
+
+  reconciliationPreview: (id: string, actualBalance: string) =>
+    api
+      .get<Envelope<ReconciliationPreview>>(
+        `/accounts/${id}/reconciliation-preview?actual_balance=${encodeURIComponent(
+          actualBalance,
+        )}`,
+      )
+      .then((r) => r.data),
+  reconcile: (id: string, payload: Record<string, unknown>) =>
+    api.post<Envelope<unknown>>(`/accounts/${id}/balance-adjustments`, payload),
 
   createTransfer: (payload: Record<string, unknown>, idempotencyKey: string) =>
     api.post<Envelope<unknown>>("/transfers", payload, {

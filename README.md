@@ -12,9 +12,9 @@ the code; the documents are the source of truth for behaviour.
 
 ## Current status
 
-Implemented through **Phase 7** of the
+Implemented through **Phase 10** of the
 [implementation plan](docs/Montra%20—%20End%20to%20End%20Implementation%20Plan.md) —
-milestones **M1 (Platform)** and **M2 (Financial Core)**.
+milestones **M1 (Platform)**, **M2 (Financial Core)** and **M3 (Cards)**.
 
 | Working | Not yet built |
 |---|---|
@@ -24,6 +24,8 @@ milestones **M1 (Platform)** and **M2 (Financial Core)**.
 | The financial posting engine | Family sharing and the family dashboard |
 | Income, expenses, transfers | Net worth history, forecasting, insights |
 | Balance reconciliation | Attachments, audit log, CSV import/export |
+| Credit cards: limit, utilization, due date, payments | |
+| Prepaid cards and top-ups | |
 
 Family sharing is deliberately refused rather than half-enforced: creating a
 `FAMILY_VISIBLE` or `SHARED` account returns `NO_ACTIVE_FAMILY` until the
@@ -133,15 +135,18 @@ account's perspective.
 make test
 ```
 
-70 tests. The ledger suites
+113 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
 repayments lower it, transfers preserve net worth, cancelled and deleted entries
 leave no trace in a balance, and decimal precision survives repeated postings.
 [`test_time.py`](backend/tests/test_time.py) covers the timezone boundaries
-where an hours-off bug would otherwise be invisible. Coverage elsewhere is
-deliberately lighter.
+where an hours-off bug would otherwise be invisible, and
+[`test_cards.py`](backend/tests/test_cards.py) guards the three card
+properties the plan singles out: a purchase is an expense that raises debt, a
+payment lowers cash and debt together, and a payment is never an expense.
+Coverage elsewhere is deliberately lighter.
 
 ---
 
@@ -160,4 +165,7 @@ deliberately lighter.
 - Deletes are soft. A cancelled or deleted transaction stops affecting balances
   but stays on the record.
 - Transfers accept an `Idempotency-Key` header; replaying a key returns the
-  original transfer instead of posting again.
+  original transfer instead of posting again. Card payments and prepaid
+  top-ups share that mechanism, because both are transfers underneath.
+- Reconciliation records the difference as its own ADJUSTMENT entry. It never
+  rewrites history or edits the opening balance.

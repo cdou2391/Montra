@@ -3,11 +3,12 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Account, Transaction, montra } from "@/lib/api";
+import { Account, CardSummary, Transaction, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { MoneyValue, TransactionRow } from "@/components/financial";
+import { CreditCardSummaryCard } from "@/components/credit-card";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 function AccountDetail() {
@@ -15,6 +16,7 @@ function AccountDetail() {
   const router = useRouter();
   const [account, setAccount] = useState<Account | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [summary, setSummary] = useState<CardSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +27,9 @@ function AccountDetail() {
       .then(([a, t]) => {
         setAccount(a);
         setTransactions(t.data);
+        if (a.account_type === "CREDIT_CARD") {
+          montra.cardSummary(id).then(setSummary).catch(() => setSummary(null));
+        }
       })
       .catch(() => setAccount(null))
       .finally(() => setLoading(false));
@@ -53,38 +58,58 @@ function AccountDetail() {
   }
 
   const isLiability = account.account_nature === "LIABILITY";
+  const isCard = account.account_type === "CREDIT_CARD";
+  const isPrepaid = account.account_type === "PREPAID_CARD";
 
   return (
     <AppShell>
       <PageHeader title={account.name} />
-      <Card className="mb-6">
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-content-secondary">
-            {isLiability ? "Balance owed" : "Current balance"}
-          </p>
-          <StatusChip tone={isLiability ? "expense" : "neutral"}>
-            {account.account_type.replace(/_/g, " ")}
-          </StatusChip>
-        </div>
-        <p className="mt-2">
-          <MoneyValue
-            amount={account.balance}
-            currency={account.currency}
-            size="value-lg"
-          />
-        </p>
-        {account.masked_identifier && (
-          <p className="mt-1 text-xs text-content-muted">{account.masked_identifier}</p>
+
+      <div className="mb-6">
+        {isCard && summary ? (
+          <CreditCardSummaryCard summary={summary} />
+        ) : (
+          <Card>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-content-secondary">
+                {isLiability ? "Balance owed" : "Current balance"}
+              </p>
+              <StatusChip tone={isLiability ? "expense" : "neutral"}>
+                {account.account_type.replace(/_/g, " ")}
+              </StatusChip>
+            </div>
+            <p className="mt-2">
+              <MoneyValue
+                amount={account.balance}
+                currency={account.currency}
+                size="value-lg"
+              />
+            </p>
+            {account.masked_identifier && (
+              <p className="mt-1 text-xs text-content-muted">{account.masked_identifier}</p>
+            )}
+          </Card>
         )}
-      </Card>
+      </div>
 
       <div className="mb-6 flex flex-wrap gap-3">
+        {isCard && (
+          <Button onClick={() => router.push(`/accounts/${id}/pay`)}>Make payment</Button>
+        )}
+        {isPrepaid && (
+          <Button onClick={() => router.push(`/accounts/${id}/pay`)}>Top up</Button>
+        )}
         <Button variant="secondary" onClick={() => router.push(`/add?account=${id}`)}>
           Add transaction
         </Button>
         <Button variant="secondary" onClick={() => router.push(`/transfer?from=${id}`)}>
           Transfer
         </Button>
+        {account.can_transact && (
+          <Button variant="secondary" onClick={() => router.push(`/accounts/${id}/reconcile`)}>
+            Reconcile
+          </Button>
+        )}
         {account.can_edit && (
           <Button variant="destructive" onClick={archive}>
             Archive
@@ -101,7 +126,7 @@ function AccountDetail() {
       ) : (
         <Card>
           {transactions.map((t) => (
-            <TransactionRow key={t.id} transaction={t} />
+            <TransactionRow key={t.id} transaction={t} showAccount={false} />
           ))}
         </Card>
       )}

@@ -19,6 +19,7 @@ from app.db.enums import (
 from app.models.finance import Account, Transaction
 from app.models.user import User
 from app.services.authz import visible_accounts
+from app.services.credit_cards import apply_card_fields, card_fields_payload
 from app.services.posting import PostingService
 
 
@@ -37,6 +38,7 @@ def create_account(
     account_identifier: str | None = None,
     description: str | None = None,
     family_id: uuid.UUID | None = None,
+    card_fields: dict | None = None,
 ) -> Account:
     if visibility is not Visibility.PRIVATE or family_id is not None:
         # Family sharing lands in Phase 16-19; refuse rather than silently
@@ -62,6 +64,9 @@ def create_account(
         status=AccountStatus.ACTIVE,
         created_by=user.id,
     )
+    if card_fields:
+        apply_card_fields(account, card_fields)
+
     db.add(account)
     db.flush()
     return account
@@ -80,6 +85,7 @@ def update_account(
     institution_id: uuid.UUID | None = None,
     account_identifier: str | None = None,
     currency: str | None = None,
+    card_fields: dict | None = None,
 ) -> Account:
     if currency is not None and currency.upper() != account.currency:
         if has_financial_activity(db, account):
@@ -96,6 +102,8 @@ def update_account(
         account.institution_id = institution_id
     if account_identifier is not None:
         account.account_identifier = account_identifier
+    if card_fields:
+        apply_card_fields(account, card_fields)
     db.flush()
     return account
 
@@ -173,4 +181,5 @@ def serialize_account(db: DbSession, account: Account, user: User) -> dict:
         },
         "can_edit": can_edit(account, user),
         "can_transact": can_transact(account, user),
+        "credit_card": card_fields_payload(account),
     }

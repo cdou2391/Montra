@@ -31,3 +31,12 @@ def serialize(value: Decimal) -> str:
 
 def money(value: Decimal, currency: str) -> dict[str, str]:
     return {"amount": serialize(value), "currency": currency}
+
+
+def serialize_rate(value: Decimal) -> str:
+    """Render a percentage without trailing zeros.
+
+    normalize() alone would turn 100 into 1E+2, so the result is formatted with
+    :f to keep plain notation.
+    """
+    return f"{Decimal(value).normalize():f}"

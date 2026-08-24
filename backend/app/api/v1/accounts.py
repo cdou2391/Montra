@@ -11,12 +11,34 @@ from app.core.responses import collection, single
 from app.core.timezone import ensure_aware
 from app.db.enums import AccountStatus, AccountType
 from app.models.user import User
-from app.schemas.accounts import AccountCreate, AccountUpdate, BalanceAdjustmentCreate
+from app.schemas.accounts import (
+    AccountCreate,
+    AccountUpdate,
+    BalanceAdjustmentCreate,
+)
 from app.services import accounts as account_service
 from app.services.authz import get_editable_account, get_viewable_account
 from app.services.posting import PostingService
 
 router = APIRouter(tags=["accounts"], prefix="/accounts")
+
+CARD_FIELD_NAMES = (
+    "credit_limit",
+    "statement_balance",
+    "statement_closing_day",
+    "payment_due_day",
+    "minimum_payment",
+    "interest_rate",
+    "expiry_month",
+    "expiry_year",
+)
+
+
+def _card_fields(payload) -> dict:
+    """Card metadata the caller actually supplied, so an omitted field is left
+    alone rather than being nulled out."""
+    supplied = payload.model_dump(exclude_unset=True)
+    return {name: supplied[name] for name in CARD_FIELD_NAMES if name in supplied}
 
 
 @router.get("")
@@ -56,6 +78,7 @@ def create_account(
         account_identifier=payload.account_identifier,
         description=payload.description,
         family_id=parse_uuid(payload.family_id, "family_id"),
+        card_fields=_card_fields(payload),
     )
     db.commit()
     db.refresh(account)
@@ -89,6 +112,7 @@ def update_account(
         institution_id=parse_uuid(payload.institution_id, "institution_id"),
         account_identifier=payload.account_identifier,
         currency=payload.currency,
+        card_fields=_card_fields(payload),
     )
     db.commit()
     db.refresh(account)
@@ -132,13 +156,19 @@ def account_balance(
     return single({"amount": serialize(balance), "currency": account.currency})
 
 
-@router.post("/{account_id}/balance-adjustments", status_code=status.HTTP_201_CREATED)
+@router.post("/{account_id}/balance-adjustments")
 def create_balance_adjustment(
     account_id: uuid.UUID,
     payload: BalanceAdjustmentCreate,
+    response: Response,
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
+    """Reconcile an account to an observed balance.
+
+    Phase 8: Montra records the difference as an explicit financial event. It
+    never rewrites history or edits the opening balance.
+    """
     from app.services.authz import get_transactable_account
     from app.services.transactions import serialize_transaction
 
@@ -151,7 +181,42 @@ def create_balance_adjustment(
         reason=payload.reason,
     )
     db.commit()
+
     if txn is None:
+        # Nothing was created, so this is not a 201.
+        response.status_code = status.HTTP_200_OK
         return single({"adjustment": None, "message": "Balance already matches; no adjustment."})
+
     db.refresh(txn)
+    response.status_code = status.HTTP_201_CREATED
     return single(serialize_transaction(txn, account))
+
+
+@router.get("/{account_id}/reconciliation-preview")
+def reconciliation_preview(
+    account_id: uuid.UUID,
+    actual_balance: str,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """What an adjustment would do, without doing it.
+
+    Lets the client show the difference before the user commits to writing a
+    financial event.
+    """
+    from app.core.money import to_decimal
+
+    account = get_viewable_account(db, account_id, user)
+    current = PostingService(db).balance_of(account)
+    target = to_decimal(actual_balance, "actual_balance")
+    delta = target - current
+    db.commit()
+    return single(
+        {
+            "current_balance": serialize(current),
+            "actual_balance": serialize(target),
+            "difference": serialize(abs(delta)),
+            "direction": "INCREASE" if delta > 0 else "DECREASE" if delta < 0 else None,
+            "currency": account.currency,
+        }
+    )

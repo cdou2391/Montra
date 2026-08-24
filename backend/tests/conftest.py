@@ -118,6 +118,11 @@ def savings_account(db: Session, user: User) -> Account:
 
 
 @pytest.fixture
+def prepaid_card(db: Session, user: User) -> Account:
+    return _make_account(db, user, AccountType.PREPAID_CARD, "850000.0000", "Prepaid Visa")
+
+
+@pytest.fixture
 def credit_card(db: Session, user: User) -> Account:
     """Opening balance on a liability is debt owed."""
     return _make_account(db, user, AccountType.CREDIT_CARD, "200000.0000", "BK Visa")

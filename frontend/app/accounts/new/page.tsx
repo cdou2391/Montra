@@ -34,6 +34,11 @@ function NewAccountForm() {
     opening_balance: "0",
     opening_balance_at: toLocalInputValue(),
     account_identifier: "",
+    credit_limit: "",
+    payment_due_day: "",
+    statement_closing_day: "",
+    minimum_payment: "",
+    interest_rate: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,9 +54,22 @@ function NewAccountForm() {
     setBusy(true);
     setError(null);
     try {
+      // Card metadata only travels for cards; the backend rejects it elsewhere.
+      const { credit_limit, payment_due_day, statement_closing_day, minimum_payment, interest_rate, ...base } = form;
       await montra.createAccount({
-        ...form,
-        account_identifier: form.account_identifier || null,
+        ...base,
+        account_identifier: base.account_identifier || null,
+        ...(isLiability
+          ? {
+              credit_limit: credit_limit || null,
+              payment_due_day: payment_due_day ? Number(payment_due_day) : null,
+              statement_closing_day: statement_closing_day
+                ? Number(statement_closing_day)
+                : null,
+              minimum_payment: minimum_payment || null,
+              interest_rate: interest_rate || null,
+            }
+          : {}),
       });
       router.push(onboarding ? "/" : "/accounts");
       router.refresh();
@@ -127,6 +145,61 @@ function NewAccountForm() {
               onChange={(e) => update("account_identifier", e.target.value)}
             />
           </Field>
+
+          {isLiability && (
+            <fieldset className="space-y-4 rounded-control border border-white/10 p-4">
+              <legend className="px-1 text-xs uppercase tracking-wide text-content-muted">
+                Card details — all optional
+              </legend>
+
+              <Field label="Credit limit" hint="Needed to show utilization.">
+                <AmountInput
+                  value={form.credit_limit}
+                  onChange={(e) => update("credit_limit", e.target.value)}
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Statement closes" hint="Day of month">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.statement_closing_day}
+                    onChange={(e) => update("statement_closing_day", e.target.value)}
+                  />
+                </Field>
+                <Field label="Payment due" hint="Day of month">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.payment_due_day}
+                    onChange={(e) => update("payment_due_day", e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Minimum payment">
+                  <AmountInput
+                    value={form.minimum_payment}
+                    onChange={(e) => update("minimum_payment", e.target.value)}
+                  />
+                </Field>
+                <Field label="Interest rate" hint="% per year">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    max={100}
+                    value={form.interest_rate}
+                    onChange={(e) => update("interest_rate", e.target.value)}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+          )}
           <div className="flex gap-3">
             <Button type="submit" disabled={busy} className="flex-1">
               {busy ? "Saving…" : "Add account"}

@@ -372,3 +372,227 @@ def test_error_envelope_carries_a_request_id(client):
     assert set(body["error"]) == {"code", "message", "details", "request_id"}
     assert body["error"]["request_id"]
     assert r.headers["X-Request-ID"]
+
+
+# --------------------------------------------------------------- credit cards
+
+
+def _make_card(client, **overrides):
+    payload = {
+        "name": "BK Visa",
+        "account_type": "CREDIT_CARD",
+        "currency": "RWF",
+        "opening_balance": "200000.00",
+        "opening_balance_at": "2026-08-01T09:00:00Z",
+        "credit_limit": "3000000.00",
+        "payment_due_day": 5,
+        "minimum_payment": "20000.00",
+        "statement_balance": "180000.00",
+    } | overrides
+    return client.post("/api/v1/accounts", json=payload)
+
+
+def test_card_fields_round_trip(client):
+    _register(client)
+    r = _make_card(client)
+    assert r.status_code == 201, r.text
+    card = r.json()["data"]["credit_card"]
+    assert card["credit_limit"] == "3000000.00"
+    assert card["payment_due_day"] == 5
+
+
+def test_non_card_accounts_carry_no_card_block(client):
+    _register(client)
+    assert _create_account(client).json()["data"]["credit_card"] is None
+
+
+def test_card_fields_rejected_on_a_bank_account(client):
+    _register(client)
+    r = _create_account(client, credit_limit="100000.00")
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "NOT_A_CREDIT_CARD"
+
+
+def test_credit_card_summary_endpoint(client):
+    _register(client)
+    card_id = _make_card(client).json()["data"]["id"]
+    s = client.get(f"/api/v1/credit-cards/{card_id}/summary").json()["data"]
+    assert s["outstanding_balance"] == "200000.00"
+    assert s["available_credit"] == "2800000.00"
+    assert s["utilization_percentage"] == "6.67"
+    assert s["utilization_band"] == "NORMAL"
+    assert s["payment_due_date"].endswith("-05")
+
+
+def test_summary_rejects_a_non_card(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    r = client.get(f"/api/v1/credit-cards/{account_id}/summary")
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "NOT_A_CREDIT_CARD"
+
+
+def test_card_payment_endpoint_moves_both_balances(client):
+    _register(client)
+    bank_id = _create_account(client).json()["data"]["id"]
+    card_id = _make_card(client).json()["data"]["id"]
+
+    r = client.post(
+        f"/api/v1/credit-cards/{card_id}/payments",
+        json={
+            "source_account_id": bank_id,
+            "amount": "150000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+        },
+        headers={"Idempotency-Key": "pay-1"},
+    )
+    assert r.status_code == 201, r.text
+    assert client.get(f"/api/v1/accounts/{bank_id}/balance").json()["data"]["amount"] == (
+        "850000.00"
+    )
+    assert client.get(f"/api/v1/accounts/{card_id}/balance").json()["data"]["amount"] == (
+        "50000.00"
+    )
+
+
+def test_card_payment_is_idempotent(client):
+    _register(client)
+    bank_id = _create_account(client).json()["data"]["id"]
+    card_id = _make_card(client).json()["data"]["id"]
+    body = {
+        "source_account_id": bank_id,
+        "amount": "150000.00",
+        "occurred_at": "2026-08-24T14:30:00Z",
+    }
+    first = client.post(
+        f"/api/v1/credit-cards/{card_id}/payments", json=body, headers={"Idempotency-Key": "k"}
+    )
+    replay = client.post(
+        f"/api/v1/credit-cards/{card_id}/payments", json=body, headers={"Idempotency-Key": "k"}
+    )
+    assert replay.json()["data"]["id"] == first.json()["data"]["id"]
+    assert client.get(f"/api/v1/accounts/{card_id}/balance").json()["data"]["amount"] == (
+        "50000.00"
+    )
+
+
+def test_card_payment_does_not_appear_as_an_expense(client):
+    _register(client)
+    bank_id = _create_account(client).json()["data"]["id"]
+    card_id = _make_card(client).json()["data"]["id"]
+    client.post(
+        f"/api/v1/credit-cards/{card_id}/payments",
+        json={
+            "source_account_id": bank_id,
+            "amount": "150000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+        },
+    )
+    expenses = client.get("/api/v1/transactions?type=EXPENSE").json()["data"]
+    assert expenses == []
+    transfers = client.get("/api/v1/transactions?type=TRANSFER").json()["data"]
+    assert len(transfers) == 2
+    assert {t["direction"] for t in transfers} == {"DECREASE"}
+
+
+def test_prepaid_top_up_endpoint(client):
+    _register(client)
+    bank_id = _create_account(client).json()["data"]["id"]
+    prepaid_id = _create_account(
+        client, name="Prepaid Visa", account_type="PREPAID_CARD", opening_balance="850000.00"
+    ).json()["data"]["id"]
+
+    r = client.post(
+        f"/api/v1/prepaid-cards/{prepaid_id}/top-ups",
+        json={
+            "source_account_id": bank_id,
+            "amount": "100000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert client.get(f"/api/v1/accounts/{prepaid_id}/balance").json()["data"]["amount"] == (
+        "950000.00"
+    )
+    assert client.get("/api/v1/transactions?type=EXPENSE").json()["data"] == []
+
+
+# ------------------------------------------------------------- reconciliation
+
+
+def test_reconciliation_records_the_difference_not_a_rewrite(client):
+    """Phase 8: history and opening balance must survive an adjustment."""
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    client.post(
+        "/api/v1/transactions",
+        json={
+            "transaction_type": "EXPENSE",
+            "account_id": account_id,
+            "amount": "50000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+            "description": "Groceries",
+        },
+    )
+
+    r = client.post(
+        f"/api/v1/accounts/{account_id}/balance-adjustments",
+        json={
+            "actual_balance": "930000.00",
+            "occurred_at": "2026-08-25T09:00:00Z",
+            "reason": "Matched bank statement",
+        },
+    )
+    assert r.status_code == 201, r.text
+    adjustment = r.json()["data"]
+    assert adjustment["transaction_type"] == "ADJUSTMENT"
+    assert adjustment["amount"] == "20000.00"
+    assert adjustment["direction"] == "DECREASE"
+
+    detail = client.get(f"/api/v1/accounts/{account_id}").json()["data"]
+    assert detail["balance"] == "930000.00"
+    # Opening balance untouched, and the original expense still on the record.
+    assert detail["opening_balance"] == "1000000.00"
+    descriptions = [t["description"] for t in client.get("/api/v1/transactions").json()["data"]]
+    assert "Groceries" in descriptions
+    assert "Matched bank statement" in descriptions
+
+
+def test_reconciliation_upwards_records_an_increase(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    r = client.post(
+        f"/api/v1/accounts/{account_id}/balance-adjustments",
+        json={"actual_balance": "1200000.00", "occurred_at": "2026-08-25T09:00:00Z"},
+    )
+    assert r.json()["data"]["direction"] == "INCREASE"
+    assert r.json()["data"]["amount"] == "200000.00"
+
+
+def test_reconciliation_is_a_noop_when_already_matching(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    r = client.post(
+        f"/api/v1/accounts/{account_id}/balance-adjustments",
+        json={"actual_balance": "1000000.00", "occurred_at": "2026-08-25T09:00:00Z"},
+    )
+    # Nothing was created, so this is a 200 rather than a 201.
+    assert r.status_code == 200
+    assert r.json()["data"]["adjustment"] is None
+    assert client.get("/api/v1/transactions").json()["data"] == []
+
+
+def test_reconciliation_preview_does_not_write(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    p = client.get(
+        f"/api/v1/accounts/{account_id}/reconciliation-preview?actual_balance=930000.00"
+    ).json()["data"]
+    assert p["current_balance"] == "1000000.00"
+    assert p["difference"] == "70000.00"
+    assert p["direction"] == "DECREASE"
+    # Preview only: no ledger entry, no balance change.
+    assert client.get("/api/v1/transactions").json()["data"] == []
+    assert client.get(f"/api/v1/accounts/{account_id}/balance").json()["data"]["amount"] == (
+        "1000000.00"
+    )
