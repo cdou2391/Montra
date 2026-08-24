@@ -14,9 +14,19 @@ import { useEffect, useState } from "react";
 import { montra } from "@/lib/api";
 import { Icon } from "@/components/icons";
 
+/**
+ * Last known count, kept outside React.
+ *
+ * The bell lives in the page header rather than the shell, so it remounts on
+ * every navigation. Starting from zero each time made the badge blink out and
+ * pop back once the request landed; seeding from the last value means it only
+ * ever changes when the count actually changes.
+ */
+let lastKnownUnread = 0;
+
 export function NotificationBell() {
   const pathname = usePathname();
-  const [unread, setUnread] = useState(0);
+  const [unread, setUnread] = useState(lastKnownUnread);
 
   // Re-checked on every navigation, so acting on a notification updates the
   // badge without a full reload.
@@ -25,10 +35,12 @@ export function NotificationBell() {
     montra
       .notifications(true)
       .then((r) => {
+        lastKnownUnread = r.data.length;
         if (!cancelled) setUnread(r.data.length);
       })
       .catch(() => {
-        if (!cancelled) setUnread(0);
+        // Leave the last known value alone: a failed refresh is not evidence
+        // that the notifications went away.
       });
     return () => {
       cancelled = true;
