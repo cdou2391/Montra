@@ -10,8 +10,8 @@ import { RequireSession } from "@/components/session";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { AccountPanel } from "@/components/account-panel";
 import {
-  CarouselArrows,
-  CarouselDots,
+  CarouselChevron,
+  CarouselPosition,
   CarouselSlide,
   CarouselTrack,
   useCarousel,
@@ -155,32 +155,46 @@ function Accounts() {
 
       {/* ---------------------------------------------- mobile + tablet: carousel */}
       <div className="lg:hidden">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs text-content-muted">
-            {index + 1} of {accounts.length}
-          </p>
-          <CarouselArrows index={index} count={accounts.length} select={select} />
+        {/* Chevrons flank the card and are vertically centred against it. */}
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          {accounts.length > 1 && (
+            <CarouselChevron
+              direction="left"
+              disabled={index === 0}
+              onClick={() => select(index - 1)}
+              label="Previous account"
+            />
+          )}
+
+          <CarouselTrack
+            trackRef={trackRef}
+            onScroll={onScroll}
+            onKeyDown={onKeyDown}
+            label="Your accounts"
+          >
+            {accounts.map((account, i) => (
+              <CarouselSlide
+                key={account.id}
+                label={account.name}
+                position={i + 1}
+                total={accounts.length}
+              >
+                <AccountPanel account={account} hidden={hidden} />
+              </CarouselSlide>
+            ))}
+          </CarouselTrack>
+
+          {accounts.length > 1 && (
+            <CarouselChevron
+              direction="right"
+              disabled={index >= accounts.length - 1}
+              onClick={() => select(index + 1)}
+              label="Next account"
+            />
+          )}
         </div>
 
-        <CarouselTrack
-          trackRef={trackRef}
-          onScroll={onScroll}
-          onKeyDown={onKeyDown}
-          label="Your accounts"
-        >
-          {accounts.map((account, i) => (
-            <CarouselSlide
-              key={account.id}
-              label={account.name}
-              position={i + 1}
-              total={accounts.length}
-            >
-              <AccountPanel account={account} hidden={hidden} />
-            </CarouselSlide>
-          ))}
-        </CarouselTrack>
-
-        <CarouselDots accounts={accounts} index={index} select={select} />
+        <CarouselPosition index={index} count={accounts.length} label={active?.name} />
 
         <ActivitySection
           account={active}

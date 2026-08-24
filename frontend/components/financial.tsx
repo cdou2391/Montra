@@ -34,7 +34,7 @@ export function MoneyValue({
   }[tone];
   const sizes = {
     body: "text-base font-medium",
-    value: "text-value",
+    value: "text-[1.55rem] font-bold leading-tight sm:text-value",
     "value-lg": "text-value sm:text-value-lg",
   }[size];
 
@@ -110,12 +110,20 @@ export function TransactionRow({
   showAccount?: boolean;
 }) {
   const { transaction_type: type, direction } = transaction;
+
+  // Colour states what kind of event this was; sign states which way it moved
+  // THIS account's own balance. The two must be derived separately: on a credit
+  // card a purchase raises the balance owed, so direction is INCREASE while the
+  // event is still spending. Colouring by direction alone paints card purchases
+  // green, as though buying groceries were income.
   const tone =
     type === "TRANSFER"
       ? "transfer"
-      : direction === "INCREASE"
-        ? "income"
-        : "expense";
+      : type === "ADJUSTMENT"
+        ? "neutral"
+        : type === "INCOME"
+          ? "income"
+          : "expense";
   const sign = direction === "INCREASE" ? "+" : "−";
 
   return (
@@ -136,11 +144,12 @@ export function TransactionRow({
         )}
         <span
           className={`tabular text-sm font-semibold ${
-            tone === "transfer"
-              ? "text-semantic-transfer"
-              : tone === "income"
-                ? "text-semantic-income"
-                : "text-semantic-expense"
+            {
+              transfer: "text-semantic-transfer",
+              income: "text-semantic-income",
+              expense: "text-semantic-expense",
+              neutral: "text-content-secondary",
+            }[tone]
           }`}
         >
           {hidden ? "••••" : `${sign}${formatMoney(transaction.amount, transaction.currency)}`}

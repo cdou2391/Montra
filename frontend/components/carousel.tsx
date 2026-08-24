@@ -73,10 +73,10 @@ export function CarouselTrack({
       aria-label={label}
       tabIndex={0}
       className="
-        -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2
+        flex min-w-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto
         [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60
-        sm:-mx-6 sm:px-6
+        focus:outline-none focus-visible:rounded-card focus-visible:ring-2
+        focus-visible:ring-accent/60
       "
     >
       {children}
@@ -107,68 +107,74 @@ export function CarouselSlide({
   );
 }
 
-export function CarouselDots({
-  accounts,
-  index,
-  select,
-}: {
-  accounts: Account[];
-  index: number;
-  select: (i: number) => void;
-}) {
-  if (accounts.length < 2) return null;
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  // Lucide-style stroke icon (UI/UX section 16), inherits currentColor.
   return (
-    <div className="mt-4 flex items-center justify-center gap-2">
-      {accounts.map((account, i) => (
-        <button
-          key={account.id}
-          onClick={() => select(i)}
-          aria-label={`Show ${account.name}`}
-          aria-current={i === index}
-          // Hit area stays 44px tall even though the dot is small.
-          className="flex h-11 w-6 items-center justify-center"
-        >
-          <span
-            className={`block rounded-full transition-all ${
-              i === index ? "h-2 w-6 bg-accent" : "h-2 w-2 bg-white/20"
-            }`}
-          />
-        </button>
-      ))}
-    </div>
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+    </svg>
   );
 }
 
-export function CarouselArrows({
+/**
+ * A chevron flanking the carousel. Stays mounted when disabled so the track
+ * never changes width at either end of the run.
+ */
+export function CarouselChevron({
+  direction,
+  disabled,
+  onClick,
+  label,
+}: {
+  direction: "left" | "right";
+  disabled: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="
+        flex h-11 w-7 shrink-0 items-center justify-center rounded-control sm:w-9
+        text-content-secondary transition
+        hover:bg-white/5 hover:text-content-primary
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60
+        disabled:opacity-20 disabled:hover:bg-transparent
+        disabled:hover:text-content-secondary
+      "
+    >
+      <Chevron direction={direction} />
+    </button>
+  );
+}
+
+/** Compact position readout, announced to screen readers as it changes. */
+export function CarouselPosition({
   index,
   count,
-  select,
+  label,
 }: {
   index: number;
   count: number;
-  select: (i: number) => void;
+  label?: string;
 }) {
   if (count < 2) return null;
-  const base =
-    "flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-surface-elevated text-content-secondary transition hover:text-content-primary disabled:opacity-30 disabled:hover:text-content-secondary";
   return (
-    <div className="hidden items-center gap-2 sm:flex">
-      <button
-        onClick={() => select(index - 1)}
-        disabled={index === 0}
-        aria-label="Previous account"
-        className={base}
-      >
-        ‹
-      </button>
-      <button
-        onClick={() => select(index + 1)}
-        disabled={index >= count - 1}
-        aria-label="Next account"
-        className={base}
-      >
-        ›
-      </button>
-    </div>
+    <p aria-live="polite" className="mt-3 text-center text-xs text-content-muted">
+      <span className="text-content-secondary">{index + 1}</span> of {count}
+      {label ? <span className="sr-only"> — {label}</span> : null}
+    </p>
   );
 }
