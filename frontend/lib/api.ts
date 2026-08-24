@@ -191,6 +191,14 @@ export type RecurringRule = {
   category_id: string | null;
 };
 
+export type Preferences = {
+  hide_balances: boolean;
+  persist_balance_privacy: boolean;
+  default_context: "PERSONAL" | "FAMILY";
+  default_reminder_days: number | null;
+  notifications_enabled: boolean;
+};
+
 export type AppNotification = {
   id: string;
   notification_type: string;
@@ -256,6 +264,11 @@ export const montra = {
     api.post<Envelope<unknown>>("/transfers", payload, {
       "Idempotency-Key": idempotencyKey,
     }),
+
+  preferences: () =>
+    api.get<Envelope<Preferences>>("/preferences").then((r) => r.data),
+  updatePreferences: (payload: Partial<Preferences>) =>
+    api.patch<Envelope<Preferences>>("/preferences", payload).then((r) => r.data),
 
   // ------------------------------------------------------------- planning
   planned: (query = "") =>

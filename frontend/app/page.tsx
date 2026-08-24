@@ -9,6 +9,7 @@ import { Providers } from "@/app/providers";
 import { RequireSession, useSession } from "@/components/session";
 import { AccountCard, MetricCard, TransactionRow } from "@/components/financial";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { ProfileAvatarLink } from "@/components/avatar";
 
 /**
  * Home dashboard.
@@ -47,12 +48,18 @@ function Home() {
     <AppShell>
       <PageHeader
         title={`Hello${user?.display_name ? `, ${user.display_name}` : ""}`}
+        leading={user ? <ProfileAvatarLink user={user} /> : undefined}
         action={
           <button
             onClick={() => setHidden((h) => !h)}
-            className="text-xs text-content-secondary hover:text-content-primary"
+            className="shrink-0 text-xs text-content-secondary hover:text-content-primary"
           >
-            {hidden ? "Show balances" : "Hide balances"}
+            {/* The avatar and bell share this row; the long label crushes the
+                greeting on a narrow phone. */}
+            <span className="sm:hidden">{hidden ? "Show" : "Hide"}</span>
+            <span className="hidden sm:inline">
+              {hidden ? "Show balances" : "Hide balances"}
+            </span>
           </button>
         }
       />

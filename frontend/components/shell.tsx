@@ -113,13 +113,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 export function PageHeader({
   title,
   action,
+  leading,
 }: {
   title: string;
   action?: ReactNode;
+  /** Rendered before the title, e.g. a profile avatar. */
+  leading?: ReactNode;
 }) {
   return (
     <header className="mb-6 flex items-center justify-between gap-3">
-      <h1 className="min-w-0 truncate text-title text-content-primary">{title}</h1>
+      <div className="flex min-w-0 items-center gap-3">
+        {leading}
+        <h1 className="min-w-0 truncate text-title text-content-primary">{title}</h1>
+      </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}
         {/* Rightmost: global chrome sits outside whatever the page offers. */}
