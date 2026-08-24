@@ -95,21 +95,30 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1">
-        <main className="mx-auto w-full max-w-3xl px-4 pb-28 pt-6 sm:px-6 lg:max-w-5xl lg:pb-10 lg:pt-8">
+        <main className="mx-auto w-full max-w-3xl px-4 pb-32 pt-6 sm:px-6 lg:max-w-5xl lg:pb-10 lg:pt-8">
           {children}
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/5 bg-background-secondary/95 pb-safe backdrop-blur lg:hidden">
-        <div className="mx-auto flex max-w-lg items-stretch justify-around">
+      {/* Mobile bottom navigation, floating clear of the screen edge.
+          The wrapper spans the width so the bar can centre, but ignores
+          pointer events — otherwise the transparent gutters beside the bar
+          would swallow taps meant for the content behind them. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+        <nav
+          className="
+            pointer-events-auto mx-auto flex max-w-lg items-stretch justify-around
+            rounded-[22px] border border-white/10 bg-surface-elevated
+            shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)]
+          "
+        >
           {NAV.map((item) =>
             item.primary ? (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-label="Add transaction"
-                className="pressable flex flex-1 items-center justify-center py-2"
+                className="pressable flex flex-1 items-center justify-center py-2.5"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-background-primary">
                   <Icon name={item.icon} size={24} strokeWidth={2.2} />
@@ -119,7 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`pressable pressable-tint flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] ${
+                className={`pressable pressable-tint flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] ${
                   pathname === item.href ? "text-accent" : "text-content-secondary"
                 }`}
               >
@@ -134,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMoreOpen(true)}
             aria-expanded={moreOpen}
             aria-haspopup="dialog"
-            className={`pressable pressable-tint flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] ${
+            className={`pressable pressable-tint flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] ${
               moreOpen || MORE_ITEMS.some((i) => i.href === pathname)
                 ? "text-accent"
                 : "text-content-secondary"
@@ -143,8 +152,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Icon name="more" size={21} />
             More
           </button>
-        </div>
-      </nav>
+        </nav>
+      </div>
 
       <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
         <div className="space-y-1">
