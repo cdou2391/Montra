@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.api.deps import current_user, db_session, parse_uuid
 from app.core.money import serialize
 from app.core.responses import collection, single
+from app.core.timezone import ensure_aware
 from app.db.enums import AccountStatus, AccountType
 from app.models.user import User
 from app.schemas.accounts import AccountCreate, AccountUpdate, BalanceAdjustmentCreate
@@ -48,7 +49,7 @@ def create_account(
         account_type=payload.account_type,
         currency=payload.currency,
         opening_balance=payload.opening_balance,
-        opening_balance_date=payload.opening_balance_date,
+        opening_balance_at=ensure_aware(payload.opening_balance_at, user.timezone),
         ownership_type=payload.ownership_type,
         visibility=payload.visibility,
         institution_id=parse_uuid(payload.institution_id, "institution_id"),
@@ -145,7 +146,7 @@ def create_balance_adjustment(
     txn = PostingService(db).adjust_balance(
         account=account,
         actual_balance=payload.actual_balance,
-        adjustment_date=payload.adjustment_date,
+        occurred_at=ensure_aware(payload.occurred_at, user.timezone),
         actor_id=user.id,
         reason=payload.reason,
     )

@@ -133,13 +133,15 @@ account's perspective.
 make test
 ```
 
-59 tests. The ledger suites
+70 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
 repayments lower it, transfers preserve net worth, cancelled and deleted entries
 leave no trace in a balance, and decimal precision survives repeated postings.
-Coverage elsewhere is deliberately lighter.
+[`test_time.py`](backend/tests/test_time.py) covers the timezone boundaries
+where an hours-off bug would otherwise be invisible. Coverage elsewhere is
+deliberately lighter.
 
 ---
 
@@ -147,6 +149,10 @@ Coverage elsewhere is deliberately lighter.
 
 - Money is `DECIMAL(20,4)` in the database and a **string** in JSON. No float
   ever touches a financial value.
+- Financial events carry a full timestamp. `occurred_at` is when the money
+  moved; `created_at` is when it was entered. Both are stored UTC and rendered
+  in the user's timezone. Date filters resolve to local day boundaries, so a
+  23:30 purchase belongs to that day and not the next.
 - Amounts are stored positive; `direction` carries the ledger effect.
 - Authorization is enforced server-side in `services/authz.py`. A resource the
   caller may not see returns `404`, not `403`, so the API never confirms that

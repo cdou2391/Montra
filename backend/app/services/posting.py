@@ -19,7 +19,7 @@ accounts; only a transfer produces two entries.
 
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -125,7 +125,7 @@ class PostingService:
         posting: Posting,
         *,
         actor_id: uuid.UUID,
-        transaction_date: date,
+        occurred_at: datetime,
         category_id: uuid.UUID | None = None,
         description: str | None = None,
         merchant: str | None = None,
@@ -141,7 +141,7 @@ class PostingService:
             amount=posting.amount,
             direction=posting.direction,
             currency=posting.account.currency,
-            transaction_date=transaction_date,
+            occurred_at=occurred_at,
             status=status,
             category_id=category_id,
             description=description,
@@ -163,7 +163,7 @@ class PostingService:
         account: Account,
         amount: Decimal,
         currency: str,
-        transaction_date: date,
+        occurred_at: datetime,
         actor_id: uuid.UUID,
         **fields,
     ) -> Transaction:
@@ -171,7 +171,7 @@ class PostingService:
         return self._write(
             Posting(account, Operation.INCOME, amount, TransactionType.INCOME),
             actor_id=actor_id,
-            transaction_date=transaction_date,
+            occurred_at=occurred_at,
             **fields,
         )
 
@@ -181,7 +181,7 @@ class PostingService:
         account: Account,
         amount: Decimal,
         currency: str,
-        transaction_date: date,
+        occurred_at: datetime,
         actor_id: uuid.UUID,
         **fields,
     ) -> Transaction:
@@ -191,7 +191,7 @@ class PostingService:
         return self._write(
             Posting(account, Operation.EXPENSE, amount, TransactionType.EXPENSE),
             actor_id=actor_id,
-            transaction_date=transaction_date,
+            occurred_at=occurred_at,
             **fields,
         )
 
@@ -202,7 +202,7 @@ class PostingService:
         destination: Account,
         source_amount: Decimal,
         destination_amount: Decimal,
-        transfer_date: date,
+        occurred_at: datetime,
         actor_id: uuid.UUID,
         notes: str | None = None,
         idempotency_key: str | None = None,
@@ -257,7 +257,7 @@ class PostingService:
             destination_amount=destination_amount,
             source_currency=source.currency,
             destination_currency=destination.currency,
-            transfer_date=transfer_date,
+            occurred_at=occurred_at,
             notes=notes,
             status=TransferStatus.COMPLETED,
             idempotency_key=idempotency_key,
@@ -269,7 +269,7 @@ class PostingService:
         self._write(
             Posting(source, Operation.TRANSFER_OUT, source_amount, TransactionType.TRANSFER),
             actor_id=actor_id,
-            transaction_date=transfer_date,
+            occurred_at=occurred_at,
             transfer_id=transfer.id,
             description=notes or f"Transfer to {destination.name}",
         )
@@ -278,7 +278,7 @@ class PostingService:
                 destination, Operation.TRANSFER_IN, destination_amount, TransactionType.TRANSFER
             ),
             actor_id=actor_id,
-            transaction_date=transfer_date,
+            occurred_at=occurred_at,
             transfer_id=transfer.id,
             description=notes or f"Transfer from {source.name}",
         )
@@ -309,7 +309,7 @@ class PostingService:
         *,
         account: Account,
         actual_balance: Decimal,
-        adjustment_date: date,
+        occurred_at: datetime,
         actor_id: uuid.UUID,
         reason: str | None = None,
     ) -> Transaction | None:
@@ -330,7 +330,7 @@ class PostingService:
             amount=abs(delta),
             direction=direction,
             currency=account.currency,
-            transaction_date=adjustment_date,
+            occurred_at=occurred_at,
             status=TransactionStatus.COMPLETED,
             description=reason or "Balance adjustment",
             created_by=actor_id,
@@ -341,7 +341,7 @@ class PostingService:
 
     # -------------------------------------------------------------- balances
 
-    def balance_of(self, account: Account, *, as_of: date | None = None) -> Decimal:
+    def balance_of(self, account: Account, *, as_of: datetime | None = None) -> Decimal:
         """Balance derived from the ledger, never from a cached column.
 
         Data Model section 72:
@@ -356,7 +356,7 @@ class PostingService:
             Transaction.deleted_at.is_(None),
         )
         if as_of is not None:
-            stmt = stmt.where(Transaction.transaction_date <= as_of)
+            stmt = stmt.where(Transaction.occurred_at <= as_of)
 
         balance = Decimal(account.opening_balance)
         for direction, amount in self.db.execute(stmt):

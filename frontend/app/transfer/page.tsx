@@ -8,6 +8,7 @@ import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import { toLocalInputValue } from "@/lib/format";
 
 function TransferForm() {
   const router = useRouter();
@@ -18,7 +19,7 @@ function TransferForm() {
     source_account_id: params.get("from") ?? "",
     destination_account_id: "",
     source_amount: "",
-    transfer_date: new Date().toISOString().slice(0, 10),
+    occurred_at: toLocalInputValue(),
     notes: "",
   });
   // Generated once per form instance so a double submit cannot post twice.
@@ -56,7 +57,7 @@ function TransferForm() {
           destination_account_id: form.destination_account_id,
           source_amount: form.source_amount,
           destination_amount: form.source_amount,
-          transfer_date: form.transfer_date,
+          occurred_at: form.occurred_at,
           notes: form.notes || null,
         },
         idempotencyKey,
@@ -119,12 +120,12 @@ function TransferForm() {
               onChange={(e) => update("source_amount", e.target.value)}
             />
           </Field>
-          <Field label="Date">
+          <Field label="When" hint="Defaults to now.">
             <Input
-              type="date"
+              type="datetime-local"
               required
-              value={form.transfer_date}
-              onChange={(e) => update("transfer_date", e.target.value)}
+              value={form.occurred_at}
+              onChange={(e) => update("occurred_at", e.target.value)}
             />
           </Field>
           <Field label="Note">

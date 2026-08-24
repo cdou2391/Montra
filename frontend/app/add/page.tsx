@@ -8,6 +8,7 @@ import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import { toLocalInputValue } from "@/lib/format";
 
 /**
  * Add income or expense.
@@ -25,7 +26,7 @@ function AddTransactionForm() {
   const [form, setForm] = useState({
     account_id: params.get("account") ?? "",
     amount: "",
-    transaction_date: new Date().toISOString().slice(0, 10),
+    occurred_at: toLocalInputValue(),
     category_id: "",
     description: "",
     merchant: "",
@@ -60,7 +61,7 @@ function AddTransactionForm() {
         transaction_type: type,
         account_id: form.account_id,
         amount: form.amount,
-        transaction_date: form.transaction_date,
+        occurred_at: form.occurred_at,
         category_id: form.category_id || null,
         description: form.description || null,
         merchant: form.merchant || null,
@@ -142,12 +143,12 @@ function AddTransactionForm() {
               ))}
             </Select>
           </Field>
-          <Field label="Date">
+          <Field label="When" hint="Defaults to now. Change it for something you are recording after the fact.">
             <Input
-              type="date"
+              type="datetime-local"
               required
-              value={form.transaction_date}
-              onChange={(e) => update("transaction_date", e.target.value)}
+              value={form.occurred_at}
+              onChange={(e) => update("occurred_at", e.target.value)}
             />
           </Field>
           <Field label="Description">

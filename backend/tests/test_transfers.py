@@ -4,7 +4,7 @@ The plan names five: source decreases, destination increases, income unchanged,
 expense unchanged, net worth unchanged.
 """
 
-from datetime import date
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -15,7 +15,7 @@ from app.db.enums import Direction, TransactionStatus, TransactionType, Transfer
 from app.models.finance import Transaction
 from app.services.posting import PostingService
 
-TODAY = date(2026, 8, 24)
+NOW = datetime(2026, 8, 24, 14, 30, tzinfo=UTC)
 AMOUNT = Decimal("100000")
 
 
@@ -38,7 +38,7 @@ def test_transfer_moves_value_between_asset_accounts(db, bank_account, savings_a
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -53,7 +53,7 @@ def test_transfer_leaves_income_and_expense_untouched(db, bank_account, savings_
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -71,7 +71,7 @@ def test_transfer_preserves_net_worth(db, bank_account, savings_account, user):
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -93,7 +93,7 @@ def test_card_repayment_preserves_net_worth(db, bank_account, credit_card, user)
         destination=credit_card,
         source_amount=Decimal("150000"),
         destination_amount=Decimal("150000"),
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -110,7 +110,7 @@ def test_transfer_creates_exactly_two_linked_entries(db, bank_account, savings_a
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -129,7 +129,7 @@ def test_card_repayment_decreases_both_sides(db, bank_account, credit_card, user
         destination=credit_card,
         source_amount=Decimal("150000"),
         destination_amount=Decimal("150000"),
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -144,7 +144,7 @@ def test_transfer_to_same_account_is_rejected(db, bank_account, user):
             destination=bank_account,
             source_amount=AMOUNT,
             destination_amount=AMOUNT,
-            transfer_date=TODAY,
+            occurred_at=NOW,
             actor_id=user.id,
         )
 
@@ -156,7 +156,7 @@ def test_mismatched_amounts_are_rejected(db, bank_account, savings_account, user
             destination=savings_account,
             source_amount=AMOUNT,
             destination_amount=Decimal("99000"),
-            transfer_date=TODAY,
+            occurred_at=NOW,
             actor_id=user.id,
         )
 
@@ -169,7 +169,7 @@ def test_failed_transfer_writes_nothing(db, bank_account, savings_account, user)
             destination=savings_account,
             source_amount=Decimal("-5"),
             destination_amount=Decimal("-5"),
-            transfer_date=TODAY,
+            occurred_at=NOW,
             actor_id=user.id,
         )
     db.rollback()
@@ -184,7 +184,7 @@ def test_cancel_reverses_both_sides_together(db, bank_account, savings_account, 
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()
@@ -207,7 +207,7 @@ def test_double_cancel_is_rejected(db, bank_account, savings_account, user):
         destination=savings_account,
         source_amount=AMOUNT,
         destination_amount=AMOUNT,
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=user.id,
     )
     db.commit()

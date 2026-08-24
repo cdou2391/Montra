@@ -4,7 +4,7 @@ Implementation Plan Phase 5: "This is one of the most important phases in the
 project." These assert the ledger rules directly, not through the API.
 """
 
-from datetime import date
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -12,7 +12,7 @@ import pytest
 from app.db.enums import AccountNature, Direction, TransactionType
 from app.services.posting import DIRECTION_RULES, Operation, PostingService, resolve_direction
 
-TODAY = date(2026, 8, 24)
+NOW = datetime(2026, 8, 24, 14, 30, tzinfo=UTC)
 
 
 # --------------------------------------------------------------- direction table
@@ -51,7 +51,7 @@ def test_income_into_asset_increases_balance(db, bank_account):
         account=bank_account,
         amount=Decimal("2500000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -64,7 +64,7 @@ def test_expense_from_asset_decreases_balance(db, bank_account):
         account=bank_account,
         amount=Decimal("85000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -81,7 +81,7 @@ def test_credit_card_expense_increases_debt(db, credit_card):
         account=credit_card,
         amount=Decimal("85000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=credit_card.owner_user_id,
     )
     db.commit()
@@ -96,7 +96,7 @@ def test_credit_card_expense_is_still_an_expense(db, credit_card):
         account=credit_card,
         amount=Decimal("85000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=credit_card.owner_user_id,
     )
     db.commit()
@@ -111,7 +111,7 @@ def test_credit_card_payment_decreases_debt(db, bank_account, credit_card):
         destination=credit_card,
         source_amount=Decimal("150000"),
         destination_amount=Decimal("150000"),
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -125,7 +125,7 @@ def test_refund_to_card_decreases_debt(db, credit_card):
         account=credit_card,
         amount=Decimal("20000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=credit_card.owner_user_id,
     )
     db.commit()
@@ -141,7 +141,7 @@ def test_cash_advance_from_card_increases_debt(db, bank_account, credit_card):
         destination=bank_account,
         source_amount=Decimal("100000"),
         destination_amount=Decimal("100000"),
-        transfer_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -171,7 +171,7 @@ def test_zero_and_negative_amounts_are_rejected(db, bank_account):
                 account=bank_account,
                 amount=bad,
                 currency="RWF",
-                transaction_date=TODAY,
+                occurred_at=NOW,
                 actor_id=bank_account.owner_user_id,
             )
 
@@ -184,7 +184,7 @@ def test_currency_must_match_account(db, bank_account):
             account=bank_account,
             amount=Decimal("100"),
             currency="USD",
-            transaction_date=TODAY,
+            occurred_at=NOW,
             actor_id=bank_account.owner_user_id,
         )
 
@@ -197,7 +197,7 @@ def test_balance_is_derived_not_cached(db, bank_account):
             account=bank_account,
             amount=Decimal("10000"),
             currency="RWF",
-            transaction_date=TODAY,
+            occurred_at=NOW,
             actor_id=bank_account.owner_user_id,
         )
     db.commit()
@@ -215,7 +215,7 @@ def test_decimal_precision_survives_many_postings(db, bank_account):
             account=bank_account,
             amount=Decimal("0.1000"),
             currency="RWF",
-            transaction_date=TODAY,
+            occurred_at=NOW,
             actor_id=bank_account.owner_user_id,
         )
     db.commit()
@@ -230,7 +230,7 @@ def test_cancelled_transactions_do_not_affect_balance(db, bank_account):
         account=bank_account,
         amount=Decimal("50000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -249,7 +249,7 @@ def test_soft_deleted_transactions_do_not_affect_balance(db, bank_account):
         account=bank_account,
         amount=Decimal("50000"),
         currency="RWF",
-        transaction_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -266,7 +266,7 @@ def test_adjustment_reconciles_asset_upwards(db, bank_account):
     txn = posting.adjust_balance(
         account=bank_account,
         actual_balance=Decimal("1200000"),
-        adjustment_date=TODAY,
+        occurred_at=NOW,
         actor_id=bank_account.owner_user_id,
     )
     db.commit()
@@ -280,7 +280,7 @@ def test_adjustment_reconciles_liability_downwards(db, credit_card):
     txn = posting.adjust_balance(
         account=credit_card,
         actual_balance=Decimal("150000"),
-        adjustment_date=TODAY,
+        occurred_at=NOW,
         actor_id=credit_card.owner_user_id,
     )
     db.commit()
@@ -294,7 +294,7 @@ def test_adjustment_is_a_noop_when_balance_matches(db, bank_account):
         posting.adjust_balance(
             account=bank_account,
             actual_balance=Decimal("1000000"),
-            adjustment_date=TODAY,
+            occurred_at=NOW,
             actor_id=bank_account.owner_user_id,
         )
         is None

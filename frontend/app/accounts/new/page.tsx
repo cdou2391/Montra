@@ -8,6 +8,7 @@ import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession, useSession } from "@/components/session";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import { toLocalInputValue } from "@/lib/format";
 
 const ACCOUNT_TYPES = [
   { value: "CHECKING", label: "Bank — current" },
@@ -31,7 +32,7 @@ function NewAccountForm() {
     account_type: "CHECKING",
     currency: user?.base_currency ?? "RWF",
     opening_balance: "0",
-    opening_balance_date: new Date().toISOString().slice(0, 10),
+    opening_balance_at: toLocalInputValue(),
     account_identifier: "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -111,12 +112,12 @@ function NewAccountForm() {
               onChange={(e) => update("opening_balance", e.target.value)}
             />
           </Field>
-          <Field label="As of">
+          <Field label="As of" hint="The moment this balance was accurate.">
             <Input
-              type="date"
+              type="datetime-local"
               required
-              value={form.opening_balance_date}
-              onChange={(e) => update("opening_balance_date", e.target.value)}
+              value={form.opening_balance_at}
+              onChange={(e) => update("opening_balance_at", e.target.value)}
             />
           </Field>
           <Field label="Last 4 digits" hint="Optional. Only the last four are ever shown.">

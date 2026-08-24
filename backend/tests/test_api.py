@@ -87,7 +87,7 @@ def _create_account(client, **overrides):
         "account_type": "CHECKING",
         "currency": "RWF",
         "opening_balance": "1000000.00",
-        "opening_balance_date": "2026-08-01",
+        "opening_balance_at": "2026-08-01T09:00:00Z",
     } | overrides
     return client.post("/api/v1/accounts", json=payload)
 
@@ -164,7 +164,7 @@ def test_one_user_cannot_post_transactions_to_another_users_account(client):
             "transaction_type": "EXPENSE",
             "account_id": account_id,
             "amount": "1000.00",
-            "transaction_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
         },
     )
     assert r.status_code == 404
@@ -186,7 +186,7 @@ def test_expense_and_income_move_the_balance(client):
             "transaction_type": "EXPENSE",
             "account_id": account_id,
             "amount": "48500.00",
-            "transaction_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
             "category_id": category_id,
             "description": "Simba Supermarket",
         },
@@ -200,7 +200,7 @@ def test_expense_and_income_move_the_balance(client):
             "transaction_type": "INCOME",
             "account_id": account_id,
             "amount": "2500000.00",
-            "transaction_date": "2026-08-25",
+            "occurred_at": "2026-08-25T09:15:00Z",
             "description": "Salary",
         },
     )
@@ -218,7 +218,7 @@ def test_amounts_serialize_as_strings(client):
             "transaction_type": "EXPENSE",
             "account_id": account_id,
             "amount": "0.10",
-            "transaction_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
         },
     )
     assert isinstance(r.json()["data"]["amount"], str)
@@ -233,7 +233,7 @@ def test_transaction_delete_is_soft_and_restores_balance(client):
             "transaction_type": "EXPENSE",
             "account_id": account_id,
             "amount": "50000.00",
-            "transaction_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
         },
     ).json()["data"]["id"]
 
@@ -254,7 +254,7 @@ def test_transactions_paginate_by_cursor(client):
                 "transaction_type": "EXPENSE",
                 "account_id": account_id,
                 "amount": "1000.00",
-                "transaction_date": f"2026-08-{day:02d}",
+                "occurred_at": f"2026-08-{day:02d}T10:00:00Z",
             },
         )
     first = client.get("/api/v1/transactions?limit=3").json()
@@ -282,7 +282,7 @@ def test_transfer_endpoint_moves_money_and_is_idempotent(client):
         "destination_account_id": dest,
         "source_amount": "100000.00",
         "destination_amount": "100000.00",
-        "transfer_date": "2026-08-24",
+        "occurred_at": "2026-08-24T14:30:00Z",
         "notes": "Move to savings",
     }
     first = client.post("/api/v1/transfers", json=body, headers={"Idempotency-Key": "key-1"})
@@ -308,7 +308,7 @@ def test_transfer_side_cannot_be_deleted_independently(client):
             "source_account_id": source,
             "destination_account_id": dest,
             "source_amount": "100000.00",
-            "transfer_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
         },
     )
     side = client.get(f"/api/v1/transactions?account_id={source}").json()["data"][0]
@@ -329,7 +329,7 @@ def test_transfer_cancel_restores_both_balances(client):
             "source_account_id": source,
             "destination_account_id": dest,
             "source_amount": "100000.00",
-            "transfer_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
         },
     ).json()["data"]["id"]
 
@@ -348,7 +348,7 @@ def test_balance_adjustment_reconciles_to_actual(client):
         f"/api/v1/accounts/{account_id}/balance-adjustments",
         json={
             "actual_balance": "980000.00",
-            "adjustment_date": "2026-08-24",
+            "occurred_at": "2026-08-24T14:30:00Z",
             "reason": "Matched bank statement",
         },
     )

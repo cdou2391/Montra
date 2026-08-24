@@ -16,6 +16,7 @@ from app.core.security import (
     validate_password_policy,
     verify_password,
 )
+from app.core.timezone import validate_timezone
 from app.db.base import utcnow
 from app.db.enums import UserStatus
 from app.models.user import Session, User, UserPreference
@@ -36,6 +37,7 @@ def register_user(
     timezone: str,
 ) -> User:
     validate_password_policy(password)
+    validate_timezone(timezone)
     user = User(
         email=normalize_email(email),
         password_hash=hash_password(password),

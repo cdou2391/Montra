@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.timezone import day_end, day_start, ensure_aware
 from app.db.base import utcnow
 from app.db.enums import TransactionStatus, TransactionType
 from app.models.finance import Account, Category, Transaction
@@ -26,15 +27,15 @@ DEFAULT_LIMIT = 50
 
 
 def _encode_cursor(txn: Transaction) -> str:
-    raw = f"{txn.transaction_date.isoformat()}|{txn.created_at.isoformat()}|{txn.id}"
+    raw = f"{txn.occurred_at.isoformat()}|{txn.id}"
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
-def _decode_cursor(cursor: str) -> tuple[date, datetime, uuid.UUID]:
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
     try:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
-        d, created, ident = raw.split("|")
-        return date.fromisoformat(d), datetime.fromisoformat(created), uuid.UUID(ident)
+        occurred, ident = raw.split("|")
+        return datetime.fromisoformat(occurred), uuid.UUID(ident)
     except Exception as exc:
         raise ValidationFailed(
             details=[{"field": "cursor", "message": "Invalid pagination cursor."}]
@@ -48,7 +49,7 @@ def create_transaction(
     account_id: uuid.UUID,
     transaction_type: TransactionType,
     amount: Decimal,
-    transaction_date: date,
+    occurred_at: datetime,
     category_id: uuid.UUID | None = None,
     description: str | None = None,
     merchant: str | None = None,
@@ -65,6 +66,10 @@ def create_transaction(
     if category_id is not None:
         _require_own_category(db, category_id, user)
 
+    # A client may post a naive local datetime; anchor it to the user's zone
+    # before it reaches the ledger, where everything is UTC.
+    occurred_at = ensure_aware(occurred_at, user.timezone)
+
     posting = PostingService(db)
     fields = {
         "category_id": category_id,
@@ -78,7 +83,7 @@ def create_transaction(
             account=account,
             amount=amount,
             currency=account.currency,
-            transaction_date=transaction_date,
+            occurred_at=occurred_at,
             actor_id=user.id,
             **fields,
         )
@@ -87,7 +92,7 @@ def create_transaction(
             account=account,
             amount=amount,
             currency=account.currency,
-            transaction_date=transaction_date,
+            occurred_at=occurred_at,
             actor_id=user.id,
             **fields,
         )
@@ -118,7 +123,7 @@ def update_transaction(
     user: User,
     transaction_id: uuid.UUID,
     amount: Decimal | None = None,
-    transaction_date: date | None = None,
+    occurred_at: datetime | None = None,
     category_id: uuid.UUID | None = None,
     description: str | None = None,
     merchant: str | None = None,
@@ -141,8 +146,8 @@ def update_transaction(
         # Direction is a function of type and account nature, both unchanged
         # here, so re-deriving it is unnecessary: only the magnitude moves.
         txn.amount = amount
-    if transaction_date is not None:
-        txn.transaction_date = transaction_date
+    if occurred_at is not None:
+        txn.occurred_at = ensure_aware(occurred_at, user.timezone)
     if category_id is not None:
         _require_own_category(db, category_id, user)
         txn.category_id = category_id
@@ -207,9 +212,10 @@ def list_transactions(
     if status is not None:
         stmt = stmt.where(Transaction.status == status)
     if date_from is not None:
-        stmt = stmt.where(Transaction.transaction_date >= date_from)
+        stmt = stmt.where(Transaction.occurred_at >= day_start(date_from, user.timezone))
     if date_to is not None:
-        stmt = stmt.where(Transaction.transaction_date <= date_to)
+        # Exclusive upper bound on the next local day, so 23:59 still counts.
+        stmt = stmt.where(Transaction.occurred_at < day_end(date_to, user.timezone))
     if min_amount is not None:
         stmt = stmt.where(Transaction.amount >= min_amount)
     if max_amount is not None:
@@ -226,16 +232,11 @@ def list_transactions(
         )
     if cursor:
         # Keyset pagination on the same tuple the ORDER BY uses, so rows that
-        # tie on date are neither skipped nor returned twice.
-        c_date, c_created, c_id = _decode_cursor(cursor)
-        stmt = stmt.where(
-            tuple_(Transaction.transaction_date, Transaction.created_at, Transaction.id)
-            < (c_date, c_created, c_id)
-        )
+        # tie on the exact instant are neither skipped nor returned twice.
+        c_occurred, c_id = _decode_cursor(cursor)
+        stmt = stmt.where(tuple_(Transaction.occurred_at, Transaction.id) < (c_occurred, c_id))
 
-    stmt = stmt.order_by(
-        Transaction.transaction_date.desc(), Transaction.created_at.desc(), Transaction.id.desc()
-    ).limit(limit + 1)
+    stmt = stmt.order_by(Transaction.occurred_at.desc(), Transaction.id.desc()).limit(limit + 1)
 
     rows = list(db.scalars(stmt))
     next_cursor = None
@@ -256,7 +257,7 @@ def serialize_transaction(txn: Transaction, account: Account | None = None) -> d
         "amount": serialize(Decimal(txn.amount)),
         "currency": txn.currency,
         "direction": txn.direction.value,
-        "transaction_date": txn.transaction_date.isoformat(),
+        "occurred_at": txn.occurred_at.isoformat(),
         "status": txn.status.value,
         "description": txn.description,
         "merchant": txn.merchant,

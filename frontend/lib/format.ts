@@ -15,11 +15,29 @@ export function formatMoney(amount: string, currency: string): string {
 }
 
 export function formatDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
+}
+
+/** Time of day, in the viewer's local zone. */
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatDateTime(iso: string): string {
+  return `${formatDate(iso)}, ${formatTime(iso)}`;
+}
+
+/** Value for an <input type="datetime-local">, which wants local wall time. */
+export function toLocalInputValue(value: Date = new Date()): string {
+  const offset = value.getTimezoneOffset() * 60_000;
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
 /** Signed display for a ledger entry, from the account's own perspective. */

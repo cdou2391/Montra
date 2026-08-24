@@ -96,7 +96,7 @@ export type Transaction = {
   amount: string;
   currency: string;
   direction: "INCREASE" | "DECREASE";
-  transaction_date: string;
+  occurred_at: string;
   status: string;
   description: string | null;
   merchant: string | null;

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import Field
@@ -12,7 +12,7 @@ class AccountCreate(MontraModel):
     account_type: AccountType
     currency: str = Field(min_length=3, max_length=3)
     opening_balance: Decimal = Decimal("0")
-    opening_balance_date: date
+    opening_balance_at: datetime
     institution_id: str | None = None
     account_identifier: str | None = Field(default=None, max_length=64)
     ownership_type: OwnershipType = OwnershipType.PERSONAL
@@ -33,7 +33,7 @@ class AccountUpdate(MontraModel):
 
 class BalanceAdjustmentCreate(MontraModel):
     actual_balance: Decimal
-    adjustment_date: date
+    occurred_at: datetime
     reason: str | None = Field(default=None, max_length=255)
 
     _v_actual = amount_validator("actual_balance")

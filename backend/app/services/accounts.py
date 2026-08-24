@@ -1,7 +1,7 @@
 """Account domain service (Implementation Plan Phase 4)."""
 
 import uuid
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import exists, select
@@ -30,7 +30,7 @@ def create_account(
     account_type: AccountType,
     currency: str,
     opening_balance: Decimal,
-    opening_balance_date: date,
+    opening_balance_at: datetime,
     ownership_type: OwnershipType = OwnershipType.PERSONAL,
     visibility: Visibility = Visibility.PRIVATE,
     institution_id: uuid.UUID | None = None,
@@ -55,7 +55,7 @@ def create_account(
         visibility=visibility,
         currency=currency.upper(),
         opening_balance=opening_balance,
-        opening_balance_date=opening_balance_date,
+        opening_balance_at=opening_balance_at,
         institution_id=institution_id,
         account_identifier=account_identifier,
         description=description,
@@ -156,7 +156,7 @@ def serialize_account(db: DbSession, account: Account, user: User) -> dict:
         "currency": account.currency,
         "balance": serialize(posting.balance_of(account)),
         "opening_balance": serialize(Decimal(account.opening_balance)),
-        "opening_balance_date": account.opening_balance_date.isoformat(),
+        "opening_balance_at": account.opening_balance_at.isoformat(),
         "masked_identifier": masked_identifier(account),
         "visibility": account.visibility.value,
         "ownership_type": account.ownership_type.value,

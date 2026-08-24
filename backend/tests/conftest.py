@@ -5,7 +5,7 @@ so the financial invariant suite never observes state from another test.
 """
 
 import os
-from datetime import date
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -101,7 +101,7 @@ def _make_account(db: Session, user: User, account_type: AccountType, opening: s
         account_type=account_type,
         currency="RWF",
         opening_balance=Decimal(opening),
-        opening_balance_date=date(2026, 8, 1),
+        opening_balance_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
     )
     db.commit()
     return account

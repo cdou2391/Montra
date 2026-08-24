@@ -1,11 +1,10 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -73,7 +72,7 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     opening_balance: Mapped[Decimal] = mapped_column(AMOUNT, nullable=False, default=Decimal("0"))
-    opening_balance_date: Mapped[date] = mapped_column(Date, nullable=False)
+    opening_balance_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     account_identifier: Mapped[str | None] = mapped_column(String(64))
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[AccountStatus] = mapped_column(
@@ -134,7 +133,7 @@ class Transfer(UUIDPrimaryKey, Timestamped, Base):
     destination_amount: Mapped[Decimal] = mapped_column(AMOUNT, nullable=False)
     source_currency: Mapped[str] = mapped_column(String(3), nullable=False)
     destination_currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    transfer_date: Mapped[date] = mapped_column(Date, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[TransferStatus] = mapped_column(
         SAEnum(TransferStatus, name="transfer_status"),
@@ -171,7 +170,9 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
         SAEnum(Direction, name="ledger_direction"), nullable=False
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # When the money actually moved, distinct from created_at (when it was
+    # entered into Montra). Stored UTC; rendered in the user's timezone.
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[TransactionStatus] = mapped_column(
         SAEnum(TransactionStatus, name="transaction_status"),
         default=TransactionStatus.COMPLETED,
@@ -197,6 +198,6 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="amount_positive"),
-        Index("ix_transactions_account_date", "account_id", "transaction_date"),
-        Index("ix_transactions_account_status_date", "account_id", "status", "transaction_date"),
+        Index("ix_transactions_account_occurred", "account_id", "occurred_at"),
+        Index("ix_transactions_account_status_occurred", "account_id", "status", "occurred_at"),
     )

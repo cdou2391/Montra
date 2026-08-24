@@ -10,7 +10,7 @@
 import Link from "next/link";
 
 import { Account, Transaction } from "@/lib/api";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { Card, StatusChip } from "@/components/ui";
 
 export function MoneyValue({
@@ -122,7 +122,7 @@ export function TransactionRow({
           {transaction.description ?? transaction.merchant ?? type}
         </p>
         <p className="mt-0.5 truncate text-xs text-content-secondary">
-          {formatDate(transaction.transaction_date)}
+          {formatDateTime(transaction.occurred_at)}
           {transaction.category ? ` · ${transaction.category.name}` : ""}
           {transaction.account ? ` · ${transaction.account.name}` : ""}
         </p>

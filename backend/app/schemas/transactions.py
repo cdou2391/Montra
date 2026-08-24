@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import Field
@@ -11,7 +11,7 @@ class TransactionCreate(MontraModel):
     transaction_type: TransactionType
     account_id: str
     amount: Decimal
-    transaction_date: date
+    occurred_at: datetime
     category_id: str | None = None
     description: str | None = Field(default=None, max_length=255)
     merchant: str | None = Field(default=None, max_length=160)
@@ -23,7 +23,7 @@ class TransactionCreate(MontraModel):
 
 class TransactionUpdate(MontraModel):
     amount: Decimal | None = None
-    transaction_date: date | None = None
+    occurred_at: datetime | None = None
     category_id: str | None = None
     description: str | None = Field(default=None, max_length=255)
     merchant: str | None = Field(default=None, max_length=160)
@@ -38,7 +38,7 @@ class TransferCreate(MontraModel):
     destination_account_id: str
     source_amount: Decimal
     destination_amount: Decimal | None = None
-    transfer_date: date
+    occurred_at: datetime
     notes: str | None = None
 
     _v_source = amount_validator("source_amount")

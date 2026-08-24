@@ -12,6 +12,7 @@ from app.api.deps import current_user, db_session, parse_uuid
 from app.core.errors import Conflict, NotFound
 from app.core.money import serialize, to_decimal
 from app.core.responses import collection, single
+from app.core.timezone import ensure_aware
 from app.db.enums import CategoryType, TransactionStatus, TransactionType
 from app.models.finance import Category, Transfer
 from app.models.user import User
@@ -81,7 +82,7 @@ def create_transaction(
         account_id=parse_uuid(payload.account_id, "account_id"),
         transaction_type=payload.transaction_type,
         amount=payload.amount,
-        transaction_date=payload.transaction_date,
+        occurred_at=payload.occurred_at,
         category_id=parse_uuid(payload.category_id, "category_id"),
         description=payload.description,
         merchant=payload.merchant,
@@ -116,7 +117,7 @@ def update_transaction(
         user=user,
         transaction_id=transaction_id,
         amount=payload.amount,
-        transaction_date=payload.transaction_date,
+        occurred_at=payload.occurred_at,
         category_id=parse_uuid(payload.category_id, "category_id"),
         description=payload.description,
         merchant=payload.merchant,
@@ -153,7 +154,7 @@ def _serialize_transfer(db: DbSession, transfer: Transfer, user: User) -> dict:
         "destination_account": {"id": str(dst.id), "name": dst.name},
         "amount": serialize(Decimal(transfer.source_amount)),
         "currency": transfer.source_currency,
-        "transfer_date": transfer.transfer_date.isoformat(),
+        "occurred_at": transfer.occurred_at.isoformat(),
         "notes": transfer.notes,
         "status": transfer.status.value,
     }
@@ -192,7 +193,7 @@ def create_transfer(
         destination=destination,
         source_amount=amount,
         destination_amount=dest_amount,
-        transfer_date=payload.transfer_date,
+        occurred_at=ensure_aware(payload.occurred_at, user.timezone),
         actor_id=user.id,
         notes=payload.notes,
         idempotency_key=idempotency_key,
