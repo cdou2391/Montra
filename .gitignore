@@ -14,6 +14,11 @@ node_modules/
 out/
 *.tsbuildinfo
 
+# Runtime state written into the bind-mounted source tree by containers.
+# Celery Beat rewrites this dbm file on every tick.
+backend/celerybeat-schedule
+backend/celerybeat.pid
+
 # Env
 .env
 .env.local
