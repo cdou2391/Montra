@@ -596,3 +596,177 @@ def test_reconciliation_preview_does_not_write(client):
     assert client.get(f"/api/v1/accounts/{account_id}/balance").json()["data"]["amount"] == (
         "1000000.00"
     )
+
+
+# ---------------------------------------------------------------------- loans
+
+
+def _make_loan(client, **overrides):
+    payload = {
+        "name": "Car Loan",
+        "direction": "PAYABLE",
+        "currency": "RWF",
+        "original_principal": "18000000.00",
+        "opening_outstanding_principal": "11850000.00",
+        "start_date": "2025-01-01",
+        "counterparty": "Bank of Kigali",
+        "interest_rate": "7.5",
+        "expected_payment_amount": "750000.00",
+        "payment_frequency": "MONTHLY",
+        "next_payment_date": "2026-08-28",
+    } | overrides
+    return client.post("/api/v1/loans", json=payload)
+
+
+def test_loan_lifecycle(client):
+    _register(client)
+    created = _make_loan(client)
+    assert created.status_code == 201, created.text
+    loan = created.json()["data"]
+    assert loan["outstanding_principal"] == "11850000.00"
+    assert loan["percent_paid"] == "34.17"
+    assert loan["interest_rate"] == "7.5"
+
+    loan_id = loan["id"]
+    assert client.get(f"/api/v1/loans/{loan_id}").status_code == 200
+    assert len(client.get("/api/v1/loans").json()["data"]) == 1
+    assert client.post(f"/api/v1/loans/{loan_id}/archive").json()["data"]["status"] == "ARCHIVED"
+    assert client.get("/api/v1/loans").json()["data"] == []
+
+
+def test_loan_payment_splits_correctly_over_the_api(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    loan_id = _make_loan(
+        client, original_principal="1000000.00", opening_outstanding_principal="1000000.00"
+    ).json()["data"]["id"]
+
+    r = client.post(
+        f"/api/v1/loans/{loan_id}/payments",
+        json={
+            "account_id": account_id,
+            "payment_date": "2026-08-28",
+            "total_amount": "150000.00",
+            "principal_amount": "120000.00",
+            "interest_amount": "25000.00",
+            "fee_amount": "5000.00",
+        },
+        headers={"Idempotency-Key": "loan-pay-1"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["loan"]["outstanding_principal"] == "880000.00"
+
+    # Cash fell by the whole payment.
+    assert client.get(f"/api/v1/accounts/{account_id}/balance").json()["data"]["amount"] == (
+        "850000.00"
+    )
+    # Only interest and fees are spending.
+    expenses = client.get("/api/v1/transactions?type=EXPENSE").json()["data"]
+    assert sorted(t["amount"] for t in expenses) == ["25000.00", "5000.00"]
+    transfers = client.get("/api/v1/transactions?type=TRANSFER").json()["data"]
+    assert [t["amount"] for t in transfers] == ["120000.00"]
+
+
+def test_loan_payment_is_idempotent(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    loan_id = _make_loan(
+        client, original_principal="1000000.00", opening_outstanding_principal="1000000.00"
+    ).json()["data"]["id"]
+    body = {
+        "account_id": account_id,
+        "payment_date": "2026-08-28",
+        "total_amount": "100000.00",
+        "principal_amount": "100000.00",
+    }
+    first = client.post(
+        f"/api/v1/loans/{loan_id}/payments", json=body, headers={"Idempotency-Key": "k"}
+    )
+    replay = client.post(
+        f"/api/v1/loans/{loan_id}/payments", json=body, headers={"Idempotency-Key": "k"}
+    )
+    assert replay.json()["data"]["id"] == first.json()["data"]["id"]
+    assert (
+        client.get(f"/api/v1/loans/{loan_id}").json()["data"]["outstanding_principal"]
+        == "900000.00"
+    )
+
+
+def test_loan_payment_rejects_a_bad_allocation(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    loan_id = _make_loan(client).json()["data"]["id"]
+    r = client.post(
+        f"/api/v1/loans/{loan_id}/payments",
+        json={
+            "account_id": account_id,
+            "payment_date": "2026-08-28",
+            "total_amount": "100000.00",
+            "principal_amount": "50000.00",
+            "interest_amount": "10000.00",
+        },
+    )
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "ALLOCATION_MISMATCH"
+
+
+def test_loan_payment_history(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    loan_id = _make_loan(
+        client, original_principal="1000000.00", opening_outstanding_principal="1000000.00"
+    ).json()["data"]["id"]
+    for day in ("2026-06-28", "2026-07-28", "2026-08-28"):
+        client.post(
+            f"/api/v1/loans/{loan_id}/payments",
+            json={
+                "account_id": account_id,
+                "payment_date": day,
+                "total_amount": "100000.00",
+                "principal_amount": "90000.00",
+                "interest_amount": "10000.00",
+            },
+        )
+    history = client.get(f"/api/v1/loans/{loan_id}/payments").json()["data"]
+    assert len(history) == 3
+    # Newest first.
+    assert history[0]["payment_date"] == "2026-08-28"
+
+
+def test_receivable_loan_over_the_api(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    loan_id = _make_loan(
+        client,
+        name="Loan to Jean",
+        direction="RECEIVABLE",
+        original_principal="300000.00",
+        opening_outstanding_principal="300000.00",
+    ).json()["data"]["id"]
+
+    client.post(
+        f"/api/v1/loans/{loan_id}/payments",
+        json={
+            "account_id": account_id,
+            "payment_date": "2026-08-28",
+            "total_amount": "110000.00",
+            "principal_amount": "100000.00",
+            "interest_amount": "10000.00",
+        },
+    )
+    assert client.get(f"/api/v1/accounts/{account_id}/balance").json()["data"]["amount"] == (
+        "1110000.00"
+    )
+    income = client.get("/api/v1/transactions?type=INCOME").json()["data"]
+    assert [t["amount"] for t in income] == ["10000.00"]
+    assert client.get("/api/v1/transactions?type=EXPENSE").json()["data"] == []
+
+
+def test_one_user_cannot_see_another_users_loan(client):
+    _register(client, email="first@example.com")
+    loan_id = _make_loan(client).json()["data"]["id"]
+    client.post("/api/v1/auth/logout")
+
+    _register(client, email="second@example.com")
+    assert client.get("/api/v1/loans").json()["data"] == []
+    assert client.get(f"/api/v1/loans/{loan_id}").status_code == 404

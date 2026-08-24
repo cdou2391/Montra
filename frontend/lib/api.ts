@@ -199,6 +199,41 @@ export type Preferences = {
   notifications_enabled: boolean;
 };
 
+export type Loan = {
+  id: string;
+  name: string;
+  direction: "PAYABLE" | "RECEIVABLE";
+  counterparty: string | null;
+  currency: string;
+  original_principal: string;
+  opening_outstanding_principal: string;
+  outstanding_principal: string;
+  principal_paid: string;
+  percent_paid: string | null;
+  interest_rate: string | null;
+  start_date: string;
+  end_date: string | null;
+  expected_payment_amount: string | null;
+  payment_frequency: string | null;
+  next_payment_date: string | null;
+  status: "ACTIVE" | "SETTLED" | "ARCHIVED";
+  visibility: string;
+  notes: string | null;
+};
+
+export type LoanPayment = {
+  id: string;
+  loan_id: string;
+  account: { id: string; name: string } | null;
+  payment_date: string;
+  total_amount: string;
+  principal_amount: string;
+  interest_amount: string;
+  fee_amount: string;
+  notes: string | null;
+  created_at: string;
+};
+
 export type AppNotification = {
   id: string;
   notification_type: string;
@@ -263,6 +298,20 @@ export const montra = {
   createTransfer: (payload: Record<string, unknown>, idempotencyKey: string) =>
     api.post<Envelope<unknown>>("/transfers", payload, {
       "Idempotency-Key": idempotencyKey,
+    }),
+
+  // ---------------------------------------------------------------- loans
+  loans: (query = "") =>
+    api.get<Collection<Loan>>(`/loans${query}`).then((r) => r.data),
+  loan: (id: string) => api.get<Envelope<Loan>>(`/loans/${id}`).then((r) => r.data),
+  createLoan: (payload: Record<string, unknown>) =>
+    api.post<Envelope<Loan>>("/loans", payload).then((r) => r.data),
+  archiveLoan: (id: string) => api.post<Envelope<Loan>>(`/loans/${id}/archive`),
+  loanPayments: (id: string) =>
+    api.get<Collection<LoanPayment>>(`/loans/${id}/payments`).then((r) => r.data),
+  recordLoanPayment: (id: string, payload: Record<string, unknown>, key: string) =>
+    api.post<Envelope<LoanPayment & { loan: Loan }>>(`/loans/${id}/payments`, payload, {
+      "Idempotency-Key": key,
     }),
 
   preferences: () =>

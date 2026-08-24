@@ -12,23 +12,24 @@ the code; the documents are the source of truth for behaviour.
 
 ## Current status
 
-Implemented through **Phase 14** of the
+Implemented through **Phase 15** of the
 [implementation plan](docs/Montra%20—%20End%20to%20End%20Implementation%20Plan.md) —
-milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)** and
-**M4 (Planning)**.
+milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**,
+**M4 (Planning)** and **M5 (Debt)**.
 
 | Working | Not yet built |
 |---|---|
-| Registration, login, logout, sessions | Loans payable and receivable |
-| Default categories and onboarding | Household sharing and family dashboard |
-| Accounts of all eight types | Cash-flow forecast and insights |
-| The financial posting engine | Attachments, audit log, CSV import/export |
+| Registration, login, logout, sessions | Household sharing and family dashboard |
+| Default categories and onboarding | Cash-flow forecast and insights |
+| Accounts of all eight types | Attachments, audit log, CSV import/export |
+| The financial posting engine | |
 | Income, expenses, transfers | |
 | Balance reconciliation | |
 | Credit cards: limit, utilization, due date, payments | |
 | Prepaid cards and top-ups | |
 | Upcoming and recurring transactions | |
 | Reminders, worker, scheduler, notifications | |
+| Loans payable and receivable | |
 
 Family sharing is deliberately refused rather than half-enforced: creating a
 `FAMILY_VISIBLE` or `SHARED` account returns `NO_ACTIVE_FAMILY` until the
@@ -144,7 +145,7 @@ account's perspective.
 make test
 ```
 
-152 tests. The ledger suites
+178 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
@@ -157,8 +158,9 @@ properties the plan singles out: a purchase is an expense that raises debt, a
 payment lowers cash and debt together, and a payment is never an expense.
 [`test_planning.py`](backend/tests/test_planning.py) holds the line that a
 planned transaction is not a ledger entry until it is completed, and that
-completing one twice cannot post twice. Coverage elsewhere is deliberately
-lighter.
+completing one twice cannot post twice.
+[`test_loans.py`](backend/tests/test_loans.py) guards the payment split: a
+repayment is not all spending. Coverage elsewhere is deliberately lighter.
 
 ---
 
@@ -188,3 +190,10 @@ lighter.
 - Recurring rules generate planned occurrences inside a 90-day window, never
   actual transactions. `(recurring_rule_id, occurrence_date)` is unique in the
   database, so a concurrent generation cannot duplicate an occurrence.
+- A loan payment is up to three ledger entries. Principal posts as a TRANSFER,
+  because settling a debt you already carried is not spending; interest and
+  fees post as expense (payable) or income (receivable). Cash moves by the
+  total, analytics move by interest and fees only. The database enforces
+  `principal + interest + fees = total`.
+- Loan outstanding principal is derived from the opening figure minus principal
+  paid. The original loan amount is never overwritten.

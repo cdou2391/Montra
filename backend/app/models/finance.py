@@ -216,6 +216,9 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
     transfer_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("transfers.id", ondelete="CASCADE"), index=True
     )
+    loan_payment_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("loan_payments.id", ondelete="CASCADE"), index=True
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

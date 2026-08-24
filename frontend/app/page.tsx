@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Account, Transaction, montra } from "@/lib/api";
+import { Account, Loan, Transaction, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession, useSession } from "@/components/session";
@@ -20,11 +20,15 @@ import { ProfileAvatarLink } from "@/components/avatar";
 function Home() {
   const { user } = useSession();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     montra.accounts().then(setAccounts).catch(() => setAccounts([]));
+    // Loans are not accounts, but they are part of what you own and owe, so
+    // net worth is wrong without them.
+    montra.loans().then(setLoans).catch(() => setLoans([]));
     montra
       .transactions("?limit=5")
       .then((r) => setRecent(r.data))
@@ -42,6 +46,15 @@ function Home() {
     },
     { assets: 0, liabilities: 0 },
   );
+
+  // A receivable is something you own; a payable is something you owe.
+  for (const loan of loans) {
+    if (loan.status === "ARCHIVED") continue;
+    const outstanding = Number(loan.outstanding_principal);
+    if (loan.direction === "RECEIVABLE") totals.assets += outstanding;
+    else totals.liabilities += outstanding;
+  }
+
   const netWorth = totals.assets - totals.liabilities;
 
   return (
@@ -77,7 +90,11 @@ function Home() {
             </p>
             <p className="mt-1 text-xs text-content-muted">
               Assets minus what you owe, across {accounts.length} account
-              {accounts.length === 1 ? "" : "s"}.
+              {accounts.length === 1 ? "" : "s"}
+              {loans.length > 0
+                ? ` and ${loans.length} loan${loans.length === 1 ? "" : "s"}`
+                : ""}
+              .
             </p>
           </Card>
 

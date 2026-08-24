@@ -5,6 +5,7 @@ from app.models.finance import (  # noqa: F401
     Transaction,
     Transfer,
 )
+from app.models.loans import Loan, LoanPayment  # noqa: F401
 from app.models.planning import (  # noqa: F401
     Notification,
     PlannedTransaction,

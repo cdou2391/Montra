@@ -167,3 +167,16 @@ class NotificationType(StrEnum):
 # Statuses a planned item can still move on from. Terminal states are excluded
 # so a completed item can never be rescheduled or completed twice.
 OPEN_PLANNED_STATUSES = frozenset({PlannedStatus.UPCOMING, PlannedStatus.DUE, PlannedStatus.MISSED})
+
+
+class LoanDirection(StrEnum):
+    """PAYABLE is money you owe; RECEIVABLE is money owed to you."""
+
+    PAYABLE = "PAYABLE"
+    RECEIVABLE = "RECEIVABLE"
+
+
+class LoanStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    SETTLED = "SETTLED"
+    ARCHIVED = "ARCHIVED"

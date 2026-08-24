@@ -132,6 +132,7 @@ class PostingService:
         notes: str | None = None,
         reference: str | None = None,
         transfer_id: uuid.UUID | None = None,
+        loan_payment_id: uuid.UUID | None = None,
         status: TransactionStatus = TransactionStatus.COMPLETED,
     ) -> Transaction:
         self._require_positive(posting.amount)
@@ -149,6 +150,7 @@ class PostingService:
             notes=notes,
             reference=reference,
             transfer_id=transfer_id,
+            loan_payment_id=loan_payment_id,
             created_by=actor_id,
         )
         self.db.add(txn)
@@ -283,6 +285,35 @@ class PostingService:
             description=notes or f"Transfer from {source.name}",
         )
         return transfer
+
+    def record_loan_principal(
+        self,
+        *,
+        account: Account,
+        amount: Decimal,
+        outgoing: bool,
+        occurred_at: datetime,
+        actor_id: uuid.UUID,
+        **fields,
+    ) -> Transaction:
+        """Move the principal portion of a loan payment.
+
+        Repaying principal settles a debt you already carried; collecting
+        principal returns money you already lent. Neither creates or consumes
+        wealth, so both post as TRANSFER and stay out of income and expense
+        analytics — the same reasoning that keeps a credit-card payment from
+        counting as spending a second time.
+
+        Interest and fees are separate entries, and those *are* real income or
+        expense.
+        """
+        operation = Operation.TRANSFER_OUT if outgoing else Operation.TRANSFER_IN
+        return self._write(
+            Posting(account, operation, amount, TransactionType.TRANSFER),
+            actor_id=actor_id,
+            occurred_at=occurred_at,
+            **fields,
+        )
 
     def cancel_transfer(self, transfer: Transfer, *, actor_id: uuid.UUID) -> Transfer:
         """Cancel both sides as one operation.

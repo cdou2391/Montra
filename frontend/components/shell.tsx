@@ -32,6 +32,12 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
     icon: "bell",
     hint: "Reminders and alerts",
   },
+  {
+    href: "/loans",
+    label: "Loans",
+    icon: "handshake",
+    hint: "What you owe and are owed",
+  },
   { href: "/transactions", label: "Activity", icon: "list", hint: "Every transaction" },
   {
     href: "/planning/recurring",
