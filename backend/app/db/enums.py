@@ -107,3 +107,63 @@ ACCOUNT_NATURE_BY_TYPE: dict[AccountType, AccountNature] = {
 
 def nature_for(account_type: AccountType) -> AccountNature:
     return ACCOUNT_NATURE_BY_TYPE[account_type]
+
+
+class PlannedType(StrEnum):
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
+
+
+class PlannedStatus(StrEnum):
+    UPCOMING = "UPCOMING"
+    DUE = "DUE"
+    COMPLETED = "COMPLETED"
+    MISSED = "MISSED"
+    CANCELLED = "CANCELLED"
+    SKIPPED = "SKIPPED"
+
+
+class PlannedSource(StrEnum):
+    ONE_TIME = "ONE_TIME"
+    RECURRING = "RECURRING"
+
+
+class Frequency(StrEnum):
+    DAILY = "DAILY"
+    WEEKLY = "WEEKLY"
+    MONTHLY = "MONTHLY"
+    QUARTERLY = "QUARTERLY"
+    YEARLY = "YEARLY"
+
+
+class RecurringStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    ENDED = "ENDED"
+
+
+class ReminderEntity(StrEnum):
+    PLANNED_TRANSACTION = "PLANNED_TRANSACTION"
+    LOAN = "LOAN"
+    CREDIT_CARD = "CREDIT_CARD"
+    FAMILY_INVITATION = "FAMILY_INVITATION"
+
+
+class ReminderStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    CANCELLED = "CANCELLED"
+    FAILED = "FAILED"
+
+
+class NotificationType(StrEnum):
+    PLANNED_DUE = "PLANNED_DUE"
+    PLANNED_OVERDUE = "PLANNED_OVERDUE"
+    CARD_PAYMENT_DUE = "CARD_PAYMENT_DUE"
+    LOAN_DUE = "LOAN_DUE"
+    SYSTEM = "SYSTEM"
+
+
+# Statuses a planned item can still move on from. Terminal states are excluded
+# so a completed item can never be rescheduled or completed twice.
+OPEN_PLANNED_STATUSES = frozenset({PlannedStatus.UPCOMING, PlannedStatus.DUE, PlannedStatus.MISSED})

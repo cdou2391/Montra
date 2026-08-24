@@ -31,9 +31,28 @@ function More() {
       </Card>
 
       <Card className="mb-4">
+        <p className="text-section">Go to</p>
+        <div className="mt-3 space-y-1">
+          {[
+            { href: "/notifications", label: "Notifications" },
+            { href: "/transactions", label: "Activity" },
+            { href: "/planning/recurring", label: "Recurring" },
+            { href: "/accounts", label: "Accounts" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex min-h-[44px] items-center rounded-control px-3 text-sm text-content-secondary transition hover:bg-white/5 hover:text-content-primary"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="mb-4">
         <p className="text-section">Coming next</p>
         <ul className="mt-3 space-y-2 text-sm text-content-secondary">
-          <li>Upcoming and recurring transactions</li>
           <li>Loans you owe and are owed</li>
           <li>Household sharing</li>
           <li>Cash-flow forecast and insights</li>

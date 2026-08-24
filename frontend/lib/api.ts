@@ -155,6 +155,53 @@ export type CurrentUser = {
   active_family: { id: string; name: string; role: string } | null;
 };
 
+
+export type PlannedTransaction = {
+  id: string;
+  planned_type: "INCOME" | "EXPENSE";
+  amount: string;
+  currency: string;
+  expected_at: string;
+  occurrence_date: string;
+  description: string;
+  notes: string | null;
+  status: "UPCOMING" | "DUE" | "COMPLETED" | "MISSED" | "CANCELLED" | "SKIPPED";
+  source: "ONE_TIME" | "RECURRING";
+  bucket: "OVERDUE" | "TODAY" | "TOMORROW" | "THIS_WEEK" | "LATER";
+  account: { id: string; name: string } | null;
+  category: { id: string; name: string } | null;
+  recurring_rule_id: string | null;
+  completed_transaction_id: string | null;
+};
+
+export type RecurringRule = {
+  id: string;
+  name: string;
+  planned_type: "INCOME" | "EXPENSE";
+  amount: string;
+  currency: string;
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+  interval_value: number;
+  start_date: string;
+  end_date: string | null;
+  next_occurrence_date: string | null;
+  status: "ACTIVE" | "PAUSED" | "ENDED";
+  reminder_days_before: number | null;
+  account_id: string;
+  category_id: string | null;
+};
+
+export type AppNotification = {
+  id: string;
+  notification_type: string;
+  title: string;
+  body: string;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 type Envelope<T> = { data: T };
 type Collection<T> = { data: T[]; pagination: { limit: number; next_cursor: string | null } };
 
@@ -209,6 +256,38 @@ export const montra = {
     api.post<Envelope<unknown>>("/transfers", payload, {
       "Idempotency-Key": idempotencyKey,
     }),
+
+  // ------------------------------------------------------------- planning
+  planned: (query = "") =>
+    api.get<Collection<PlannedTransaction>>(`/planned-transactions${query}`).then((r) => r.data),
+  createPlanned: (payload: Record<string, unknown>) =>
+    api.post<Envelope<PlannedTransaction>>("/planned-transactions", payload).then((r) => r.data),
+  completePlanned: (id: string, payload: Record<string, unknown>, key: string) =>
+    api.post<Envelope<PlannedTransaction>>(
+      `/planned-transactions/${id}/complete`,
+      payload,
+      { "Idempotency-Key": key },
+    ),
+  reschedulePlanned: (id: string, payload: Record<string, unknown>) =>
+    api.post<Envelope<PlannedTransaction>>(`/planned-transactions/${id}/reschedule`, payload),
+  cancelPlanned: (id: string) =>
+    api.post<Envelope<PlannedTransaction>>(`/planned-transactions/${id}/cancel`),
+  skipPlanned: (id: string) =>
+    api.post<Envelope<PlannedTransaction>>(`/planned-transactions/${id}/skip`),
+
+  recurringRules: () =>
+    api.get<Collection<RecurringRule>>("/recurring-rules").then((r) => r.data),
+  createRule: (payload: Record<string, unknown>) =>
+    api.post<Envelope<RecurringRule>>("/recurring-rules", payload).then((r) => r.data),
+  ruleAction: (id: string, action: "pause" | "resume" | "end") =>
+    api.post<Envelope<RecurringRule>>(`/recurring-rules/${id}/${action}`),
+
+  notifications: (unreadOnly = false) =>
+    api.get<Collection<AppNotification> & { has_unread: boolean }>(
+      `/notifications${unreadOnly ? "?unread_only=true" : ""}`,
+    ),
+  markNotificationRead: (id: string) => api.post<void>(`/notifications/${id}/read`),
+  markAllNotificationsRead: () => api.post<void>("/notifications/read-all"),
 
   categories: (type?: "INCOME" | "EXPENSE") =>
     api

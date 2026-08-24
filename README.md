@@ -12,20 +12,23 @@ the code; the documents are the source of truth for behaviour.
 
 ## Current status
 
-Implemented through **Phase 10** of the
+Implemented through **Phase 14** of the
 [implementation plan](docs/Montra%20—%20End%20to%20End%20Implementation%20Plan.md) —
-milestones **M1 (Platform)**, **M2 (Financial Core)** and **M3 (Cards)**.
+milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)** and
+**M4 (Planning)**.
 
 | Working | Not yet built |
 |---|---|
-| Registration, login, logout, sessions | Planned and recurring transactions |
-| Default categories and onboarding | Reminders, worker jobs, notifications |
-| Accounts of all eight types | Loans payable and receivable |
-| The financial posting engine | Family sharing and the family dashboard |
-| Income, expenses, transfers | Net worth history, forecasting, insights |
-| Balance reconciliation | Attachments, audit log, CSV import/export |
+| Registration, login, logout, sessions | Loans payable and receivable |
+| Default categories and onboarding | Household sharing and family dashboard |
+| Accounts of all eight types | Cash-flow forecast and insights |
+| The financial posting engine | Attachments, audit log, CSV import/export |
+| Income, expenses, transfers | |
+| Balance reconciliation | |
 | Credit cards: limit, utilization, due date, payments | |
 | Prepaid cards and top-ups | |
+| Upcoming and recurring transactions | |
+| Reminders, worker, scheduler, notifications | |
 
 Family sharing is deliberately refused rather than half-enforced: creating a
 `FAMILY_VISIBLE` or `SHARED` account returns `NO_ACTIVE_FAMILY` until the
@@ -68,8 +71,14 @@ A modular monolith, following the
 web (Next.js) ──▶ api (FastAPI) ──┬──▶ postgres   financial source of truth
                                   └──▶ redis      queue and cache
                                             ▲
-                       worker + scheduler ──┘     (Celery, jobs land in Phase 12+)
+                       worker + scheduler ──┘     Celery: recurrence, reminders
 ```
+
+Queues are `default`, `recurring`, `reminders` and `notifications`. Beat
+regenerates the 90-day recurrence window hourly, sweeps due reminders every 15
+minutes, and promotes due planned items on the hour. Every schedule and
+reminder definition lives in Postgres, never only in the broker: losing Redis
+loses no reminders, because the next run re-reads state from the database.
 
 ```text
 backend/
@@ -135,7 +144,7 @@ account's perspective.
 make test
 ```
 
-113 tests. The ledger suites
+152 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
@@ -146,7 +155,10 @@ where an hours-off bug would otherwise be invisible, and
 [`test_cards.py`](backend/tests/test_cards.py) guards the three card
 properties the plan singles out: a purchase is an expense that raises debt, a
 payment lowers cash and debt together, and a payment is never an expense.
-Coverage elsewhere is deliberately lighter.
+[`test_planning.py`](backend/tests/test_planning.py) holds the line that a
+planned transaction is not a ledger entry until it is completed, and that
+completing one twice cannot post twice. Coverage elsewhere is deliberately
+lighter.
 
 ---
 
@@ -169,3 +181,10 @@ Coverage elsewhere is deliberately lighter.
   top-ups share that mechanism, because both are transfers underneath.
 - Reconciliation records the difference as its own ADJUSTMENT entry. It never
   rewrites history or edits the opening balance.
+- A planned transaction is not a ledger entry. Creating, rescheduling and
+  cancelling touch no balance; only completion posts, and it delegates to the
+  posting engine. Completion locks the row `FOR UPDATE` before reading its
+  status, so two concurrent completions cannot both post.
+- Recurring rules generate planned occurrences inside a 90-day window, never
+  actual transactions. `(recurring_rule_id, occurrence_date)` is unique in the
+  database, so a concurrent generation cannot duplicate an occurrence.
