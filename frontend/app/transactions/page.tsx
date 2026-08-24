@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { Account, Transaction, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
@@ -11,11 +12,17 @@ import { TransactionRow } from "@/components/financial";
 import { Button, Card, EmptyState, Input, Select, Skeleton } from "@/components/ui";
 
 function Transactions() {
+  const params = useSearchParams();
   const [rows, setRows] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ account_id: "", type: "", search: "" });
+  // Arriving from an account's "View all" pre-selects that account.
+  const [filters, setFilters] = useState({
+    account_id: params.get("account") ?? "",
+    type: "",
+    search: "",
+  });
 
   useEffect(() => {
     montra.accounts().then(setAccounts);
@@ -127,7 +134,9 @@ export default function Page() {
   return (
     <Providers>
       <RequireSession>
-        <Transactions />
+        <Suspense fallback={null}>
+          <Transactions />
+        </Suspense>
       </RequireSession>
     </Providers>
   );

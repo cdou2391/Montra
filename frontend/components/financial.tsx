@@ -102,9 +102,12 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
 export function TransactionRow({
   transaction,
   hidden,
+  showAccount = true,
 }: {
   transaction: Transaction;
   hidden?: boolean;
+  /** Off when the surrounding view already names the account. */
+  showAccount?: boolean;
 }) {
   const { transaction_type: type, direction } = transaction;
   const tone =
@@ -124,7 +127,7 @@ export function TransactionRow({
         <p className="mt-0.5 truncate text-xs text-content-secondary">
           {formatDateTime(transaction.occurred_at)}
           {transaction.category ? ` · ${transaction.category.name}` : ""}
-          {transaction.account ? ` · ${transaction.account.name}` : ""}
+          {showAccount && transaction.account ? ` · ${transaction.account.name}` : ""}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-3">
