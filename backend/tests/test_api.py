@@ -829,3 +829,57 @@ def test_reset_refuses_a_wrong_password(client):
 def test_reset_requires_authentication(client):
     r = client.post("/api/v1/profile/reset", json={"password": "anything"})
     assert r.status_code == 401
+
+
+# ------------------------------------------------------------ favorite account
+
+
+def test_favorite_leads_the_accounts_endpoint(client):
+    _register(client)
+    _create_account(client, name="Alpha")
+    zebra = _create_account(client, name="Zebra").json()["data"]["id"]
+
+    assert [a["name"] for a in client.get("/api/v1/accounts").json()["data"]] == [
+        "Alpha",
+        "Zebra",
+    ]
+
+    r = client.post(f"/api/v1/accounts/{zebra}/favorite")
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["is_favorite"] is True
+
+    rows = client.get("/api/v1/accounts").json()["data"]
+    assert [a["name"] for a in rows] == ["Zebra", "Alpha"]
+    assert rows[0]["is_favorite"] is True
+    assert rows[1]["is_favorite"] is False
+
+
+def test_favorite_can_be_cleared_over_the_api(client):
+    _register(client)
+    _create_account(client, name="Alpha")
+    zebra = _create_account(client, name="Zebra").json()["data"]["id"]
+    client.post(f"/api/v1/accounts/{zebra}/favorite")
+
+    assert (
+        client.delete(f"/api/v1/accounts/{zebra}/favorite").json()["data"]["is_favorite"] is False
+    )
+    assert [a["name"] for a in client.get("/api/v1/accounts").json()["data"]] == [
+        "Alpha",
+        "Zebra",
+    ]
+
+
+def test_preferences_report_the_favorite(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    client.post(f"/api/v1/accounts/{account_id}/favorite")
+    assert client.get("/api/v1/preferences").json()["data"]["favorite_account_id"] == account_id
+
+
+def test_cannot_favorite_another_users_account_over_the_api(client):
+    _register(client, email="first@example.com")
+    account_id = _create_account(client).json()["data"]["id"]
+    client.post("/api/v1/auth/logout")
+
+    _register(client, email="second@example.com")
+    assert client.post(f"/api/v1/accounts/{account_id}/favorite").status_code == 404

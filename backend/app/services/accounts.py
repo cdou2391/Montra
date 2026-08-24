@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import exists, select
+from sqlalchemy import case, exists, literal, select
 from sqlalchemy.orm import Session as DbSession
 
-from app.core.errors import Conflict, ValidationFailed
+from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.db.base import utcnow
 from app.db.enums import (
     AccountStatus,
@@ -126,6 +126,38 @@ def restore_account(db: DbSession, account: Account) -> Account:
     return account
 
 
+def favorite_account_id(db: DbSession, user: User) -> uuid.UUID | None:
+    from app.models.user import UserPreference
+
+    return db.scalar(
+        select(UserPreference.favorite_account_id).where(UserPreference.user_id == user.id)
+    )
+
+
+def set_favorite_account(
+    db: DbSession, *, user: User, account_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    """Choose the account that leads every list, or clear the choice.
+
+    Setting a new favourite replaces the old one: there is exactly one, because
+    "first" only means something for one account.
+    """
+    from app.models.user import UserPreference
+
+    if account_id is not None:
+        # Only an account the user can actually see may be favourited.
+        from app.services.authz import get_viewable_account
+
+        account_id = get_viewable_account(db, account_id, user).id
+
+    preferences = db.scalar(select(UserPreference).where(UserPreference.user_id == user.id))
+    if preferences is None:
+        raise NotFound("Preferences not found.", code="PREFERENCES_NOT_FOUND")
+    preferences.favorite_account_id = account_id
+    db.flush()
+    return account_id
+
+
 def list_accounts(
     db: DbSession,
     *,
@@ -141,7 +173,12 @@ def list_accounts(
         stmt = stmt.where(Account.status == AccountStatus.ACTIVE)
     if account_type is not None:
         stmt = stmt.where(Account.account_type == account_type)
-    return list(db.scalars(stmt.order_by(Account.name).limit(limit)))
+
+    # Sorted here rather than in the client, so the accounts screen, every
+    # account dropdown and the API all agree on what comes first.
+    favorite = favorite_account_id(db, user)
+    ordering = case((Account.id == favorite, 0), else_=1) if favorite else literal(1)
+    return list(db.scalars(stmt.order_by(ordering, Account.name).limit(limit)))
 
 
 def masked_identifier(account: Account) -> str | None:
@@ -151,10 +188,16 @@ def masked_identifier(account: Account) -> str | None:
     return f"**** {tail}"
 
 
-def serialize_account(db: DbSession, account: Account, user: User) -> dict:
+def serialize_account(
+    db: DbSession, account: Account, user: User, *, favorite: uuid.UUID | None = None
+) -> dict:
     from app.core.money import serialize
     from app.services.authz import can_edit, can_transact
 
+    # Callers serializing a list pass the favourite in, to avoid one query per
+    # account.
+    if favorite is None:
+        favorite = favorite_account_id(db, user)
     posting = PostingService(db)
     return {
         "id": str(account.id),
@@ -182,4 +225,5 @@ def serialize_account(db: DbSession, account: Account, user: User) -> dict:
         "can_edit": can_edit(account, user),
         "can_transact": can_transact(account, user),
         "credit_card": card_fields_payload(account),
+        "is_favorite": favorite == account.id,
     }

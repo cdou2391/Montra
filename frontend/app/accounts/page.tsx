@@ -9,6 +9,7 @@ import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { AccountPanel } from "@/components/account-panel";
+import { Icon } from "@/components/icons";
 import {
   CarouselChevron,
   CarouselPosition,
@@ -33,9 +34,11 @@ function Accounts() {
   const { trackRef, index, onScroll, select } = useCarousel(accounts?.length ?? 0);
   const active = accounts?.[index];
 
-  useEffect(() => {
+  const loadAccounts = useCallback(() => {
     montra.accounts().then(setAccounts).catch(() => setAccounts([]));
   }, []);
+
+  useEffect(loadAccounts, [loadAccounts]);
 
   useEffect(() => {
     if (!active || activity[active.id] || inFlight.current.has(active.id)) return;
@@ -183,7 +186,11 @@ function Accounts() {
                 position={i + 1}
                 total={accounts.length}
               >
-                <AccountPanel account={account} hidden={hidden} />
+                <AccountPanel
+                account={account}
+                hidden={hidden}
+                onFavoriteChanged={loadAccounts}
+              />
               </CarouselSlide>
             ))}
           </CarouselTrack>
@@ -224,7 +231,10 @@ function Accounts() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-content-primary">
+                  <p className="flex items-center gap-1.5 truncate text-sm font-medium text-content-primary">
+                    {account.is_favorite && (
+                      <Icon name="star" size={13} filled className="shrink-0 text-accent" />
+                    )}
                     {account.name}
                   </p>
                   <p className="mt-0.5 text-xs text-content-secondary">
@@ -243,7 +253,13 @@ function Accounts() {
         </nav>
 
         <div>
-          {active && <AccountPanel account={active} hidden={hidden} />}
+          {active && (
+            <AccountPanel
+              account={active}
+              hidden={hidden}
+              onFavoriteChanged={loadAccounts}
+            />
+          )}
           <ActivitySection
             account={active}
             rows={rows}

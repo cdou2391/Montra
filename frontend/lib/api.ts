@@ -100,6 +100,7 @@ export type Account = {
   can_edit: boolean;
   can_transact: boolean;
   credit_card: CreditCardFields | null;
+  is_favorite: boolean;
 };
 
 export type CardSummary = {
@@ -227,6 +228,7 @@ export type Preferences = {
   default_context: "PERSONAL" | "FAMILY";
   default_reminder_days: number | null;
   notifications_enabled: boolean;
+  favorite_account_id: string | null;
 };
 
 export type Loan = {
@@ -296,6 +298,10 @@ export const montra = {
   createAccount: (payload: Record<string, unknown>) =>
     api.post<Envelope<Account>>("/accounts", payload).then((r) => r.data),
   archiveAccount: (id: string) => api.post<void>(`/accounts/${id}/archive`),
+  setFavoriteAccount: (id: string) =>
+    api.post<Envelope<Account>>(`/accounts/${id}/favorite`),
+  clearFavoriteAccount: (id: string) =>
+    api.delete<Envelope<Account>>(`/accounts/${id}/favorite`),
 
   transactions: (query = "") =>
     api.get<Collection<Transaction>>(`/transactions${query}`),

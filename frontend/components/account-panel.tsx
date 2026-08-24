@@ -9,17 +9,62 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 
-import { Account } from "@/lib/api";
+import { Account, montra } from "@/lib/api";
 import { MoneyValue } from "@/components/financial";
+import { Icon } from "@/components/icons";
 import { Card, StatusChip } from "@/components/ui";
+
+/** Star toggle. Optimistic, because a star that lags a tap feels broken. */
+function FavoriteToggle({
+  account,
+  onChanged,
+}: {
+  account: Account;
+  onChanged?: () => void;
+}) {
+  const [favorite, setFavorite] = useState(account.is_favorite);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    const next = !favorite;
+    setFavorite(next);
+    setBusy(true);
+    try {
+      if (next) await montra.setFavoriteAccount(account.id);
+      else await montra.clearFavoriteAccount(account.id);
+      onChanged?.();
+    } catch {
+      setFavorite(!next);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      aria-pressed={favorite}
+      aria-label={favorite ? `Unstar ${account.name}` : `Make ${account.name} my favourite`}
+      className={`pressable pressable-tint flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+        favorite ? "text-accent" : "text-content-muted"
+      }`}
+    >
+      <Icon name="star" size={20} filled={favorite} />
+    </button>
+  );
+}
 
 export function AccountPanel({
   account,
   hidden,
+  onFavoriteChanged,
 }: {
   account: Account;
   hidden?: boolean;
+  onFavoriteChanged?: () => void;
 }) {
   const isLiability = account.account_nature === "LIABILITY";
 
@@ -33,7 +78,10 @@ export function AccountPanel({
             {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
           </p>
         </div>
-        {isLiability && <StatusChip tone="expense">Credit</StatusChip>}
+        <div className="flex shrink-0 items-center gap-2">
+          {isLiability && <StatusChip tone="expense">Credit</StatusChip>}
+          <FavoriteToggle account={account} onChanged={onFavoriteChanged} />
+        </div>
       </div>
 
       <div className="mt-5">

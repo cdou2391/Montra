@@ -50,6 +50,9 @@ def _preferences_payload(prefs: UserPreference) -> dict:
         "default_context": prefs.default_context.value,
         "default_reminder_days": prefs.default_reminder_days,
         "notifications_enabled": prefs.notifications_enabled,
+        "favorite_account_id": (
+            str(prefs.favorite_account_id) if prefs.favorite_account_id else None
+        ),
     }
 
 

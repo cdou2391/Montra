@@ -201,7 +201,12 @@ def export_backup(db: DbSession, user: User) -> dict:
             "timezone": user.timezone,
         },
         "preferences": (
-            {f: getattr(preferences, f) for f in PREFERENCE_FIELDS} if preferences else None
+            {
+                **{f: getattr(preferences, f) for f in PREFERENCE_FIELDS},
+                "favorite_account_id": link(preferences.favorite_account_id),
+            }
+            if preferences
+            else None
         ),
         "institutions": [_dump(i, INSTITUTION_FIELDS) for i in institutions],
         "categories": [
@@ -647,6 +652,10 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
             for field in PREFERENCE_FIELDS:
                 if field in preferences_payload and preferences_payload[field] is not None:
                     setattr(preferences, field, preferences_payload[field])
+            # Resolved through the map: the exported id no longer exists.
+            preferences.favorite_account_id = ids.get(
+                preferences_payload.get("favorite_account_id")
+            )
 
     db.flush()
     return summarize(payload)

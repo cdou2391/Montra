@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import { Account, Transaction } from "@/lib/api";
 import { formatDateTime, formatMoney } from "@/lib/format";
+import { Icon } from "@/components/icons";
 import { Card, StatusChip } from "@/components/ui";
 
 export function MoneyValue({
@@ -75,7 +76,12 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
       <Card className="transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="truncate font-medium text-content-primary">{account.name}</p>
+            <p className="flex items-center gap-1.5 truncate font-medium text-content-primary">
+              {account.is_favorite && (
+                <Icon name="star" size={14} filled className="shrink-0 text-accent" />
+              )}
+              {account.name}
+            </p>
             <p className="mt-1 text-xs text-content-secondary">
               {account.account_type.replace(/_/g, " ")}
               {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}

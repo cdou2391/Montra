@@ -45,6 +45,14 @@ class UserPreference(UUIDPrimaryKey, Timestamped, Base):
     default_reminder_days: Mapped[int | None] = mapped_column(Integer, default=3)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # The favourite lives on the user, not the account. Accounts become
+    # shareable in the Family phases, and a flag on the account row would make
+    # one member's favourite everybody's. SET NULL so archiving or deleting the
+    # account simply clears it.
+    favorite_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL")
+    )
+
     user: Mapped[User] = relationship(back_populates="preferences")
 
 

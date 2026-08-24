@@ -26,7 +26,9 @@ export type IconName =
   | "logOut"
   | "handshake"
   | "download"
-  | "upload";
+  | "upload"
+  | "star"
+  | "starFilled";
 
 const PATHS: Record<IconName, string[]> = {
   home: [
@@ -70,6 +72,9 @@ const PATHS: Record<IconName, string[]> = {
     "M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3",
     "M3 4h8",
   ],
+  star: ["M11.5 3.1a.6.6 0 0 1 1 0l2.3 4.7 5.2.7a.6.6 0 0 1 .3 1l-3.8 3.6.9 5.2a.6.6 0 0 1-.9.6L12 16.4l-4.6 2.5a.6.6 0 0 1-.9-.6l.9-5.2-3.8-3.6a.6.6 0 0 1 .3-1l5.2-.7z"],
+  // Same outline; the fill comes from the caller so one shape serves both states.
+  starFilled: ["M11.5 3.1a.6.6 0 0 1 1 0l2.3 4.7 5.2.7a.6.6 0 0 1 .3 1l-3.8 3.6.9 5.2a.6.6 0 0 1-.9.6L12 16.4l-4.6 2.5a.6.6 0 0 1-.9-.6l.9-5.2-3.8-3.6a.6.6 0 0 1 .3-1l5.2-.7z"],
   download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"],
   upload: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M17 8l-5-5-5 5", "M12 3v12"],
   logOut: ["m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"],
@@ -80,18 +85,21 @@ export function Icon({
   size = 22,
   className = "",
   strokeWidth = 1.8,
+  filled = false,
 }: {
   name: IconName;
   size?: number;
   className?: string;
   strokeWidth?: number;
+  /** Fill the shape with currentColor, for on/off states like a star. */
+  filled?: boolean;
 }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth={strokeWidth}
       strokeLinecap="round"

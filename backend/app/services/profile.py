@@ -89,6 +89,7 @@ def reset_profile(db: DbSession, *, user: User, password: str) -> dict:
         preferences.persist_balance_privacy = False
         preferences.default_reminder_days = 3
         preferences.notifications_enabled = True
+        preferences.favorite_account_id = None
 
     db.flush()
     return summary

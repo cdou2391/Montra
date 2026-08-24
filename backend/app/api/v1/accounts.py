@@ -52,10 +52,10 @@ def list_accounts(
     accounts = account_service.list_accounts(
         db, user=user, status=status_filter, account_type=type_filter, limit=limit
     )
+    favorite = account_service.favorite_account_id(db, user)
+    payload = [account_service.serialize_account(db, a, user, favorite=favorite) for a in accounts]
     db.commit()
-    return collection(
-        [account_service.serialize_account(db, a, user) for a in accounts], limit=limit
-    )
+    return collection(payload, limit=limit)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -139,6 +139,36 @@ def restore_account(
 ) -> dict:
     account = get_editable_account(db, account_id, user)
     account_service.restore_account(db, account)
+    db.commit()
+    db.refresh(account)
+    return single(account_service.serialize_account(db, account, user))
+
+
+@router.post("/{account_id}/favorite")
+def set_favorite(
+    account_id: uuid.UUID,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Make this the account that leads every list."""
+    account = get_viewable_account(db, account_id, user)
+    account_service.set_favorite_account(db, user=user, account_id=account.id)
+    db.commit()
+    db.refresh(account)
+    return single(account_service.serialize_account(db, account, user))
+
+
+@router.delete("/{account_id}/favorite")
+def clear_favorite(
+    account_id: uuid.UUID,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    account = get_viewable_account(db, account_id, user)
+    # Only clear if this account is the one currently favourited, so a stale
+    # request cannot unset somebody's newer choice.
+    if account_service.favorite_account_id(db, user) == account.id:
+        account_service.set_favorite_account(db, user=user, account_id=None)
     db.commit()
     db.refresh(account)
     return single(account_service.serialize_account(db, account, user))
