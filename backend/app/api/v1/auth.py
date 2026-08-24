@@ -8,12 +8,14 @@ from app.core.config import settings
 from app.core.responses import single
 from app.models.user import Session, User, UserPreference
 from app.schemas.auth import (
+    BackupRestoreRequest,
     LoginRequest,
     PreferencesUpdate,
     ProfileResetRequest,
     RegisterRequest,
 )
 from app.services import auth as auth_service
+from app.services import backup as backup_service
 from app.services import profile as profile_service
 
 router = APIRouter(tags=["auth"])
@@ -155,3 +157,41 @@ def reset_profile(
     deleted = profile_service.reset_profile(db, user=user, password=payload.password)
     db.commit()
     return single({"deleted": deleted})
+
+
+@router.get("/profile/backup")
+def download_backup(
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> Response:
+    """Every financial record this user owns, as a downloadable document.
+
+    Served as an attachment with a dated filename, because a backup that lands
+    in a browser tab is not a backup.
+    """
+    import json
+
+    payload = backup_service.export_backup(db, user)
+    db.commit()
+    stamp = payload["exported_at"][:10]
+    return Response(
+        content=json.dumps(payload, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="montra-backup-{stamp}.json"',
+        },
+    )
+
+
+@router.post("/profile/restore")
+def restore_backup(
+    payload: BackupRestoreRequest,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Replace everything with the contents of a backup. Irreversible."""
+    restored = backup_service.restore_backup(
+        db, user=user, payload=payload.backup, password=payload.password
+    )
+    db.commit()
+    return single({"restored": restored})

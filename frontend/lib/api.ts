@@ -203,6 +203,24 @@ export type ResetPreview = {
   custom_categories: number;
 };
 
+export type BackupSummary = {
+  accounts: number;
+  transactions: number;
+  transfers: number;
+  loans: number;
+  loan_payments: number;
+  planned_transactions: number;
+  recurring_rules: number;
+  categories: number;
+};
+
+export type BackupFile = {
+  montra_backup_version: number;
+  exported_at: string;
+  user?: { email?: string; display_name?: string | null };
+  [key: string]: unknown;
+};
+
 export type Preferences = {
   hide_balances: boolean;
   persist_balance_privacy: boolean;
@@ -324,6 +342,15 @@ export const montra = {
   recordLoanPayment: (id: string, payload: Record<string, unknown>, key: string) =>
     api.post<Envelope<LoanPayment & { loan: Loan }>>(`/loans/${id}/payments`, payload, {
       "Idempotency-Key": key,
+    }),
+
+  // The download is a plain link, not fetch: the browser should save the file
+  // rather than the app holding it in memory.
+  backupUrl: () => `${BASE_URL}/profile/backup`,
+  restoreBackup: (password: string, backup: unknown) =>
+    api.post<Envelope<{ restored: BackupSummary }>>("/profile/restore", {
+      password,
+      backup,
     }),
 
   resetPreview: () =>

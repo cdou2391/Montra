@@ -1,15 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { MontraApiError, Preferences, ResetPreview, montra } from "@/lib/api";
+import {
+  BackupFile,
+  MontraApiError,
+  Preferences,
+  ResetPreview,
+  montra,
+} from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession, useSession } from "@/components/session";
 import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Icon } from "@/components/icons";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -80,6 +87,59 @@ function Profile() {
       .then(setPrefs)
       .catch(() => setPrefs(null));
   }, []);
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [pending, setPending] = useState<BackupFile | null>(null);
+  const [restorePassword, setRestorePassword] = useState("");
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  async function onFileChosen(file: File | undefined) {
+    if (!file) return;
+    setRestoreError(null);
+    setRestorePassword("");
+    try {
+      const parsed = JSON.parse(await file.text()) as BackupFile;
+      // Checked here too, so an obviously wrong file is rejected before the
+      // user types a password. The server checks again regardless.
+      if (parsed?.montra_backup_version !== 1) {
+        setPending(null);
+        setRestoreError("That file is not a Montra backup this version can read.");
+      } else {
+        setPending(parsed);
+      }
+    } catch {
+      setPending(null);
+      setRestoreError("That file could not be read as JSON.");
+    }
+    setRestoreOpen(true);
+    // Allow re-choosing the same file after a failure.
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  function countIn(key: string): number {
+    const value = pending?.[key];
+    return Array.isArray(value) ? value.length : 0;
+  }
+
+  async function confirmRestore() {
+    if (!pending) return;
+    setRestoring(true);
+    setRestoreError(null);
+    try {
+      await montra.restoreBackup(restorePassword, pending);
+      setRestoreOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setRestoreError(
+        err instanceof MontraApiError ? err.message : "Could not restore that backup.",
+      );
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   function openReset() {
     setResetError(null);
@@ -230,7 +290,143 @@ function Profile() {
         Sign out
       </Button>
 
-      <Card className="mt-8 border-semantic-expense/25">
+      <Card className="mt-8">
+        <p className="text-xs uppercase tracking-wide text-content-muted">Backup</p>
+        <p className="mt-2 text-sm text-content-secondary">
+          A backup is a single file holding every account, transaction, loan and plan you have.
+          It never contains your password.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <a
+            href={montra.backupUrl()}
+            download
+            className="pressable inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-5 text-sm font-semibold text-content-primary"
+          >
+            <Icon name="download" size={18} />
+            Download backup
+          </a>
+
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => onFileChosen(e.target.files?.[0])}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => fileInput.current?.click()}
+            className="flex-1"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              <Icon name="upload" size={18} />
+              Restore from backup
+            </span>
+          </Button>
+        </div>
+
+        <p className="mt-3 text-xs text-content-muted">
+          Restoring replaces everything you currently have. It does not merge.
+        </p>
+      </Card>
+
+      <ConfirmDialog
+        open={restoreOpen}
+        onClose={() => setRestoreOpen(false)}
+        title="Restore backup"
+      >
+        <p className="text-section text-content-primary">Restore this backup?</p>
+
+        {pending === null ? (
+          <>
+            <p className="mt-2 text-sm text-content-secondary">
+              The file could not be used.
+            </p>
+            {restoreError && (
+              <div className="mt-4">
+                <ErrorNotice message={restoreError} />
+              </div>
+            )}
+            <div className="mt-5">
+              <Button
+                variant="secondary"
+                onClick={() => setRestoreOpen(false)}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-content-secondary">
+              This replaces everything currently in your profile with the contents of the file.
+              Your existing data is deleted, not merged, and it cannot be undone.
+            </p>
+
+            <div className="mt-4 rounded-control border border-white/10 bg-background-primary p-4">
+              <p className="text-xs uppercase tracking-wide text-content-muted">
+                Taken {new Date(pending.exported_at).toLocaleString()}
+                {pending.user?.email ? ` · ${pending.user.email}` : ""}
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-content-primary">
+                {[
+                  ["accounts", "accounts"],
+                  ["transactions", "transactions"],
+                  ["loans", "loans"],
+                  ["planned_transactions", "upcoming items"],
+                  ["recurring_rules", "recurring series"],
+                ]
+                  .filter(([key]) => countIn(key) > 0)
+                  .map(([key, label]) => (
+                    <li key={key} className="flex justify-between gap-4">
+                      <span className="text-content-secondary">{label}</span>
+                      <span className="tabular font-semibold">{countIn(key)}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+
+            {restoreError && (
+              <div className="mt-4">
+                <ErrorNotice message={restoreError} />
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Field label="Confirm with your password" hint="Required, because this replaces your data.">
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                />
+              </Field>
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row">
+              <Button
+                variant="secondary"
+                onClick={() => setRestoreOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmRestore}
+                disabled={restoring || !restorePassword}
+                className="flex-1"
+              >
+                {restoring ? "Restoring…" : "Replace my data"}
+              </Button>
+            </div>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <Card className="mt-4 border-semantic-expense/25">
         <p className="text-xs uppercase tracking-wide text-semantic-expense">Danger zone</p>
         <p className="mt-2 text-sm font-medium text-content-primary">Reset profile</p>
         <p className="mt-1 text-sm text-content-secondary">
@@ -251,8 +447,8 @@ function Profile() {
       >
         <p className="text-section text-content-primary">Reset your profile?</p>
         <p className="mt-2 text-sm text-content-secondary">
-          This permanently deletes your financial history. It cannot be undone, and there is no
-          backup.
+          This permanently deletes your financial history. It cannot be undone. Download a
+          backup first if you might want any of it later.
         </p>
 
         {/* A warning that names real numbers is a warning; "this cannot be

@@ -24,7 +24,9 @@ export type IconName =
   | "chevronLeft"
   | "chevronRight"
   | "logOut"
-  | "handshake";
+  | "handshake"
+  | "download"
+  | "upload";
 
 const PATHS: Record<IconName, string[]> = {
   home: [
@@ -68,6 +70,8 @@ const PATHS: Record<IconName, string[]> = {
     "M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3",
     "M3 4h8",
   ],
+  download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"],
+  upload: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M17 8l-5-5-5 5", "M12 3v12"],
   logOut: ["m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"],
 };
 

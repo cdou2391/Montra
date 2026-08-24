@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import EmailStr, Field
 
 from app.schemas.common import MontraModel
@@ -28,3 +30,10 @@ class ProfileResetRequest(MontraModel):
     """Re-authentication for an irreversible action."""
 
     password: str = Field(min_length=1)
+
+
+class BackupRestoreRequest(MontraModel):
+    """The backup document, plus re-authentication for a destructive action."""
+
+    password: str = Field(min_length=1)
+    backup: dict[str, Any]
