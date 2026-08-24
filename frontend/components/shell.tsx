@@ -9,9 +9,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 
 import { montra } from "@/lib/api";
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV = [
   { href: "/", label: "Home", icon: "◧" },
@@ -21,22 +22,10 @@ const NAV = [
   { href: "/more", label: "More", icon: "⋯" },
 ];
 
-/** Unread badge, polled once per mount rather than held in global state. */
-function useUnreadNotifications() {
-  const [unread, setUnread] = useState(false);
-  useEffect(() => {
-    montra
-      .notifications(true)
-      .then((r) => setUnread(r.has_unread))
-      .catch(() => setUnread(false));
-  }, []);
-  return unread;
-}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const unread = useUnreadNotifications();
 
   async function signOut() {
     await montra.logout();
@@ -65,24 +54,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/notifications"
-          className={`mt-1 flex items-center gap-3 rounded-control px-3 py-2.5 text-sm transition ${
-            pathname === "/notifications"
-              ? "bg-accent-muted text-accent"
-              : "text-content-secondary hover:bg-white/5"
-          }`}
-        >
-          <span aria-hidden>◎</span>
-          Notifications
-          {unread && (
-            <span
-              aria-label="unread"
-              className="ml-auto h-2 w-2 rounded-full bg-accent"
-            />
-          )}
-        </Link>
-
         <Link
           href="/add"
           className="mt-6 flex min-h-[48px] items-center justify-center rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
@@ -122,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] ${
+                className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] ${
                   pathname === item.href ? "text-accent" : "text-content-secondary"
                 }`}
               >
@@ -130,12 +101,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {item.icon}
                 </span>
                 {item.label}
-                {item.href === "/more" && unread && (
-                  <span
-                    aria-label="unread notifications"
-                    className="absolute right-[22%] top-2 h-2 w-2 rounded-full bg-accent"
-                  />
-                )}
               </Link>
             ),
           )}
@@ -153,9 +118,13 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex items-center justify-between gap-4">
-      <h1 className="text-title text-content-primary">{title}</h1>
-      {action}
+    <header className="mb-6 flex items-center justify-between gap-3">
+      <h1 className="min-w-0 truncate text-title text-content-primary">{title}</h1>
+      <div className="flex shrink-0 items-center gap-2">
+        {action}
+        {/* Rightmost: global chrome sits outside whatever the page offers. */}
+        <NotificationBell />
+      </div>
     </header>
   );
 }

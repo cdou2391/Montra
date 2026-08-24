@@ -142,7 +142,9 @@ function Planning() {
         title="Upcoming"
         action={
           <div className="flex items-center gap-3">
-            <Link href="/planning/recurring" className="text-xs text-accent">
+            {/* Hidden on the narrowest phones so the page title is not
+                crushed; still reachable from More. */}
+            <Link href="/planning/recurring" className="hidden text-xs text-accent sm:inline">
               Recurring
             </Link>
             <Link href="/planning/new">

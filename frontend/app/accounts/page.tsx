@@ -118,7 +118,12 @@ function Accounts() {
               {hidden ? "Show" : "Hide"}
             </button>
             <Link href="/accounts/new">
-              <Button>New account</Button>
+              {/* The bell now shares this row; the long label would crush the
+                  page title on a narrow phone. */}
+              <Button>
+                <span className="sm:hidden">Add</span>
+                <span className="hidden sm:inline">New account</span>
+              </Button>
             </Link>
           </div>
         }
