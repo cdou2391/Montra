@@ -770,3 +770,62 @@ def test_one_user_cannot_see_another_users_loan(client):
     _register(client, email="second@example.com")
     assert client.get("/api/v1/loans").json()["data"] == []
     assert client.get(f"/api/v1/loans/{loan_id}").status_code == 404
+
+
+# -------------------------------------------------------------- profile reset
+
+
+def test_reset_preview_reports_what_would_go(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    client.post(
+        "/api/v1/transactions",
+        json={
+            "transaction_type": "EXPENSE",
+            "account_id": account_id,
+            "amount": "1000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+        },
+    )
+    preview = client.get("/api/v1/profile/reset-preview").json()["data"]
+    assert preview["accounts"] == 1
+    assert preview["transactions"] == 1
+
+
+def test_reset_wipes_data_but_keeps_the_session(client):
+    _register(client)
+    account_id = _create_account(client).json()["data"]["id"]
+    client.post(
+        "/api/v1/transactions",
+        json={
+            "transaction_type": "EXPENSE",
+            "account_id": account_id,
+            "amount": "1000.00",
+            "occurred_at": "2026-08-24T14:30:00Z",
+        },
+    )
+
+    r = client.post("/api/v1/profile/reset", json={"password": "a-good-passphrase-1"})
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["deleted"]["accounts"] == 1
+
+    # Still signed in, with a clean slate and default categories back.
+    assert client.get("/api/v1/auth/me").status_code == 200
+    assert client.get("/api/v1/accounts").json()["data"] == []
+    assert client.get("/api/v1/transactions").json()["data"] == []
+    assert len(client.get("/api/v1/categories").json()["data"]) == 29
+
+
+def test_reset_refuses_a_wrong_password(client):
+    _register(client)
+    _create_account(client)
+    r = client.post("/api/v1/profile/reset", json={"password": "wrong-password"})
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "INVALID_CREDENTIALS"
+    # And the data is still there.
+    assert len(client.get("/api/v1/accounts").json()["data"]) == 1
+
+
+def test_reset_requires_authentication(client):
+    r = client.post("/api/v1/profile/reset", json={"password": "anything"})
+    assert r.status_code == 401

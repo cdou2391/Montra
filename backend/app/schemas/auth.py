@@ -22,3 +22,9 @@ class PreferencesUpdate(MontraModel):
     default_context: str | None = None
     default_reminder_days: int | None = Field(default=None, ge=0, le=30)
     notifications_enabled: bool | None = None
+
+
+class ProfileResetRequest(MontraModel):
+    """Re-authentication for an irreversible action."""
+
+    password: str = Field(min_length=1)

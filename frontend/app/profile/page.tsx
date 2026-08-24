@@ -3,12 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { MontraApiError, Preferences, montra } from "@/lib/api";
+import { MontraApiError, Preferences, ResetPreview, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession, useSession } from "@/components/session";
 import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -67,12 +68,48 @@ function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [resetOpen, setResetOpen] = useState(false);
+  const [preview, setPreview] = useState<ResetPreview | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
   useEffect(() => {
     montra
       .preferences()
       .then(setPrefs)
       .catch(() => setPrefs(null));
   }, []);
+
+  function openReset() {
+    setResetError(null);
+    setResetPassword("");
+    setPreview(null);
+    setResetOpen(true);
+    // Counts are fetched fresh each time, so the warning is never stale.
+    montra
+      .resetPreview()
+      .then(setPreview)
+      .catch(() => setPreview(null));
+  }
+
+  async function confirmReset() {
+    setResetting(true);
+    setResetError(null);
+    try {
+      await montra.resetProfile(resetPassword);
+      setResetOpen(false);
+      // Land on Home, which is now the empty state a new account sees.
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setResetError(
+        err instanceof MontraApiError ? err.message : "Could not reset your profile.",
+      );
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function save(patch: Partial<Preferences>) {
     if (!prefs) return;
@@ -189,9 +226,105 @@ function Profile() {
         )}
       </Card>
 
-      <Button variant="destructive" onClick={signOut}>
+      <Button variant="secondary" onClick={signOut}>
         Sign out
       </Button>
+
+      <Card className="mt-8 border-semantic-expense/25">
+        <p className="text-xs uppercase tracking-wide text-semantic-expense">Danger zone</p>
+        <p className="mt-2 text-sm font-medium text-content-primary">Reset profile</p>
+        <p className="mt-1 text-sm text-content-secondary">
+          Deletes every account, transaction, loan and plan, and puts you back where a new
+          account starts. Your login stays.
+        </p>
+        <div className="mt-4">
+          <Button variant="destructive" onClick={openReset}>
+            Reset profile
+          </Button>
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        title="Reset profile"
+      >
+        <p className="text-section text-content-primary">Reset your profile?</p>
+        <p className="mt-2 text-sm text-content-secondary">
+          This permanently deletes your financial history. It cannot be undone, and there is no
+          backup.
+        </p>
+
+        {/* A warning that names real numbers is a warning; "this cannot be
+            undone" on its own is wallpaper. */}
+        <div className="mt-4 rounded-control border border-semantic-expense/30 bg-semantic-expense/10 p-4">
+          {preview === null ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <ul className="space-y-1 text-sm text-content-primary">
+              {[
+                ["accounts", "accounts"],
+                ["transactions", "transactions"],
+                ["transfers", "transfers"],
+                ["loans", "loans"],
+                ["planned_transactions", "upcoming items"],
+                ["recurring_rules", "recurring series"],
+                ["custom_categories", "custom categories"],
+                ["notifications", "notifications"],
+              ]
+                .filter(([key]) => preview[key as keyof ResetPreview] > 0)
+                .map(([key, label]) => (
+                  <li key={key} className="flex justify-between gap-4">
+                    <span className="text-content-secondary">{label}</span>
+                    <span className="tabular font-semibold">
+                      {preview[key as keyof ResetPreview]}
+                    </span>
+                  </li>
+                ))}
+              {Object.values(preview).every((v) => v === 0) && (
+                <li className="text-content-secondary">
+                  There is nothing to delete — your profile is already empty.
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+
+        {resetError && (
+          <div className="mt-4">
+            <ErrorNotice message={resetError} />
+          </div>
+        )}
+
+        <div className="mt-4">
+          <Field label="Confirm with your password" hint="Required for an action this final.">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row">
+          <Button
+            variant="secondary"
+            onClick={() => setResetOpen(false)}
+            className="flex-1"
+          >
+            Keep my data
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmReset}
+            disabled={resetting || !resetPassword}
+            className="flex-1"
+          >
+            {resetting ? "Resetting…" : "Delete everything"}
+          </Button>
+        </div>
+      </ConfirmDialog>
     </AppShell>
   );
 }

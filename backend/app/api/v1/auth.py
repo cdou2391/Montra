@@ -7,8 +7,14 @@ from app.api.deps import current_session, current_user, db_session
 from app.core.config import settings
 from app.core.responses import single
 from app.models.user import Session, User, UserPreference
-from app.schemas.auth import LoginRequest, PreferencesUpdate, RegisterRequest
+from app.schemas.auth import (
+    LoginRequest,
+    PreferencesUpdate,
+    ProfileResetRequest,
+    RegisterRequest,
+)
 from app.services import auth as auth_service
+from app.services import profile as profile_service
 
 router = APIRouter(tags=["auth"])
 
@@ -123,3 +129,29 @@ def update_preferences(
     db.commit()
     db.refresh(prefs)
     return single(_preferences_payload(prefs))
+
+
+@router.get("/profile/reset-preview")
+def reset_preview(
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """What a reset would delete, so the warning can name real numbers."""
+    summary = profile_service.reset_summary(db, user)
+    db.commit()
+    return single(summary)
+
+
+@router.post("/profile/reset")
+def reset_profile(
+    payload: ProfileResetRequest,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Delete every financial record and start fresh. Irreversible.
+
+    The login survives, so this is "start over", not "delete my account".
+    """
+    deleted = profile_service.reset_profile(db, user=user, password=payload.password)
+    db.commit()
+    return single({"deleted": deleted})

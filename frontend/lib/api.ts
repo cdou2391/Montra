@@ -191,6 +191,18 @@ export type RecurringRule = {
   category_id: string | null;
 };
 
+export type ResetPreview = {
+  accounts: number;
+  transactions: number;
+  transfers: number;
+  loans: number;
+  loan_payments: number;
+  planned_transactions: number;
+  recurring_rules: number;
+  notifications: number;
+  custom_categories: number;
+};
+
 export type Preferences = {
   hide_balances: boolean;
   persist_balance_privacy: boolean;
@@ -313,6 +325,11 @@ export const montra = {
     api.post<Envelope<LoanPayment & { loan: Loan }>>(`/loans/${id}/payments`, payload, {
       "Idempotency-Key": key,
     }),
+
+  resetPreview: () =>
+    api.get<Envelope<ResetPreview>>("/profile/reset-preview").then((r) => r.data),
+  resetProfile: (password: string) =>
+    api.post<Envelope<{ deleted: ResetPreview }>>("/profile/reset", { password }),
 
   preferences: () =>
     api.get<Envelope<Preferences>>("/preferences").then((r) => r.data),
