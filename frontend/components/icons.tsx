@@ -35,7 +35,8 @@ export type IconName =
   | "smartphone"
   | "walletCards"
   | "trendingUp"
-  | "shapes";
+  | "shapes"
+  | "users";
 
 const PATHS: Record<IconName, string[]> = {
   home: [
@@ -114,6 +115,12 @@ const PATHS: Record<IconName, string[]> = {
     "M8.3 10a.7.7 0 0 1-.6-1l4-6.5a.7.7 0 0 1 1.2 0l4 6.5a.7.7 0 0 1-.6 1z",
     "M17.5 14a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z",
     "M3 15h7v7H3z",
+  ],
+  users: [
+    "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+    "M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z",
+    "M22 21v-2a4 4 0 0 0-3-3.87",
+    "M16 3.13a4 4 0 0 1 0 7.75",
   ],
   star: ["M11.5 3.1a.6.6 0 0 1 1 0l2.3 4.7 5.2.7a.6.6 0 0 1 .3 1l-3.8 3.6.9 5.2a.6.6 0 0 1-.9.6L12 16.4l-4.6 2.5a.6.6 0 0 1-.9-.6l.9-5.2-3.8-3.6a.6.6 0 0 1 .3-1l5.2-.7z"],
   // Same outline; the fill comes from the caller so one shape serves both states.

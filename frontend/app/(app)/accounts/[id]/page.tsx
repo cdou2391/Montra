@@ -97,12 +97,16 @@ export default function AccountDetail() {
         {isPrepaid && (
           <Button onClick={() => router.push(`/accounts/${id}/pay`)}>Top up</Button>
         )}
-        <Button variant="secondary" onClick={() => router.push(`/add?account=${id}`)}>
-          Add transaction
-        </Button>
-        <Button variant="secondary" onClick={() => router.push(`/transfer?from=${id}`)}>
-          Transfer
-        </Button>
+        {account.can_transact && (
+          <>
+            <Button variant="secondary" onClick={() => router.push(`/add?account=${id}`)}>
+              Add transaction
+            </Button>
+            <Button variant="secondary" onClick={() => router.push(`/transfer?from=${id}`)}>
+              Transfer
+            </Button>
+          </>
+        )}
         {account.can_transact && (
           <Button variant="secondary" onClick={() => router.push(`/accounts/${id}/reconcile`)}>
             Reconcile
@@ -114,6 +118,12 @@ export default function AccountDetail() {
           </Button>
         )}
       </div>
+
+      {!account.can_transact && (
+        <p className="mb-6 rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+          Shared with you to view. Only the owner can record transactions here.
+        </p>
+      )}
 
       <h2 className="mb-3 text-section">Activity</h2>
       {transactions.length === 0 ? (

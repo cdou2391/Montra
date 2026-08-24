@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Account, Transaction, montra } from "@/lib/api";
+import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { AccountPanel } from "@/components/account-panel";
@@ -32,9 +33,11 @@ export default function Accounts() {
   const { trackRef, index, onScroll, select } = useCarousel(accounts?.length ?? 0);
   const active = accounts?.[index];
 
+  const { context, family } = useFinancialContext();
+
   const loadAccounts = useCallback(() => {
-    montra.accounts().then(setAccounts).catch(() => setAccounts([]));
-  }, []);
+    montra.accounts(context).then(setAccounts).catch(() => setAccounts([]));
+  }, [context]);
 
   useEffect(loadAccounts, [loadAccounts]);
 
@@ -110,6 +113,8 @@ export default function Accounts() {
 
   return (
     <>
+      {family && <ContextSwitch className="mb-5" />}
+
       <PageHeader
         title="Accounts"
         icon="wallet"
@@ -298,23 +303,34 @@ function ActivitySection({
       </div>
 
       {/* Actions live with the activity they produce, rather than on the card,
-          which is now the link to the account. */}
-      <div className="mb-3 flex gap-2">
-        <Link
-          href={`/add?account=${account.id}`}
-          className="pressable inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
-        >
-          <Icon name="plus" size={18} strokeWidth={2.2} />
-          Add
-        </Link>
-        <Link
-          href={`/transfer?from=${account.id}`}
-          className="pressable pressable-tint inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-4 text-sm font-medium text-content-primary"
-        >
-          <Icon name="transfer" size={18} />
-          Transfer
-        </Link>
-      </div>
+          which is now the link to the account.
+
+          Hidden entirely when the account is only visible to you: offering an
+          action the server will refuse is worse than not offering it. A
+          FAMILY_VISIBLE account belonging to someone else is readable, not
+          writable. */}
+      {account.can_transact ? (
+        <div className="mb-3 flex gap-2">
+          <Link
+            href={`/add?account=${account.id}`}
+            className="pressable inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
+          >
+            <Icon name="plus" size={18} strokeWidth={2.2} />
+            Add
+          </Link>
+          <Link
+            href={`/transfer?from=${account.id}`}
+            className="pressable pressable-tint inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-4 text-sm font-medium text-content-primary"
+          >
+            <Icon name="transfer" size={18} />
+            Transfer
+          </Link>
+        </div>
+      ) : (
+        <p className="mb-3 rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+          Shared with you to view. Only the owner can record transactions here.
+        </p>
+      )}
 
       {rows === undefined && loading ? (
         <Skeleton className="h-40 w-full" />

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
+import { FinancialContextProvider } from "@/components/context";
 
 /**
  * Layout for every authenticated route.
@@ -25,9 +26,11 @@ export default function AuthenticatedLayout({
 }) {
   return (
     <Providers>
-      <AppShell>
-        <RequireSession>{children}</RequireSession>
-      </AppShell>
+      <FinancialContextProvider>
+        <AppShell>
+          <RequireSession>{children}</RequireSession>
+        </AppShell>
+      </FinancialContextProvider>
     </Providers>
   );
 }

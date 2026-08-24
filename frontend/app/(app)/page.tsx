@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Account, Loan, Transaction, montra } from "@/lib/api";
+import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { AccountCard, MetricCard, TransactionRow } from "@/components/financial";
@@ -22,17 +23,19 @@ export default function Home() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [hidden, setHidden] = useState(false);
+  const { context, family } = useFinancialContext();
 
   useEffect(() => {
-    montra.accounts().then(setAccounts).catch(() => setAccounts([]));
+    montra.accounts(context).then(setAccounts).catch(() => setAccounts([]));
     // Loans are not accounts, but they are part of what you own and owe, so
     // net worth is wrong without them.
-    montra.loans().then(setLoans).catch(() => setLoans([]));
+    if (context === "personal") montra.loans().then(setLoans).catch(() => setLoans([]));
+    else setLoans([]);
     montra
-      .transactions("?limit=5")
+      .transactions(`?limit=5&context=${context}`)
       .then((r) => setRecent(r.data))
       .catch(() => setRecent([]));
-  }, []);
+  }, [context]);
 
   const currency = user?.base_currency ?? "RWF";
 
@@ -58,9 +61,17 @@ export default function Home() {
 
   return (
     <>
+      {family && <ContextSwitch className="mb-5" />}
+
       <PageHeader
-        title={`Hello${user?.display_name ? `, ${user.display_name}` : ""}`}
-        leading={user ? <ProfileAvatarLink user={user} /> : undefined}
+        title={
+          context === "family"
+            ? family?.name ?? "Household"
+            : `Hello${user?.display_name ? `, ${user.display_name}` : ""}`
+        }
+        leading={
+          context === "personal" && user ? <ProfileAvatarLink user={user} /> : undefined
+        }
         action={
           <button
             onClick={() => setHidden((h) => !h)}

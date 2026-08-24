@@ -147,6 +147,65 @@ export type Category = {
   category_type: "INCOME" | "EXPENSE";
 };
 
+export type FamilyMember = {
+  user_id: string;
+  display_name: string | null;
+  email: string;
+  role: "OWNER" | "ADULT" | "MEMBER";
+  status: "ACTIVE" | "LEFT" | "REMOVED";
+  joined_at: string;
+};
+
+export type Family = {
+  id: string;
+  name: string;
+  base_currency: string;
+  status: string;
+  role: "OWNER" | "ADULT" | "MEMBER";
+  members: FamilyMember[];
+};
+
+export type Invitation = {
+  id: string;
+  invitee_email: string | null;
+  proposed_role: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  token?: string;
+};
+
+export type Position = {
+  assets: string;
+  liabilities: string;
+  net_worth: string;
+  account_count: number;
+  loan_count: number;
+};
+
+export type NetWorth = Position & {
+  context: "personal" | "family";
+  currency: string;
+  shared?: Position | null;
+};
+
+export type Dashboard = {
+  context: "personal" | "family";
+  currency: string;
+  in_family: boolean;
+  net_worth: NetWorth | null;
+  month: {
+    month: string;
+    income: string;
+    expense: string;
+    saved: string;
+    savings_rate: string | null;
+  } | null;
+  upcoming: PlannedTransaction[];
+  recent: Transaction[];
+  loans?: LoanPaymentDue[];
+};
+
 export type CurrentUser = {
   id: string;
   email: string;
@@ -294,6 +353,9 @@ export type AppNotification = {
   created_at: string;
 };
 
+/** Which lens the app is looking through (API spec section 11). */
+export type Context = "personal" | "family";
+
 type Envelope<T> = { data: T };
 type Collection<T> = { data: T[]; pagination: { limit: number; next_cursor: string | null } };
 
@@ -310,7 +372,8 @@ export const montra = {
   }) => api.post<Envelope<CurrentUser>>("/auth/register", payload),
   logout: () => api.post<void>("/auth/logout"),
 
-  accounts: () => api.get<Collection<Account>>("/accounts").then((r) => r.data),
+  accounts: (context: Context = "personal") =>
+    api.get<Collection<Account>>(`/accounts?context=${context}`).then((r) => r.data),
   account: (id: string) => api.get<Envelope<Account>>(`/accounts/${id}`).then((r) => r.data),
   createAccount: (payload: Record<string, unknown>) =>
     api.post<Envelope<Account>>("/accounts", payload).then((r) => r.data),
@@ -352,6 +415,39 @@ export const montra = {
     api.post<Envelope<unknown>>("/transfers", payload, {
       "Idempotency-Key": idempotencyKey,
     }),
+
+  // ------------------------------------------------------------- household
+  currentFamily: () =>
+    api.get<Envelope<Family | null>>("/families/current").then((r) => r.data),
+  createFamily: (name: string, base_currency: string) =>
+    api.post<Envelope<Family>>("/families", { name, base_currency }).then((r) => r.data),
+  invite: (familyId: string, invitee_email: string | null, proposed_role = "ADULT") =>
+    api
+      .post<Envelope<Invitation>>(`/families/${familyId}/invitations`, {
+        invitee_email,
+        proposed_role,
+      })
+      .then((r) => r.data),
+  invitations: (familyId: string) =>
+    api.get<Collection<Invitation>>(`/families/${familyId}/invitations`).then((r) => r.data),
+  cancelInvitation: (familyId: string, invitationId: string) =>
+    api.delete<Envelope<Invitation>>(`/families/${familyId}/invitations/${invitationId}`),
+  acceptInvitation: (token: string) =>
+    api.post<Envelope<Family>>(`/family-invitations/${token}/accept`).then((r) => r.data),
+  removeMember: (familyId: string, userId: string) =>
+    api.delete<Envelope<unknown>>(`/families/${familyId}/members/${userId}`),
+  leaveFamily: (familyId: string) =>
+    api.post<Envelope<unknown>>(`/families/${familyId}/leave`),
+  setAccountVisibility: (accountId: string, visibility: string) =>
+    api
+      .patch<Envelope<Account>>(`/accounts/${accountId}/visibility`, { visibility })
+      .then((r) => r.data),
+
+  // ------------------------------------------------------------- reporting
+  dashboard: (context: Context = "personal") =>
+    api.get<Envelope<Dashboard>>(`/dashboard?context=${context}`).then((r) => r.data),
+  netWorth: (context: Context = "personal") =>
+    api.get<Envelope<NetWorth>>(`/reports/net-worth?context=${context}`).then((r) => r.data),
 
   // ---------------------------------------------------------------- loans
   loans: (query = "") =>

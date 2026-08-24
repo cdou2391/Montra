@@ -12,16 +12,17 @@ the code; the documents are the source of truth for behaviour.
 
 ## Current status
 
-Implemented through **Phase 15** of the
+Implemented through **Phase 23** of the
 [implementation plan](docs/Montra%20—%20End%20to%20End%20Implementation%20Plan.md) —
 milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**,
-**M4 (Planning)** and **M5 (Debt)**.
+**M4 (Planning)**, **M5 (Debt)**, **M6 (Family)**, and the dashboard and
+net-worth half of **M7**.
 
 | Working | Not yet built |
 |---|---|
-| Registration, login, logout, sessions | Household sharing and family dashboard |
-| Default categories and onboarding | Cash-flow forecast and insights |
-| Accounts of all eight types | Attachments, audit log, CSV import/export |
+| Registration, login, logout, sessions | Cash-flow forecast and insights |
+| Default categories and onboarding | Attachments, audit log, CSV import/export |
+| Accounts of all eight types | |
 | The financial posting engine | |
 | Income, expenses, transfers | |
 | Balance reconciliation | |
@@ -30,6 +31,9 @@ milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**,
 | Upcoming and recurring transactions | |
 | Reminders, worker, scheduler, notifications | |
 | Loans payable and receivable | |
+| Households, sharing, permissions | Cash-flow forecast and insights |
+| Personal / Family context switch | Attachments, audit log, CSV import/export |
+| Dashboard and net worth | |
 
 Family sharing is deliberately refused rather than half-enforced: creating a
 `FAMILY_VISIBLE` or `SHARED` account returns `NO_ACTIVE_FAMILY` until the
@@ -145,7 +149,7 @@ account's perspective.
 make test
 ```
 
-178 tests. The ledger suites
+295 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
@@ -160,7 +164,12 @@ payment lowers cash and debt together, and a payment is never an expense.
 planned transaction is not a ledger entry until it is completed, and that
 completing one twice cannot post twice.
 [`test_loans.py`](backend/tests/test_loans.py) guards the payment split: a
-repayment is not all spending. Coverage elsewhere is deliberately lighter.
+repayment is not all spending.
+[`test_family_authorization.py`](backend/tests/test_family_authorization.py) is
+the visibility matrix the plan gates the family work on, and
+[`test_transfer_redaction.py`](backend/tests/test_transfer_redaction.py) checks
+at the serialization layer that a private counterparty never leaves the API.
+Coverage elsewhere is deliberately lighter.
 
 ---
 
@@ -197,3 +206,13 @@ repayment is not all spending. Coverage elsewhere is deliberately lighter.
   `principal + interest + fees = total`.
 - Loan outstanding principal is derived from the opening figure minus principal
   paid. The original loan amount is never overwritten.
+- Visibility has three levels and reading is not writing. PRIVATE is owner-only
+  and answers 404 rather than 403, since 403 confirms a record exists.
+  FAMILY_VISIBLE lets the household read but only the owner write. SHARED lets
+  OWNER and ADULT transact. Child records resolve through their account, never
+  through their author.
+- Sharing is derived from the caller's own membership, never from a `family_id`
+  in the request. Joining a household shares nothing until you say so, and
+  leaving returns everything to private.
+- Private data is excluded from aggregates before they are summed, and scoping
+  is by account, so a shared account counts once rather than once per member.

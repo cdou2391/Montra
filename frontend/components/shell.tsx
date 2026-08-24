@@ -33,6 +33,12 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
     hint: "Reminders and alerts",
   },
   {
+    href: "/family",
+    label: "Household",
+    icon: "users",
+    hint: "Share with the people you live with",
+  },
+  {
     href: "/loans",
     label: "Loans",
     icon: "handshake",
