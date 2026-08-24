@@ -4,8 +4,8 @@
  * The large single-account panel shared by the mobile carousel and the desktop
  * master/detail layout (UI/UX sections 31, 33).
  *
- * The whole panel is deliberately not a link: on mobile it lives inside a
- * swipeable track, where a tap target that large fights the gesture.
+ * The whole panel is the link to the account. Inside a swipeable track that is
+ * safe: a drag scrolls and suppresses the click, a tap navigates.
  */
 
 import Link from "next/link";
@@ -27,7 +27,11 @@ function FavoriteToggle({
   const [favorite, setFavorite] = useState(account.is_favorite);
   const [busy, setBusy] = useState(false);
 
-  async function toggle() {
+  async function toggle(event: React.MouseEvent) {
+    // The star sits inside the link to the account; starring is not navigating.
+    event.preventDefault();
+    event.stopPropagation();
+
     const next = !favorite;
     setFavorite(next);
     setBusy(true);
@@ -69,56 +73,41 @@ export function AccountPanel({
   const isLiability = account.account_nature === "LIABILITY";
 
   return (
-    <Card className="flex min-h-[188px] flex-col justify-between">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-section text-content-primary">{account.name}</p>
-          <p className="mt-1 text-xs text-content-secondary">
-            {account.account_type.replace(/_/g, " ")}
-            {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
+    <Link
+      href={`/accounts/${account.id}`}
+      aria-label={`${account.name} details`}
+      className="pressable pressable-surface block"
+    >
+      <Card className="flex min-h-[150px] flex-col justify-between transition-colors hover:bg-surface-elevated">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-section text-content-primary">{account.name}</p>
+            <p className="mt-1 text-xs text-content-secondary">
+              {account.account_type.replace(/_/g, " ")}
+              {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {isLiability && <StatusChip tone="expense">Credit</StatusChip>}
+            <FavoriteToggle account={account} onChanged={onFavoriteChanged} />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          {/* A liability balance is debt owed, never money available. */}
+          <p className="text-xs uppercase tracking-wide text-content-muted">
+            {isLiability ? "Balance owed" : "Available"}
+          </p>
+          <p className="mt-1">
+            <MoneyValue
+              amount={account.balance}
+              currency={account.currency}
+              size="value"
+              hidden={hidden}
+            />
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {isLiability && <StatusChip tone="expense">Credit</StatusChip>}
-          <FavoriteToggle account={account} onChanged={onFavoriteChanged} />
-        </div>
-      </div>
-
-      <div className="mt-5">
-        {/* A liability balance is debt owed, never money available. */}
-        <p className="text-xs uppercase tracking-wide text-content-muted">
-          {isLiability ? "Balance owed" : "Available"}
-        </p>
-        <p className="mt-1">
-          <MoneyValue
-            amount={account.balance}
-            currency={account.currency}
-            size="value"
-            hidden={hidden}
-          />
-        </p>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Link
-          href={`/add?account=${account.id}`}
-          className="pressable min-h-[40px] rounded-control bg-accent px-4 text-sm font-semibold leading-10 text-background-primary"
-        >
-          Add
-        </Link>
-        <Link
-          href={`/transfer?from=${account.id}`}
-          className="pressable pressable-tint min-h-[40px] rounded-control border border-white/15 px-4 text-sm font-medium leading-10 text-content-primary"
-        >
-          Transfer
-        </Link>
-        <Link
-          href={`/accounts/${account.id}`}
-          className="pressable min-h-[40px] px-2 text-sm font-medium leading-10 text-accent"
-        >
-          Details
-        </Link>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }

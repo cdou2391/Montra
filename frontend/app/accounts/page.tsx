@@ -289,8 +289,27 @@ function ActivitySection({
     <section className="mt-8">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-section">Recent activity</h2>
-        <Link href={`/transactions?account=${account.id}`} className="text-xs text-accent">
+        <Link href={`/transactions?account=${account.id}`} className="pressable text-xs text-accent">
           View all
+        </Link>
+      </div>
+
+      {/* Actions live with the activity they produce, rather than on the card,
+          which is now the link to the account. */}
+      <div className="mb-3 flex gap-2">
+        <Link
+          href={`/add?account=${account.id}`}
+          className="pressable inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
+        >
+          <Icon name="plus" size={18} strokeWidth={2.2} />
+          Add
+        </Link>
+        <Link
+          href={`/transfer?from=${account.id}`}
+          className="pressable pressable-tint inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-4 text-sm font-medium text-content-primary"
+        >
+          <Icon name="transfer" size={18} />
+          Transfer
         </Link>
       </div>
 
@@ -300,11 +319,6 @@ function ActivitySection({
         <EmptyState
           title="Nothing here yet"
           message={`No transactions recorded on ${account.name}.`}
-          action={
-            <Link href={`/add?account=${account.id}`}>
-              <Button>Add transaction</Button>
-            </Link>
-          }
         />
       ) : (
         <Card>
