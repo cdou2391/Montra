@@ -23,6 +23,40 @@ from app.services.credit_cards import apply_card_fields, card_fields_payload
 from app.services.posting import PostingService
 
 
+def _resolve_sharing(
+    db: DbSession,
+    *,
+    user: User,
+    visibility: Visibility,
+    family_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    """Work out which household a record belongs to, if any.
+
+    Sharing is derived from the caller's active membership rather than trusted
+    from the request: a client must not be able to attach a record to a
+    household by naming its id.
+    """
+    from app.services.families import active_membership
+
+    if visibility is Visibility.PRIVATE:
+        return None  # A private record belongs to no household, whatever was sent.
+
+    membership = active_membership(db, user)
+    if membership is None:
+        raise ValidationFailed(
+            "You are not in a household yet.",
+            code="NO_ACTIVE_FAMILY",
+            details=[{"field": "visibility", "message": "Join or create a household first."}],
+        )
+    if family_id is not None and family_id != membership.family_id:
+        raise ValidationFailed(
+            "That is not your household.",
+            code="NO_ACTIVE_FAMILY",
+            details=[{"field": "family_id", "message": "You belong to a different household."}],
+        )
+    return membership.family_id
+
+
 def create_account(
     db: DbSession,
     *,
@@ -40,17 +74,11 @@ def create_account(
     family_id: uuid.UUID | None = None,
     card_fields: dict | None = None,
 ) -> Account:
-    if visibility is not Visibility.PRIVATE or family_id is not None:
-        # Family sharing lands in Phase 16-19; refuse rather than silently
-        # storing a visibility the backend cannot yet enforce.
-        raise ValidationFailed(
-            "Family sharing is not available yet.",
-            code="NO_ACTIVE_FAMILY",
-            details=[{"field": "visibility", "message": "Only PRIVATE accounts are supported."}],
-        )
+    family_id = _resolve_sharing(db, user=user, visibility=visibility, family_id=family_id)
 
     account = Account(
         owner_user_id=user.id,
+        family_id=family_id,
         name=name.strip(),
         account_type=account_type,
         ownership_type=ownership_type,
@@ -165,8 +193,9 @@ def list_accounts(
     status: AccountStatus | None = None,
     account_type: AccountType | None = None,
     limit: int = 50,
+    context: str = "personal",
 ) -> list[Account]:
-    stmt = visible_accounts(user, include_archived=True)
+    stmt = visible_accounts(db, user, include_archived=True, context=context)
     if status is not None:
         stmt = stmt.where(Account.status == status)
     else:
@@ -189,10 +218,20 @@ def masked_identifier(account: Account) -> str | None:
 
 
 def serialize_account(
-    db: DbSession, account: Account, user: User, *, favorite: uuid.UUID | None = None
+    db: DbSession,
+    account: Account,
+    user: User,
+    *,
+    favorite: uuid.UUID | None = None,
+    access=None,
 ) -> dict:
     from app.core.money import serialize
-    from app.services.authz import can_edit, can_transact
+    from app.services.authz import can_edit, can_transact, resolve
+
+    # Callers serializing a list pass this in, to avoid one membership lookup
+    # per account.
+    if access is None:
+        access = resolve(db, user)
 
     # Callers serializing a list pass the favourite in, to avoid one query per
     # account.
@@ -222,8 +261,27 @@ def serialize_account(
             "id": str(user.id),
             "display_name": user.display_name,
         },
-        "can_edit": can_edit(account, user),
-        "can_transact": can_transact(account, user),
+        "can_edit": can_edit(account, access),
+        "can_transact": can_transact(account, access),
         "credit_card": card_fields_payload(account),
         "is_favorite": favorite == account.id,
     }
+
+
+def set_visibility(
+    db: DbSession, *, account: Account, user: User, visibility: Visibility
+) -> Account:
+    """Move an account between private, family-visible and shared.
+
+    Visibility is inherited by everything the account holds, so this one field
+    decides what the household can see of its history too (API spec section 18).
+    """
+    account.family_id = _resolve_sharing(
+        db, user=user, visibility=visibility, family_id=account.family_id
+    )
+    account.visibility = visibility
+    if visibility is not Visibility.SHARED and account.ownership_type is OwnershipType.JOINT:
+        # A joint account that is no longer shared has nobody to be joint with.
+        account.ownership_type = OwnershipType.PERSONAL
+    db.flush()
+    return account

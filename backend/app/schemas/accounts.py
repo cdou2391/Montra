@@ -96,3 +96,7 @@ class PrepaidTopUp(MontraModel):
     occurred_at: datetime
 
     _v_amount = amount_validator("amount")
+
+
+class VisibilityUpdate(MontraModel):
+    visibility: Visibility

@@ -126,3 +126,56 @@ def prepaid_card(db: Session, user: User) -> Account:
 def credit_card(db: Session, user: User) -> Account:
     """Opening balance on a liability is debt owed."""
     return _make_account(db, user, AccountType.CREDIT_CARD, "200000.0000", "BK Visa")
+
+
+# --------------------------------------------------------------------- family
+
+
+@pytest.fixture
+def third_user(db: Session) -> User:
+    """Someone outside the household, for the "no business seeing this" cases."""
+    u = register_user(
+        db,
+        email="outsider@example.com",
+        password="a third good passphrase",
+        display_name="Outsider",
+        base_currency="RWF",
+        timezone="Africa/Kigali",
+    )
+    db.commit()
+    return u
+
+
+@pytest.fixture
+def family(db: Session, user: User, other_user: User):
+    """A household: `user` owns it, `other_user` joined as ADULT."""
+    from app.services import families as family_service
+
+    fam = family_service.create_family(db, user=user, name="Our Household", base_currency="RWF")
+    db.commit()
+    _, token = family_service.invite(
+        db, user=user, family_id=fam.id, invitee_email=other_user.email
+    )
+    db.commit()
+    family_service.accept_invitation(db, user=other_user, token=token)
+    db.commit()
+    return fam
+
+
+def make_account(db: Session, owner: User, name: str, visibility, **kw):
+    from app.db.enums import AccountType
+    from app.services.accounts import create_account
+
+    account = create_account(
+        db,
+        user=owner,
+        name=name,
+        account_type=kw.pop("account_type", AccountType.CHECKING),
+        currency="RWF",
+        opening_balance=Decimal(kw.pop("opening", "100000")),
+        opening_balance_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+        visibility=visibility,
+        **kw,
+    )
+    db.commit()
+    return account

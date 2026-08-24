@@ -190,11 +190,16 @@ def list_transactions(
     search: str | None = None,
     limit: int = DEFAULT_LIMIT,
     cursor: str | None = None,
+    context: str = "personal",
 ) -> tuple[list[Transaction], str | None]:
     limit = max(1, min(limit, MAX_LIMIT))
 
-    # Scope first: only transactions on accounts this user may view.
-    account_ids = select(visible_accounts(user, include_archived=True).subquery().c.id)
+    # Scope first: only transactions on accounts this user may view, in the
+    # requested context. Private data is excluded here rather than filtered
+    # out of the results afterwards.
+    account_ids = select(
+        visible_accounts(db, user, include_archived=True, context=context).subquery().c.id
+    )
 
     stmt = (
         select(Transaction)
@@ -268,4 +273,42 @@ def serialize_transaction(txn: Transaction, account: Account | None = None) -> d
         ),
         "transfer_id": str(txn.transfer_id) if txn.transfer_id else None,
         "created_at": txn.created_at.isoformat(),
+    }
+
+
+def redacted_account_ref(account, access) -> dict:
+    """One side of a transfer, as this viewer is allowed to see it.
+
+    Implementation Plan Phase 20 and Data Model section 48: a household member
+    watching money leave a shared account may see that it went somewhere
+    private, and nothing more. Not the id, not the name, not the balance.
+
+    The linkage stays intact in the database; only the projection is reduced.
+    """
+    from app.services.authz import can_view
+
+    if account is None:
+        return None
+    if can_view(account, access):
+        return {"id": str(account.id), "name": account.name}
+    return {"visibility": "PRIVATE", "display_name": "Private account"}
+
+
+def serialize_transfer(db, transfer, access) -> dict:
+    from decimal import Decimal
+
+    from app.core.money import serialize
+    from app.models.finance import Account
+
+    source = db.get(Account, transfer.source_account_id)
+    destination = db.get(Account, transfer.destination_account_id)
+    return {
+        "id": str(transfer.id),
+        "source_account": redacted_account_ref(source, access),
+        "destination_account": redacted_account_ref(destination, access),
+        "amount": serialize(Decimal(transfer.source_amount)),
+        "currency": transfer.source_currency,
+        "occurred_at": transfer.occurred_at.isoformat(),
+        "notes": transfer.notes,
+        "status": transfer.status.value,
     }

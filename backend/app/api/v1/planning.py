@@ -52,6 +52,7 @@ def list_planned(
     date_to: date | None = None,
     include_closed: bool = False,
     limit: int = Query(default=100, ge=1, le=200),
+    context: str = Query(default="personal", pattern="^(personal|family)$"),
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
@@ -68,6 +69,7 @@ def list_planned(
         date_to=date_to,
         include_closed=include_closed,
         limit=limit,
+        context=context,
     )
     today = _today(user)
     db.commit()
@@ -250,7 +252,7 @@ def list_rules(
 ) -> dict:
     from app.services.authz import visible_accounts
 
-    account_ids = select(visible_accounts(user, include_archived=True).subquery().c.id)
+    account_ids = select(visible_accounts(db, user, include_archived=True).subquery().c.id)
     stmt = select(RecurringRule).where(RecurringRule.account_id.in_(account_ids))
     if status_filter is not None:
         stmt = stmt.where(RecurringRule.status == status_filter)

@@ -107,8 +107,21 @@ def me(
     user: User = Depends(current_user),
 ) -> dict:
     db.commit()  # persist last_used_at touch from session resolution
+    from app.models.family import Family
+    from app.services import families as family_service
+
+    membership = family_service.active_membership(db, user)
     payload = _user_payload(user)
-    payload["active_family"] = None  # Family arrives in Phase 16
+    if membership is None:
+        payload["active_family"] = None
+    else:
+        family = db.get(Family, membership.family_id)
+        payload["active_family"] = {
+            "id": str(family.id),
+            "name": family.name,
+            "base_currency": family.base_currency,
+            "role": membership.role.value,
+        }
     return single(payload)
 
 

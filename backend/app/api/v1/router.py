@@ -1,6 +1,16 @@
 from fastapi import APIRouter
 
-from app.api.v1 import accounts, auth, cards, health, loans, planning, transactions
+from app.api.v1 import (
+    accounts,
+    auth,
+    cards,
+    families,
+    health,
+    loans,
+    planning,
+    reports,
+    transactions,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -10,3 +20,5 @@ api_router.include_router(transactions.router)
 api_router.include_router(cards.router)
 api_router.include_router(planning.router)
 api_router.include_router(loans.router)
+api_router.include_router(families.router)
+api_router.include_router(reports.router)

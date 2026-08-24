@@ -17,7 +17,9 @@ from app.db.base import utcnow
 from app.models.finance import Transfer
 from app.models.user import User
 from app.schemas.accounts import CreditCardPayment, PrepaidTopUp
+from app.services import authz
 from app.services import credit_cards as card_service
+from app.services import transactions as txn_service
 from app.services.authz import get_transactable_account, get_viewable_account
 
 router = APIRouter(tags=["cards"])
@@ -29,25 +31,6 @@ def _replay(db: DbSession, user: User, key: str | None) -> Transfer | None:
     return db.scalar(
         select(Transfer).where(Transfer.created_by == user.id, Transfer.idempotency_key == key)
     )
-
-
-def _transfer_payload(db: DbSession, transfer: Transfer) -> dict:
-    from decimal import Decimal
-
-    from app.core.money import serialize
-    from app.models.finance import Account
-
-    src = db.get(Account, transfer.source_account_id)
-    dst = db.get(Account, transfer.destination_account_id)
-    return {
-        "id": str(transfer.id),
-        "source_account": {"id": str(src.id), "name": src.name},
-        "destination_account": {"id": str(dst.id), "name": dst.name},
-        "amount": serialize(Decimal(transfer.source_amount)),
-        "currency": transfer.source_currency,
-        "occurred_at": transfer.occurred_at.isoformat(),
-        "status": transfer.status.value,
-    }
 
 
 @router.get("/credit-cards/{account_id}/summary")
@@ -76,7 +59,7 @@ def pay_credit_card(
     existing = _replay(db, user, idempotency_key)
     if existing is not None:
         db.commit()
-        return single(_transfer_payload(db, existing))
+        return single(txn_service.serialize_transfer(db, existing, authz.resolve(db, user)))
 
     card = get_transactable_account(db, account_id, user)
     source = get_transactable_account(
@@ -93,7 +76,7 @@ def pay_credit_card(
     )
     db.commit()
     db.refresh(transfer)
-    return single(_transfer_payload(db, transfer))
+    return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))
 
 
 @router.post("/prepaid-cards/{account_id}/top-ups", status_code=status.HTTP_201_CREATED)
@@ -107,7 +90,7 @@ def top_up_prepaid_card(
     existing = _replay(db, user, idempotency_key)
     if existing is not None:
         db.commit()
-        return single(_transfer_payload(db, existing))
+        return single(txn_service.serialize_transfer(db, existing, authz.resolve(db, user)))
 
     card = get_transactable_account(db, account_id, user)
     source = get_transactable_account(
@@ -124,4 +107,4 @@ def top_up_prepaid_card(
     )
     db.commit()
     db.refresh(transfer)
-    return single(_transfer_payload(db, transfer))
+    return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))

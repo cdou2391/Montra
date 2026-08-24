@@ -1,3 +1,8 @@
+from app.models.family import (  # noqa: F401
+    Family,
+    FamilyInvitation,
+    FamilyMembership,
+)
 from app.models.finance import (  # noqa: F401
     Account,
     Category,

@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import date
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy import select
@@ -10,7 +9,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import current_user, db_session, parse_uuid
 from app.core.errors import Conflict, NotFound
-from app.core.money import serialize, to_decimal
+from app.core.money import to_decimal
 from app.core.responses import collection, single
 from app.core.timezone import ensure_aware
 from app.db.enums import CategoryType, TransactionStatus, TransactionType
@@ -22,6 +21,7 @@ from app.schemas.transactions import (
     TransactionUpdate,
     TransferCreate,
 )
+from app.services import authz
 from app.services import categories as category_service
 from app.services import transactions as txn_service
 from app.services.authz import get_transactable_account, get_viewable_account
@@ -46,6 +46,7 @@ def list_transactions(
     search: str | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     cursor: str | None = None,
+    context: str = Query(default="personal", pattern="^(personal|family)$"),
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
@@ -63,6 +64,7 @@ def list_transactions(
         search=search,
         limit=limit,
         cursor=cursor,
+        context=context,
     )
     db.commit()
     return collection(
@@ -143,23 +145,6 @@ def delete_transaction(
 # --------------------------------------------------------------------- transfers
 
 
-def _serialize_transfer(db: DbSession, transfer: Transfer, user: User) -> dict:
-    from app.models.finance import Account
-
-    src = db.get(Account, transfer.source_account_id)
-    dst = db.get(Account, transfer.destination_account_id)
-    return {
-        "id": str(transfer.id),
-        "source_account": {"id": str(src.id), "name": src.name},
-        "destination_account": {"id": str(dst.id), "name": dst.name},
-        "amount": serialize(Decimal(transfer.source_amount)),
-        "currency": transfer.source_currency,
-        "occurred_at": transfer.occurred_at.isoformat(),
-        "notes": transfer.notes,
-        "status": transfer.status.value,
-    }
-
-
 @router.post("/transfers", status_code=status.HTTP_201_CREATED)
 def create_transfer(
     payload: TransferCreate,
@@ -177,7 +162,7 @@ def create_transfer(
         )
         if existing is not None:
             db.commit()
-            return single(_serialize_transfer(db, existing, user))
+            return single(txn_service.serialize_transfer(db, existing, authz.resolve(db, user)))
 
     source = get_transactable_account(
         db, parse_uuid(payload.source_account_id, "source_account_id"), user
@@ -201,7 +186,7 @@ def create_transfer(
     # One commit for the transfer and both ledger entries (Architecture section 23).
     db.commit()
     db.refresh(transfer)
-    return single(_serialize_transfer(db, transfer, user))
+    return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))
 
 
 @router.get("/transfers/{transfer_id}")
@@ -216,7 +201,7 @@ def get_transfer(
     # Viewing requires access to at least one side.
     get_viewable_account(db, transfer.source_account_id, user)
     db.commit()
-    return single(_serialize_transfer(db, transfer, user))
+    return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))
 
 
 @router.post("/transfers/{transfer_id}/cancel")
@@ -233,7 +218,7 @@ def cancel_transfer(
     PostingService(db).cancel_transfer(transfer, actor_id=user.id)
     db.commit()
     db.refresh(transfer)
-    return single(_serialize_transfer(db, transfer, user))
+    return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))
 
 
 # -------------------------------------------------------------------- categories

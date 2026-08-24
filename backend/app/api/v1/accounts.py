@@ -15,6 +15,7 @@ from app.schemas.accounts import (
     AccountCreate,
     AccountUpdate,
     BalanceAdjustmentCreate,
+    VisibilityUpdate,
 )
 from app.services import accounts as account_service
 from app.services.authz import get_editable_account, get_viewable_account
@@ -46,11 +47,17 @@ def list_accounts(
     status_filter: AccountStatus | None = Query(default=None, alias="status"),
     type_filter: AccountType | None = Query(default=None, alias="type"),
     limit: int = Query(default=50, ge=1, le=100),
+    context: str = Query(default="personal", pattern="^(personal|family)$"),
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
     accounts = account_service.list_accounts(
-        db, user=user, status=status_filter, account_type=type_filter, limit=limit
+        db,
+        user=user,
+        status=status_filter,
+        account_type=type_filter,
+        limit=limit,
+        context=context,
     )
     favorite = account_service.favorite_account_id(db, user)
     payload = [account_service.serialize_account(db, a, user, favorite=favorite) for a in accounts]
@@ -114,6 +121,25 @@ def update_account(
         currency=payload.currency,
         card_fields=_card_fields(payload),
     )
+    db.commit()
+    db.refresh(account)
+    return single(account_service.serialize_account(db, account, user))
+
+
+@router.patch("/{account_id}/visibility")
+def change_visibility(
+    account_id: uuid.UUID,
+    payload: VisibilityUpdate,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Share an account with the household, or take it back.
+
+    Child records inherit account visibility, so this decides what the
+    household can see of its history too (API spec section 18).
+    """
+    account = get_editable_account(db, account_id, user)
+    account_service.set_visibility(db, account=account, user=user, visibility=payload.visibility)
     db.commit()
     db.refresh(account)
     return single(account_service.serialize_account(db, account, user))

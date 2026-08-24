@@ -77,14 +77,9 @@ def create_loan(
     family_id: uuid.UUID | None = None,
     notes: str | None = None,
 ) -> Loan:
-    if visibility is not Visibility.PRIVATE or family_id is not None:
-        # Same stance as accounts: refuse a visibility the backend cannot yet
-        # enforce rather than store one it will honour later.
-        raise ValidationFailed(
-            "Family sharing is not available yet.",
-            code="NO_ACTIVE_FAMILY",
-            details=[{"field": "visibility", "message": "Only PRIVATE loans are supported."}],
-        )
+    from app.services.accounts import _resolve_sharing
+
+    family_id = _resolve_sharing(db, user=user, visibility=visibility, family_id=family_id)
     if original_principal < 0 or opening_outstanding_principal < 0:
         raise ValidationFailed(
             details=[{"field": "original_principal", "message": "Amounts cannot be negative."}]
@@ -105,6 +100,7 @@ def create_loan(
 
     loan = Loan(
         owner_user_id=user.id,
+        family_id=family_id,
         direction=direction,
         visibility=visibility,
         ownership_type=ownership_type,

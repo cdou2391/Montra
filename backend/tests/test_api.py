@@ -883,3 +883,149 @@ def test_cannot_favorite_another_users_account_over_the_api(client):
 
     _register(client, email="second@example.com")
     assert client.post(f"/api/v1/accounts/{account_id}/favorite").status_code == 404
+
+
+# -------------------------------------------------------------------- family
+
+
+def test_household_invitation_flow(client):
+    """Create a household, invite someone, they accept, both see it."""
+    _register(client, email="owner@example.com")
+    created = client.post(
+        "/api/v1/families", json={"name": "Our Household", "base_currency": "RWF"}
+    )
+    assert created.status_code == 201, created.text
+    family = created.json()["data"]
+    assert family["role"] == "OWNER"
+
+    invited = client.post(
+        f"/api/v1/families/{family['id']}/invitations",
+        json={"invitee_email": "partner@example.com", "proposed_role": "ADULT"},
+    )
+    assert invited.status_code == 201, invited.text
+    token = invited.json()["data"]["token"]
+    assert token
+
+    client.post("/api/v1/auth/logout")
+    _register(client, email="partner@example.com")
+    accepted = client.post(f"/api/v1/family-invitations/{token}/accept")
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["data"]["role"] == "ADULT"
+
+    # Both are now members, and /auth/me reports it.
+    me = client.get("/api/v1/auth/me").json()["data"]
+    assert me["active_family"]["name"] == "Our Household"
+    assert len(client.get("/api/v1/families/current").json()["data"]["members"]) == 2
+
+
+def test_the_invitation_token_is_only_ever_returned_once(client):
+    _register(client, email="owner@example.com")
+    family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
+        "data"
+    ]["id"]
+    client.post(
+        f"/api/v1/families/{family_id}/invitations", json={"invitee_email": "p@example.com"}
+    )
+    listed = client.get(f"/api/v1/families/{family_id}/invitations").json()["data"]
+    # Only the hash is stored, so listing cannot reveal it again.
+    assert "token" not in listed[0]
+
+
+def test_cannot_belong_to_two_households(client):
+    _register(client, email="owner@example.com")
+    client.post("/api/v1/families", json={"name": "First", "base_currency": "RWF"})
+    second = client.post("/api/v1/families", json={"name": "Second", "base_currency": "RWF"})
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "ACTIVE_FAMILY_ALREADY_EXISTS"
+
+
+def test_an_invitation_for_someone_else_is_not_yours_to_accept(client):
+    _register(client, email="owner@example.com")
+    family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
+        "data"
+    ]["id"]
+    token = client.post(
+        f"/api/v1/families/{family_id}/invitations",
+        json={"invitee_email": "intended@example.com"},
+    ).json()["data"]["token"]
+
+    client.post("/api/v1/auth/logout")
+    _register(client, email="someone-else@example.com")
+    # 404 rather than 403: do not confirm the invitation exists.
+    assert client.post(f"/api/v1/family-invitations/{token}/accept").status_code == 404
+
+
+def test_only_the_owner_can_invite(client):
+    _register(client, email="owner@example.com")
+    family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
+        "data"
+    ]["id"]
+    token = client.post(
+        f"/api/v1/families/{family_id}/invitations", json={"invitee_email": "a@example.com"}
+    ).json()["data"]["token"]
+    client.post("/api/v1/auth/logout")
+
+    _register(client, email="a@example.com")
+    client.post(f"/api/v1/family-invitations/{token}/accept")
+    denied = client.post(
+        f"/api/v1/families/{family_id}/invitations", json={"invitee_email": "b@example.com"}
+    )
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "INVITE_NOT_ALLOWED"
+
+
+def test_sharing_an_account_makes_it_visible_to_the_household(client):
+    _register(client, email="owner@example.com")
+    family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
+        "data"
+    ]["id"]
+    account_id = _create_account(client, name="Salary").json()["data"]["id"]
+    token = client.post(
+        f"/api/v1/families/{family_id}/invitations", json={"invitee_email": "p@example.com"}
+    ).json()["data"]["token"]
+
+    shared = client.patch(
+        f"/api/v1/accounts/{account_id}/visibility", json={"visibility": "FAMILY_VISIBLE"}
+    )
+    assert shared.status_code == 200, shared.text
+    assert shared.json()["data"]["visibility"] == "FAMILY_VISIBLE"
+
+    client.post("/api/v1/auth/logout")
+    _register(client, email="p@example.com")
+    client.post(f"/api/v1/family-invitations/{token}/accept")
+
+    # Joining shares nothing of their own, but they can now see the salary.
+    personal = client.get("/api/v1/accounts").json()["data"]
+    assert personal == []
+    family_view = client.get("/api/v1/accounts?context=family").json()["data"]
+    assert [a["name"] for a in family_view] == ["Salary"]
+    # Visible is not writable.
+    assert family_view[0]["can_transact"] is False
+
+
+def test_joining_leaves_your_own_accounts_private(client):
+    """Implementation Plan Phase 18: nothing is shared until you say so."""
+    _register(client, email="owner@example.com")
+    family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
+        "data"
+    ]["id"]
+    token = client.post(
+        f"/api/v1/families/{family_id}/invitations", json={"invitee_email": "p@example.com"}
+    ).json()["data"]["token"]
+    client.post("/api/v1/auth/logout")
+
+    _register(client, email="p@example.com")
+    account_id = _create_account(client, name="Mine").json()["data"]["id"]
+    client.post(f"/api/v1/family-invitations/{token}/accept")
+
+    detail = client.get(f"/api/v1/accounts/{account_id}").json()["data"]
+    assert detail["visibility"] == "PRIVATE"
+    assert client.get("/api/v1/accounts?context=family").json()["data"] == []
+
+
+def test_dashboard_and_net_worth_respond_in_both_contexts(client):
+    _register(client)
+    _create_account(client)
+    for context in ("personal", "family"):
+        assert client.get(f"/api/v1/dashboard?context={context}").status_code == 200
+        assert client.get(f"/api/v1/reports/net-worth?context={context}").status_code == 200

@@ -378,8 +378,11 @@ def list_planned(
     date_to: date | None = None,
     include_closed: bool = False,
     limit: int = 100,
+    context: str = "personal",
 ) -> list[PlannedTransaction]:
-    account_ids = select(visible_accounts(user, include_archived=True).subquery().c.id)
+    account_ids = select(
+        visible_accounts(db, user, include_archived=True, context=context).subquery().c.id
+    )
     stmt = (
         select(PlannedTransaction)
         .options(
@@ -443,7 +446,7 @@ def refresh_due_status(db: DbSession, *, user: User) -> int:
     """
     today = _local_date(utcnow(), user.timezone)
     boundary = day_end(today, user.timezone)
-    account_ids = select(visible_accounts(user, include_archived=True).subquery().c.id)
+    account_ids = select(visible_accounts(db, user, include_archived=True).subquery().c.id)
     rows = db.scalars(
         select(PlannedTransaction).where(
             PlannedTransaction.account_id.in_(account_ids),

@@ -183,3 +183,38 @@ class LoanStatus(StrEnum):
     ACTIVE = "ACTIVE"
     SETTLED = "SETTLED"
     ARCHIVED = "ARCHIVED"
+
+
+class FamilyStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+
+class FamilyRole(StrEnum):
+    """FSD section 4.2.
+
+    MEMBER is reserved for reduced-permission household members and is
+    read-only for MVP.
+    """
+
+    OWNER = "OWNER"
+    ADULT = "ADULT"
+    MEMBER = "MEMBER"
+
+
+class MembershipStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    LEFT = "LEFT"
+    REMOVED = "REMOVED"
+
+
+class InvitationStatus(StrEnum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+
+
+# Roles permitted to transact on a shared account. MEMBER is read-only in MVP.
+TRANSACTING_ROLES = frozenset({FamilyRole.OWNER, FamilyRole.ADULT})
