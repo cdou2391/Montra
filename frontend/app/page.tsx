@@ -103,6 +103,9 @@ function Home() {
               label="Assets"
               amount={String(totals.assets)}
               currency={currency}
+              // Mirrors Owed beside it: neutral at zero, coloured once there
+              // is something to say.
+              tone={totals.assets > 0 ? "income" : "neutral"}
               hidden={hidden}
             />
             <MetricCard
