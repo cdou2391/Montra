@@ -112,9 +112,10 @@ function Recurring() {
     <AppShell>
       <PageHeader
         title="Recurring"
+        icon="repeat"
         action={
           <div className="flex items-center gap-3">
-            <Link href="/planning" className="text-xs text-accent">
+            <Link href="/planning" className="hidden text-xs text-accent sm:inline">
               Upcoming
             </Link>
             <Link href="/planning/recurring/new">

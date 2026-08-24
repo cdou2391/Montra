@@ -72,7 +72,7 @@ function Reconcile() {
   if (!account) {
     return (
       <AppShell>
-        <PageHeader title="Reconcile" />
+        <PageHeader title="Reconcile" icon="scale" />
         <Skeleton className="h-48 w-full" />
       </AppShell>
     );
@@ -83,7 +83,7 @@ function Reconcile() {
 
   return (
     <AppShell>
-      <PageHeader title={`Reconcile ${account.name}`} />
+      <PageHeader title={`Reconcile ${account.name}`} icon="scale" />
 
       <Card className="mb-4">
         <p className="text-xs uppercase tracking-wide text-content-muted">

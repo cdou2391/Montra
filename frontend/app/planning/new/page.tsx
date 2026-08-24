@@ -76,7 +76,8 @@ function NewPlanned() {
 
   return (
     <AppShell>
-      <PageHeader title="Add upcoming" />
+      <PageHeader title="Add upcoming"
+        icon="calendar" />
 
       <div className="mb-5 grid grid-cols-2 gap-2 rounded-control bg-background-secondary p-1">
         {(["EXPENSE", "INCOME"] as const).map((t) => (

@@ -32,6 +32,7 @@ function Notifications() {
     <AppShell>
       <PageHeader
         title="Notifications"
+        icon="bell"
         action={
           unread > 0 ? (
             <Button variant="secondary" onClick={markAll}>

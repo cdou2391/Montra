@@ -95,7 +95,7 @@ function PayCard() {
 
   return (
     <AppShell>
-      <PageHeader title={title} />
+      <PageHeader title={title} icon="creditCard" />
 
       {isCredit && summary && (
         <Card className="mb-4">

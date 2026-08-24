@@ -69,7 +69,8 @@ function Accounts() {
   if (accounts === null) {
     return (
       <AppShell>
-        <PageHeader title="Accounts" />
+        <PageHeader title="Accounts"
+        icon="wallet" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="mt-6 h-64 w-full" />
       </AppShell>
@@ -79,7 +80,8 @@ function Accounts() {
   if (accounts.length === 0) {
     return (
       <AppShell>
-        <PageHeader title="Accounts" />
+        <PageHeader title="Accounts"
+        icon="wallet" />
         <EmptyState
           title="No accounts yet"
           message="Add a bank account, cash, mobile money or a card to get started."
@@ -109,28 +111,25 @@ function Accounts() {
     <AppShell>
       <PageHeader
         title="Accounts"
+        icon="wallet"
         action={
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setHidden((h) => !h)}
-              className="text-xs text-content-secondary hover:text-content-primary"
-            >
-              {hidden ? "Show" : "Hide"}
-            </button>
-            <Link href="/accounts/new">
-              {/* The bell now shares this row; the long label would crush the
-                  page title on a narrow phone. */}
-              <Button>
-                <span className="sm:hidden">Add</span>
-                <span className="hidden sm:inline">New account</span>
-              </Button>
-            </Link>
-          </div>
+          <Link href="/accounts/new">
+            <Button>
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">New account</span>
+            </Button>
+          </Link>
         }
       />
 
       {/* Totals across every account, so swiping never loses the whole picture. */}
       <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <button
+          onClick={() => setHidden((h) => !h)}
+          className="order-last ml-auto text-xs text-content-secondary hover:text-content-primary"
+        >
+          {hidden ? "Show balances" : "Hide balances"}
+        </button>
         <div>
           <span className="text-xs uppercase tracking-wide text-content-muted">
             Total available

@@ -56,7 +56,7 @@ function Reschedule() {
   if (!planned) {
     return (
       <AppShell>
-        <PageHeader title="Reschedule" />
+        <PageHeader title="Reschedule" icon="calendar" />
         <Skeleton className="h-48 w-full" />
       </AppShell>
     );
@@ -64,7 +64,7 @@ function Reschedule() {
 
   return (
     <AppShell>
-      <PageHeader title="Reschedule" />
+      <PageHeader title="Reschedule" icon="calendar" />
       <Card className="mb-4">
         <p className="font-medium">{planned.description}</p>
         <p className="tabular mt-1 text-sm text-content-secondary">

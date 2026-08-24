@@ -72,7 +72,7 @@ function CompletePlanned() {
   if (!planned) {
     return (
       <AppShell>
-        <PageHeader title="Complete" />
+        <PageHeader title="Complete" icon="calendar" />
         <Skeleton className="h-48 w-full" />
       </AppShell>
     );
@@ -82,7 +82,7 @@ function CompletePlanned() {
 
   return (
     <AppShell>
-      <PageHeader title={isIncome ? "Mark as received" : "Mark as paid"} />
+      <PageHeader title={isIncome ? "Mark as received" : "Mark as paid"} icon="calendar" />
 
       <Card className="mb-4">
         <p className="font-medium">{planned.description}</p>

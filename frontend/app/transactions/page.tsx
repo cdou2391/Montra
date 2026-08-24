@@ -62,6 +62,7 @@ function Transactions() {
     <AppShell>
       <PageHeader
         title="Activity"
+        icon="list"
         action={
           <Link href="/add">
             <Button>Add</Button>

@@ -73,7 +73,8 @@ function TransferForm() {
 
   return (
     <AppShell>
-      <PageHeader title="Transfer" />
+      <PageHeader title="Transfer"
+        icon="transfer" />
       <Card>
         <form onSubmit={submit} className="space-y-4">
           {error && <ErrorNotice message={error} />}

@@ -63,7 +63,7 @@ function AccountDetail() {
 
   return (
     <AppShell>
-      <PageHeader title={account.name} />
+      <PageHeader title={account.name} icon={isCard ? "creditCard" : "wallet"} />
 
       <div className="mb-6">
         {isCard && summary ? (

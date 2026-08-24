@@ -13,13 +13,14 @@ import { ReactNode } from "react";
 
 import { montra } from "@/lib/api";
 import { NotificationBell } from "@/components/notification-bell";
+import { Icon, IconName } from "@/components/icons";
 
-const NAV = [
-  { href: "/", label: "Home", icon: "◧" },
-  { href: "/accounts", label: "Accounts", icon: "▤" },
-  { href: "/add", label: "Add", icon: "＋", primary: true },
-  { href: "/planning", label: "Planning", icon: "◔" },
-  { href: "/more", label: "More", icon: "⋯" },
+const NAV: { href: string; label: string; icon: IconName; primary?: boolean }[] = [
+  { href: "/", label: "Home", icon: "home" },
+  { href: "/accounts", label: "Accounts", icon: "wallet" },
+  { href: "/add", label: "Add", icon: "plus", primary: true },
+  { href: "/planning", label: "Planning", icon: "calendar" },
+  { href: "/more", label: "More", icon: "more" },
 ];
 
 
@@ -49,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   : "text-content-secondary hover:bg-white/5"
               }`}
             >
-              <span aria-hidden>{item.icon}</span>
+              <Icon name={item.icon} size={20} />
               {item.label}
             </Link>
           ))}
@@ -85,8 +86,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-label="Add transaction"
                 className="flex flex-1 items-center justify-center py-2"
               >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-2xl leading-none text-background-primary">
-                  {item.icon}
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-background-primary">
+                  <Icon name={item.icon} size={24} strokeWidth={2.2} />
                 </span>
               </Link>
             ) : (
@@ -97,9 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   pathname === item.href ? "text-accent" : "text-content-secondary"
                 }`}
               >
-                <span aria-hidden className="text-lg leading-none">
-                  {item.icon}
-                </span>
+                <Icon name={item.icon} size={21} />
                 {item.label}
               </Link>
             ),
@@ -114,16 +113,27 @@ export function PageHeader({
   title,
   action,
   leading,
+  icon,
 }: {
   title: string;
   action?: ReactNode;
-  /** Rendered before the title, e.g. a profile avatar. */
+  /** Rendered before the title, e.g. a profile avatar. Wins over `icon`. */
   leading?: ReactNode;
+  /** Section icon shown before the title. */
+  icon?: IconName;
 }) {
   return (
     <header className="mb-6 flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-3">
-        {leading}
+      <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+        {/* Tighter on a narrow phone: this row also carries the page action
+            and the bell, and the title must not be the thing that gives way. */}
+        {leading ??
+          (icon && (
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-muted text-accent sm:h-9 sm:w-9">
+              <Icon name={icon} size={18} className="sm:hidden" />
+              <Icon name={icon} size={19} className="hidden sm:block" />
+            </span>
+          ))}
         <h1 className="min-w-0 truncate text-title text-content-primary">{title}</h1>
       </div>
       <div className="flex shrink-0 items-center gap-2">

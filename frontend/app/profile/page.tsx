@@ -100,7 +100,8 @@ function Profile() {
   if (!user) {
     return (
       <AppShell>
-        <PageHeader title="Profile" />
+        <PageHeader title="Profile"
+        icon="user" />
         <Skeleton className="h-48 w-full" />
       </AppShell>
     );
@@ -108,7 +109,8 @@ function Profile() {
 
   return (
     <AppShell>
-      <PageHeader title="Profile" />
+      <PageHeader title="Profile"
+        icon="user" />
 
       <Card className="mb-4">
         <div className="flex items-center gap-4">

@@ -22,7 +22,8 @@ function More() {
 
   return (
     <AppShell>
-      <PageHeader title="More" />
+      <PageHeader title="More"
+        icon="more" />
       <Link href="/profile" className="mb-4 block">
         <Card className="transition hover:bg-surface-elevated">
           <div className="flex items-center gap-4">

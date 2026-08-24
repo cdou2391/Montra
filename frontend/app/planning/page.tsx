@@ -117,7 +117,8 @@ function Planning() {
   if (rows === null) {
     return (
       <AppShell>
-        <PageHeader title="Upcoming" />
+        <PageHeader title="Upcoming"
+        icon="calendar" />
         <Skeleton className="h-64 w-full" />
       </AppShell>
     );
@@ -140,6 +141,7 @@ function Planning() {
     <AppShell>
       <PageHeader
         title="Upcoming"
+        icon="calendar"
         action={
           <div className="flex items-center gap-3">
             {/* Hidden on the narrowest phones so the page title is not

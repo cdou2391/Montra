@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Account } from "@/lib/api";
+import { Icon } from "@/components/icons";
 
 export function useCarousel(count: number) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -107,25 +108,6 @@ export function CarouselSlide({
   );
 }
 
-function Chevron({ direction }: { direction: "left" | "right" }) {
-  // Lucide-style stroke icon (UI/UX section 16), inherits currentColor.
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
-    </svg>
-  );
-}
-
 /**
  * A chevron flanking the carousel. Stays mounted when disabled so the track
  * never changes width at either end of the run.
@@ -155,7 +137,7 @@ export function CarouselChevron({
         disabled:hover:text-content-secondary
       "
     >
-      <Chevron direction={direction} />
+      <Icon name={direction === "left" ? "chevronLeft" : "chevronRight"} />
     </button>
   );
 }

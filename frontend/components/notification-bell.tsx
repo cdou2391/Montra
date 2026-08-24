@@ -12,26 +12,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { montra } from "@/lib/api";
-
-function BellIcon() {
-  // Lucide-style stroke icon at 22px (UI/UX section 16).
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10.268 21a2 2 0 0 0 3.464 0" />
-      <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
-    </svg>
-  );
-}
+import { Icon } from "@/components/icons";
 
 export function NotificationBell() {
   const pathname = usePathname();
@@ -68,7 +49,7 @@ export function NotificationBell() {
       aria-label={label}
       className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-content-secondary transition hover:bg-white/5 hover:text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
     >
-      <BellIcon />
+      <Icon name="bell" />
       {unread > 0 && (
         <span
           aria-hidden

@@ -84,7 +84,8 @@ function NewAccountForm() {
 
   return (
     <AppShell>
-      <PageHeader title={onboarding ? "Add your first account" : "Add account"} />
+      <PageHeader title={onboarding ? "Add your first account" : "Add account"}
+        icon="wallet" />
       <Card>
         <form onSubmit={submit} className="space-y-4">
           {error && <ErrorNotice message={error} />}
