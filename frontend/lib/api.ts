@@ -269,6 +269,20 @@ export type LoanPayment = {
   created_at: string;
 };
 
+export type LoanPaymentDue = {
+  id: string;
+  kind: "LOAN_PAYMENT";
+  loan_id: string;
+  direction: "PAYABLE" | "RECEIVABLE";
+  description: string;
+  counterparty: string | null;
+  amount: string;
+  currency: string;
+  due_date: string;
+  bucket: "OVERDUE" | "TODAY" | "TOMORROW" | "THIS_WEEK" | "LATER";
+  outstanding_principal: string;
+};
+
 export type AppNotification = {
   id: string;
   notification_type: string;
@@ -346,6 +360,8 @@ export const montra = {
   createLoan: (payload: Record<string, unknown>) =>
     api.post<Envelope<Loan>>("/loans", payload).then((r) => r.data),
   archiveLoan: (id: string) => api.post<Envelope<Loan>>(`/loans/${id}/archive`),
+  upcomingLoanPayments: () =>
+    api.get<Collection<LoanPaymentDue>>("/loans/upcoming").then((r) => r.data),
   loanPayments: (id: string) =>
     api.get<Collection<LoanPayment>>(`/loans/${id}/payments`).then((r) => r.data),
   recordLoanPayment: (id: string, payload: Record<string, unknown>, key: string) =>

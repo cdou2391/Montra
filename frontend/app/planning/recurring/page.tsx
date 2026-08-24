@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { RecurringRule, montra } from "@/lib/api";
+import { Loan, RecurringRule, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { formatMoney } from "@/lib/format";
+import { Icon } from "@/components/icons";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 const CADENCE: Record<string, string> = {
@@ -103,14 +104,73 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
   );
 }
 
+/**
+ * A loan with a payment schedule is a recurring commitment too, but it is not
+ * a RecurringRule: the loan owns its own schedule. Shown here for what it is,
+ * managed from the loan itself.
+ */
+function ScheduledLoanCard({ loan }: { loan: Loan }) {
+  const owed = loan.direction === "PAYABLE";
+  const cadence = loan.payment_frequency
+    ? `Every ${(CADENCE[loan.payment_frequency] ?? loan.payment_frequency).toLowerCase()}`
+    : "One payment";
+
+  return (
+    <Link href={`/loans/${loan.id}`} className="pressable pressable-surface block">
+      <Card className="transition-colors hover:bg-surface-elevated">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+              <Icon name="handshake" size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-content-primary">{loan.name}</p>
+              <p className="mt-1 truncate text-xs text-content-secondary">
+                {cadence}
+                {loan.next_payment_date ? ` · next ${loan.next_payment_date}` : ""}
+              </p>
+            </div>
+          </div>
+          <span
+            className={`tabular shrink-0 text-sm font-semibold ${
+              owed ? "text-semantic-expense" : "text-semantic-income"
+            }`}
+          >
+            {owed ? "−" : "+"}
+            {formatMoney(loan.expected_payment_amount ?? "0", loan.currency)}
+          </span>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <StatusChip tone={owed ? "expense" : "income"}>Loan</StatusChip>
+          <span className="text-xs text-content-muted">
+            {formatMoney(loan.outstanding_principal, loan.currency)} outstanding
+          </span>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 function Recurring() {
   const [rules, setRules] = useState<RecurringRule[] | null>(null);
+  const [loans, setLoans] = useState<Loan[]>([]);
 
   const load = useCallback(() => {
     montra
       .recurringRules()
       .then(setRules)
       .catch(() => setRules([]));
+    montra
+      .loans()
+      .then((all) =>
+        setLoans(
+          all.filter(
+            (l) => l.status === "ACTIVE" && l.next_payment_date && l.expected_payment_amount,
+          ),
+        ),
+      )
+      .catch(() => setLoans([]));
   }, []);
   useEffect(load, [load]);
 
@@ -133,7 +193,7 @@ function Recurring() {
 
       {rules === null ? (
         <Skeleton className="h-48 w-full" />
-      ) : rules.length === 0 ? (
+      ) : rules.length === 0 && loans.length === 0 ? (
         <EmptyState
           title="No recurring items"
           message="Set up rent, subscriptions or a salary once and Montra will keep the upcoming list filled in."
@@ -144,10 +204,25 @@ function Recurring() {
           }
         />
       ) : (
-        <div className="space-y-3">
-          {rules.map((r) => (
-            <RuleCard key={r.id} rule={r} onChanged={load} />
-          ))}
+        <div className="space-y-6">
+          {rules.length > 0 && (
+            <div className="space-y-3">
+              {rules.map((r) => (
+                <RuleCard key={r.id} rule={r} onChanged={load} />
+              ))}
+            </div>
+          )}
+
+          {loans.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-section text-content-secondary">Loan payments</h2>
+              <div className="space-y-3">
+                {loans.map((l) => (
+                  <ScheduledLoanCard key={l.id} loan={l} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </AppShell>

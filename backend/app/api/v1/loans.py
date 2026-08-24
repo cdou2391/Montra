@@ -72,6 +72,25 @@ def create_loan(
     return single(loan_service.serialize_loan(db, loan))
 
 
+@router.get("/upcoming")
+def upcoming_loan_payments(
+    horizon_days: int = Query(default=90, ge=1, le=365),
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Loan payments falling due, for the planning screens.
+
+    Declared before /{loan_id} so "upcoming" is not read as a loan id.
+    """
+    from app.core.timezone import to_local
+    from app.db.base import utcnow
+
+    today = to_local(utcnow(), user.timezone).date()
+    payload = loan_service.upcoming_payments(db, user=user, today=today, horizon_days=horizon_days)
+    db.commit()
+    return collection(payload, limit=len(payload))
+
+
 @router.get("/{loan_id}")
 def get_loan(
     loan_id: uuid.UUID,

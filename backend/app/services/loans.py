@@ -12,7 +12,7 @@ Cash moves by the total; analytics move by interest and fees only.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -33,6 +33,7 @@ from app.models.loans import Loan, LoanPayment
 from app.models.user import User
 from app.services.authz import get_transactable_account
 from app.services.posting import PostingService
+from app.services.recurrence import occurrence_after
 
 ZERO = Decimal("0")
 
@@ -288,9 +289,99 @@ def record_payment(
 
     if outstanding_principal(db, loan) == 0 and loan.status is LoanStatus.ACTIVE:
         loan.status = LoanStatus.SETTLED
+    else:
+        # Move the schedule on, or the loan stays permanently due on the same
+        # date and the upcoming list never changes.
+        advance_schedule(db, loan, paid_on=payment_date)
 
     db.flush()
     return payment
+
+
+def advance_schedule(db: DbSession, loan: Loan, *, paid_on: date) -> date | None:
+    """Move next_payment_date on by exactly one instalment.
+
+    One payment settles one scheduled instalment, whether it arrives early or
+    late. Advancing past the payment date instead would silently forgive missed
+    instalments on a late payment, and paying a few days early would leave the
+    loan still showing as due.
+    """
+    if loan.payment_frequency is None or loan.next_payment_date is None:
+        return loan.next_payment_date
+
+    nxt = occurrence_after(
+        previous=loan.next_payment_date,
+        frequency=loan.payment_frequency,
+        interval=1,
+        anchor=loan.next_payment_date,
+    )
+    if loan.end_date is not None and nxt > loan.end_date:
+        loan.next_payment_date = None
+    else:
+        loan.next_payment_date = nxt
+    db.flush()
+    return loan.next_payment_date
+
+
+def upcoming_payments(
+    db: DbSession,
+    *,
+    user: User,
+    today: date,
+    horizon_days: int = 90,
+) -> list[dict]:
+    """Loan payments falling due, shaped like the planning screen's entries.
+
+    Derived rather than materialised: a loan already carries its own schedule,
+    so generating PlannedTransaction rows from it would mean two places to keep
+    in step and a way for them to disagree.
+    """
+    from app.core.money import serialize
+    from app.services.planning import bucket_for_day
+
+    horizon = today + timedelta(days=horizon_days)
+    entries: list[dict] = []
+
+    for loan in list_loans(db, user=user, status=LoanStatus.ACTIVE):
+        if loan.next_payment_date is None or loan.expected_payment_amount is None:
+            continue
+
+        # Only occurrences up to the horizon, so a weekly loan does not flood
+        # the list with a year of rows.
+        due = loan.next_payment_date
+        guard = 0
+        while due <= horizon:
+            outstanding = outstanding_principal(db, loan)
+            amount = min(Decimal(loan.expected_payment_amount), outstanding)
+            entries.append(
+                {
+                    "id": f"loan:{loan.id}:{due.isoformat()}",
+                    "kind": "LOAN_PAYMENT",
+                    "loan_id": str(loan.id),
+                    "direction": loan.direction.value,
+                    "description": loan.name,
+                    "counterparty": loan.counterparty,
+                    "amount": serialize(amount),
+                    "currency": loan.currency,
+                    "due_date": due.isoformat(),
+                    "bucket": bucket_for_day(due, today=today),
+                    "outstanding_principal": serialize(outstanding),
+                }
+            )
+            if loan.payment_frequency is None:
+                break  # A one-off payment date, not a series.
+            guard += 1
+            if guard > 200:
+                break
+            due = occurrence_after(
+                previous=due,
+                frequency=loan.payment_frequency,
+                interval=1,
+                anchor=loan.next_payment_date,
+            )
+
+    entries.sort(key=lambda e: e["due_date"])
+    return entries
 
 
 # --------------------------------------------------------------------- listing

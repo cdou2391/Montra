@@ -411,10 +411,13 @@ def list_planned(
     return list(db.scalars(stmt.order_by(PlannedTransaction.expected_at).limit(limit)))
 
 
-def bucket_for(planned: PlannedTransaction, *, today: date, timezone_name: str) -> str:
-    """Grouping used by the upcoming screen (Implementation Plan Phase 11)."""
-    day = _local_date(planned.expected_at, timezone_name)
-    if planned.status is PlannedStatus.MISSED or day < today:
+def bucket_for_day(day: date, *, today: date, overdue: bool = False) -> str:
+    """Grouping used by the upcoming screen (Implementation Plan Phase 11).
+
+    Pure date arithmetic, so anything with a due date can be placed in the same
+    buckets — planned transactions and loan payments alike.
+    """
+    if overdue or day < today:
         return "OVERDUE"
     if day == today:
         return "TODAY"
@@ -423,6 +426,14 @@ def bucket_for(planned: PlannedTransaction, *, today: date, timezone_name: str) 
     if day <= today + timedelta(days=7):
         return "THIS_WEEK"
     return "LATER"
+
+
+def bucket_for(planned: PlannedTransaction, *, today: date, timezone_name: str) -> str:
+    return bucket_for_day(
+        _local_date(planned.expected_at, timezone_name),
+        today=today,
+        overdue=planned.status is PlannedStatus.MISSED,
+    )
 
 
 def refresh_due_status(db: DbSession, *, user: User) -> int:

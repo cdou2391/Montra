@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { PlannedTransaction, montra } from "@/lib/api";
+import { LoanPaymentDue, PlannedTransaction, montra } from "@/lib/api";
 import { AppShell, PageHeader } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
-import { formatMoney, formatTime } from "@/lib/format";
+import { formatDate, formatMoney, formatTime } from "@/lib/format";
+import { Icon } from "@/components/icons";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 /**
@@ -112,14 +113,70 @@ function PlannedRow({
   );
 }
 
+function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
+  const owed = due.direction === "PAYABLE";
+  return (
+    <div className="border-b border-white/5 py-4 last:border-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+            <Icon name="handshake" size={18} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-content-primary">
+              {due.description}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-content-secondary">
+              {formatDate(`${due.due_date}T00:00:00`)}
+              {due.counterparty ? ` · ${due.counterparty}` : ""}
+              {" · "}
+              {owed ? "Loan payment" : "Repayment due to you"}
+            </p>
+          </div>
+        </div>
+        <span
+          className={`tabular shrink-0 text-sm font-semibold ${
+            owed ? "text-semantic-expense" : "text-semantic-income"
+          }`}
+        >
+          {owed ? "−" : "+"}
+          {formatMoney(due.amount, due.currency)}
+        </span>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 pl-12">
+        {/* Not completable inline: a loan payment splits across principal,
+            interest and fees, and only the payer knows the split. */}
+        <Link href={`/loans/${due.loan_id}/pay`}>
+          <span className="pressable inline-flex min-h-[36px] items-center rounded-full bg-accent px-3 text-xs font-semibold text-background-primary">
+            Record payment
+          </span>
+        </Link>
+        <Link href={`/loans/${due.loan_id}`}>
+          <span className="pressable pressable-tint inline-flex min-h-[36px] items-center rounded-full border border-white/10 px-3 text-xs text-content-secondary">
+            View loan
+          </span>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function Planning() {
   const [rows, setRows] = useState<PlannedTransaction[] | null>(null);
+  const [loanDues, setLoanDues] = useState<LoanPaymentDue[]>([]);
 
   const load = useCallback(() => {
     montra
       .planned()
       .then(setRows)
       .catch(() => setRows([]));
+    // Loan payments are derived from each loan's own schedule, so they arrive
+    // separately and are merged into the same buckets here.
+    montra
+      .upcomingLoanPayments()
+      .then(setLoanDues)
+      .catch(() => setLoanDues([]));
   }, []);
 
   useEffect(load, [load]);
@@ -137,17 +194,27 @@ function Planning() {
   const grouped = BUCKETS.map((b) => ({
     ...b,
     items: rows.filter((r) => r.bucket === b.key),
-  })).filter((b) => b.items.length > 0);
+    loans: loanDues.filter((l) => l.bucket === b.key),
+  })).filter((b) => b.items.length > 0 || b.loans.length > 0);
 
   // Transfers are excluded from both: money moving between your own accounts
   // is neither going out nor coming in.
-  const outstanding = rows
-    .filter((r) => r.planned_type === "EXPENSE")
-    .reduce((sum, r) => sum + Number(r.amount), 0);
-  const incoming = rows
-    .filter((r) => r.planned_type === "INCOME")
-    .reduce((sum, r) => sum + Number(r.amount), 0);
-  const currency = rows[0]?.currency ?? "RWF";
+  const outstanding =
+    rows
+      .filter((r) => r.planned_type === "EXPENSE")
+      .reduce((sum, r) => sum + Number(r.amount), 0) +
+    // Loan payments are money going out too.
+    loanDues
+      .filter((l) => l.direction === "PAYABLE")
+      .reduce((sum, l) => sum + Number(l.amount), 0);
+  const incoming =
+    rows
+      .filter((r) => r.planned_type === "INCOME")
+      .reduce((sum, r) => sum + Number(r.amount), 0) +
+    loanDues
+      .filter((l) => l.direction === "RECEIVABLE")
+      .reduce((sum, l) => sum + Number(l.amount), 0);
+  const currency = rows[0]?.currency ?? loanDues[0]?.currency ?? "RWF";
 
   return (
     <AppShell>
@@ -168,7 +235,7 @@ function Planning() {
         }
       />
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && loanDues.length === 0 ? (
         <EmptyState
           title="Nothing scheduled"
           message="Add a bill or expected income and it will show up here before it lands."
@@ -210,11 +277,16 @@ function Planning() {
               <section key={group.key}>
                 <div className="mb-2 flex items-center gap-2">
                   <h2 className="text-section">{group.label}</h2>
-                  <StatusChip tone={group.tone}>{group.items.length}</StatusChip>
+                  <StatusChip tone={group.tone}>
+                    {group.items.length + group.loans.length}
+                  </StatusChip>
                 </div>
                 <Card>
                   {group.items.map((p) => (
                     <PlannedRow key={p.id} planned={p} onChanged={load} />
+                  ))}
+                  {group.loans.map((l) => (
+                    <LoanPaymentRow key={l.id} due={l} />
                   ))}
                 </Card>
               </section>
