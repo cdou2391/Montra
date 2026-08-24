@@ -1,0 +1,71 @@
+"""Category management and the default category set (PRD sections 19.1-19.2)."""
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DbSession
+
+from app.db.enums import CategoryStatus, CategoryType
+from app.models.finance import Category
+
+DEFAULT_INCOME_CATEGORIES = [
+    "Salary",
+    "Bonus",
+    "Business",
+    "Investment income",
+    "Interest",
+    "Refund",
+    "Gift",
+    "Other",
+]
+
+DEFAULT_EXPENSE_CATEGORIES = [
+    "Food",
+    "Groceries",
+    "Restaurants",
+    "Housing",
+    "Rent",
+    "Mortgage",
+    "Utilities",
+    "Internet",
+    "Transport",
+    "Fuel",
+    "Shopping",
+    "Entertainment",
+    "Education",
+    "Healthcare",
+    "Family",
+    "Subscriptions",
+    "Insurance",
+    "Banking Fees",
+    "Travel",
+    "Gifts",
+    "Other",
+]
+
+
+def create_default_categories(db: DbSession, *, user_id: uuid.UUID) -> list[Category]:
+    categories = [
+        Category(user_id=user_id, name=name, category_type=CategoryType.INCOME, is_system=True)
+        for name in DEFAULT_INCOME_CATEGORIES
+    ] + [
+        Category(user_id=user_id, name=name, category_type=CategoryType.EXPENSE, is_system=True)
+        for name in DEFAULT_EXPENSE_CATEGORIES
+    ]
+    db.add_all(categories)
+    return categories
+
+
+def list_categories(
+    db: DbSession,
+    *,
+    user_id: uuid.UUID,
+    category_type: CategoryType | None = None,
+    include_archived: bool = False,
+) -> list[Category]:
+    stmt = select(Category).where(Category.user_id == user_id)
+    if category_type is not None:
+        stmt = stmt.where(Category.category_type == category_type)
+    if not include_archived:
+        stmt = stmt.where(Category.status == CategoryStatus.ACTIVE)
+    return list(db.scalars(stmt.order_by(Category.category_type, Category.name)))
