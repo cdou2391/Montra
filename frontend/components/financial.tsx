@@ -11,7 +11,7 @@ import Link from "next/link";
 
 import { Account, Transaction } from "@/lib/api";
 import { formatDateTime, formatMoney } from "@/lib/format";
-import { Icon } from "@/components/icons";
+import { Icon, accountTypeIcon } from "@/components/icons";
 import { Card, StatusChip } from "@/components/ui";
 
 export function MoneyValue({
@@ -75,17 +75,22 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
     <Link href={`/accounts/${account.id}`} className="pressable pressable-surface block">
       <Card className="transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 truncate font-medium text-content-primary">
-              {account.is_favorite && (
-                <Icon name="star" size={14} filled className="shrink-0 text-accent" />
-              )}
-              {account.name}
-            </p>
-            <p className="mt-1 text-xs text-content-secondary">
-              {account.account_type.replace(/_/g, " ")}
-              {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+              <Icon name={accountTypeIcon(account.account_type)} size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 truncate font-medium text-content-primary">
+                {account.is_favorite && (
+                  <Icon name="star" size={14} filled className="shrink-0 text-accent" />
+                )}
+                {account.name}
+              </p>
+              <p className="mt-1 truncate text-xs text-content-secondary">
+                {account.account_type.replace(/_/g, " ")}
+                {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
+              </p>
+            </div>
           </div>
           <div className="text-right">
             <MoneyValue

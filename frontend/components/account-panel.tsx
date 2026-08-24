@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import { Account, montra } from "@/lib/api";
 import { MoneyValue } from "@/components/financial";
-import { Icon } from "@/components/icons";
+import { Icon, accountTypeIcon } from "@/components/icons";
 import { Card, StatusChip } from "@/components/ui";
 
 /** Star toggle. Optimistic, because a star that lags a tap feels broken. */
@@ -80,12 +80,21 @@ export function AccountPanel({
     >
       <Card className="flex min-h-[150px] flex-col justify-between transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-section text-content-primary">{account.name}</p>
-            <p className="mt-1 text-xs text-content-secondary">
-              {account.account_type.replace(/_/g, " ")}
-              {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            {/* Restrained: the accent stays reserved for meaning, not decoration
+                (UI/UX section 9). */}
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+              <Icon name={accountTypeIcon(account.account_type)} size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-section text-content-primary">{account.name}</p>
+              {/* One line: with the icon taking width, this wrapped at 320px
+                  and made the card taller than the balance it exists to show. */}
+              <p className="mt-1 truncate text-xs text-content-secondary">
+                {account.account_type.replace(/_/g, " ")}
+                {account.masked_identifier ? ` · ${account.masked_identifier}` : ""}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isLiability && <StatusChip tone="expense">Credit</StatusChip>}

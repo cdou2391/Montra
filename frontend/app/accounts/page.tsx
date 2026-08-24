@@ -9,7 +9,7 @@ import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { AccountPanel } from "@/components/account-panel";
-import { Icon } from "@/components/icons";
+import { Icon, accountTypeIcon } from "@/components/icons";
 import {
   CarouselChevron,
   CarouselPosition,
@@ -230,16 +230,21 @@ function Accounts() {
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 truncate text-sm font-medium text-content-primary">
-                    {account.is_favorite && (
-                      <Icon name="star" size={13} filled className="shrink-0 text-accent" />
-                    )}
-                    {account.name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-content-secondary">
-                    {account.account_type.replace(/_/g, " ")}
-                  </p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+                    <Icon name={accountTypeIcon(account.account_type)} size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 truncate text-sm font-medium text-content-primary">
+                      {account.is_favorite && (
+                        <Icon name="star" size={13} filled className="shrink-0 text-accent" />
+                      )}
+                      {account.name}
+                    </p>
+                    <p className="mt-0.5 text-xs text-content-secondary">
+                      {account.account_type.replace(/_/g, " ")}
+                    </p>
+                  </div>
                 </div>
                 <MoneyValue
                   amount={account.balance}
