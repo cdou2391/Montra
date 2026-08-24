@@ -110,8 +110,11 @@ def nature_for(account_type: AccountType) -> AccountNature:
 
 
 class PlannedType(StrEnum):
+    """Data Model section 76 anticipated TRANSFER here from the start."""
+
     INCOME = "INCOME"
     EXPENSE = "EXPENSE"
+    TRANSFER = "TRANSFER"
 
 
 class PlannedStatus(StrEnum):

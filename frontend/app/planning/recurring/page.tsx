@@ -28,6 +28,7 @@ function describe(rule: RecurringRule): string {
 function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const isIncome = rule.planned_type === "INCOME";
+  const isTransfer = rule.planned_type === "TRANSFER";
 
   async function act(action: "pause" | "resume" | "end") {
     setBusy(true);
@@ -45,16 +46,21 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
         <div className="min-w-0">
           <p className="truncate font-medium text-content-primary">{rule.name}</p>
           <p className="mt-1 text-xs text-content-secondary">
+            {isTransfer ? "Transfer · " : ""}
             {describe(rule)}
             {rule.next_occurrence_date ? ` · next ${rule.next_occurrence_date}` : ""}
           </p>
         </div>
         <span
           className={`tabular shrink-0 text-sm font-semibold ${
-            isIncome ? "text-semantic-income" : "text-semantic-expense"
+            isTransfer
+              ? "text-semantic-transfer"
+              : isIncome
+                ? "text-semantic-income"
+                : "text-semantic-expense"
           }`}
         >
-          {isIncome ? "+" : "−"}
+          {isTransfer ? "" : isIncome ? "+" : "−"}
           {formatMoney(rule.amount, rule.currency)}
         </span>
       </div>

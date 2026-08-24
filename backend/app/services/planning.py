@@ -29,6 +29,7 @@ from app.db.enums import (
     ReminderEntity,
     ReminderStatus,
 )
+from app.models.finance import Account
 from app.models.planning import Notification, PlannedTransaction, RecurringRule, Reminder
 from app.models.user import User
 from app.services.authz import get_transactable_account, get_viewable_account, visible_accounts
@@ -59,6 +60,61 @@ def get_planned(db: DbSession, planned_id: uuid.UUID, user: User) -> PlannedTran
         raise NotFound("Planned transaction not found.", code="PLANNED_TRANSACTION_NOT_FOUND")
     get_viewable_account(db, planned.account_id, user)
     return planned
+
+
+def _resolve_destination(
+    db: DbSession,
+    *,
+    user: User,
+    planned_type: PlannedType,
+    source: "Account",
+    destination_account_id: uuid.UUID | None,
+) -> "Account | None":
+    """Validate the far side of a planned transfer.
+
+    Checked once here rather than at completion, so a rule that could never be
+    completed cannot be created in the first place.
+    """
+    if planned_type is not PlannedType.TRANSFER:
+        if destination_account_id is not None:
+            raise ValidationFailed(
+                "Only a transfer has a destination account.",
+                code="DESTINATION_NOT_APPLICABLE",
+                details=[
+                    {"field": "destination_account_id", "message": "Not valid for this type."}
+                ],
+            )
+        return None
+
+    if destination_account_id is None:
+        raise ValidationFailed(
+            "A transfer needs an account to move money into.",
+            code="DESTINATION_REQUIRED",
+            details=[{"field": "destination_account_id", "message": "Choose a destination."}],
+        )
+
+    destination = get_transactable_account(db, destination_account_id, user)
+    if destination.id == source.id:
+        raise ValidationFailed(
+            details=[
+                {
+                    "field": "destination_account_id",
+                    "message": "Source and destination must be different accounts.",
+                }
+            ]
+        )
+    if destination.currency != source.currency:
+        raise ValidationFailed(
+            "Cross-currency transfers are not supported yet.",
+            code="CURRENCY_MISMATCH",
+            details=[
+                {
+                    "field": "destination_account_id",
+                    "message": "Both accounts must use the same currency.",
+                }
+            ],
+        )
+    return destination
 
 
 def _require_open(planned: PlannedTransaction) -> None:
@@ -124,8 +180,16 @@ def create_planned(
     category_id: uuid.UUID | None = None,
     notes: str | None = None,
     reminder_days_before: int | None = None,
+    destination_account_id: uuid.UUID | None = None,
 ) -> PlannedTransaction:
     account = get_transactable_account(db, account_id, user)
+    destination = _resolve_destination(
+        db,
+        user=user,
+        planned_type=planned_type,
+        source=account,
+        destination_account_id=destination_account_id,
+    )
     if amount <= 0:
         raise ValidationFailed(
             details=[{"field": "amount", "message": "Amount must be greater than zero."}]
@@ -134,6 +198,7 @@ def create_planned(
     expected_at = ensure_aware(expected_at, user.timezone)
     planned = PlannedTransaction(
         account_id=account.id,
+        destination_account_id=destination.id if destination else None,
         planned_type=planned_type,
         amount=amount,
         currency=account.currency,
@@ -200,24 +265,40 @@ def complete_planned(
     )
 
     posting = PostingService(db)
-    record = (
-        posting.record_income
-        if locked.planned_type is PlannedType.INCOME
-        else posting.record_expense
-    )
-    txn = record(
-        account=account,
-        amount=amount,
-        currency=account.currency,
-        occurred_at=occurred_at,
-        actor_id=user.id,
-        category_id=locked.category_id,
-        description=locked.description,
-        notes=locked.notes,
-    )
+
+    if locked.planned_type is PlannedType.TRANSFER:
+        # A transfer is two linked ledger entries, so it goes through
+        # transfer_funds rather than being posted as a single transaction.
+        destination = get_transactable_account(db, locked.destination_account_id, user)
+        transfer = posting.transfer_funds(
+            source=account,
+            destination=destination,
+            source_amount=amount,
+            destination_amount=amount,
+            occurred_at=occurred_at,
+            actor_id=user.id,
+            notes=locked.description,
+        )
+        locked.completed_transfer_id = transfer.id
+    else:
+        record = (
+            posting.record_income
+            if locked.planned_type is PlannedType.INCOME
+            else posting.record_expense
+        )
+        txn = record(
+            account=account,
+            amount=amount,
+            currency=account.currency,
+            occurred_at=occurred_at,
+            actor_id=user.id,
+            category_id=locked.category_id,
+            description=locked.description,
+            notes=locked.notes,
+        )
+        locked.completed_transaction_id = txn.id
 
     locked.status = PlannedStatus.COMPLETED
-    locked.completed_transaction_id = txn.id
     locked.completion_key = idempotency_key
     cancel_reminders(db, locked.id)
     db.flush()
@@ -303,6 +384,7 @@ def list_planned(
         select(PlannedTransaction)
         .options(
             selectinload(PlannedTransaction.account),
+            selectinload(PlannedTransaction.destination_account),
             selectinload(PlannedTransaction.category),
         )
         .where(PlannedTransaction.account_id.in_(account_ids))
@@ -382,8 +464,16 @@ def create_rule(
     notes: str | None = None,
     occurrence_hour: int = 9,
     reminder_days_before: int | None = None,
+    destination_account_id: uuid.UUID | None = None,
 ) -> RecurringRule:
     account = get_transactable_account(db, account_id, user)
+    destination = _resolve_destination(
+        db,
+        user=user,
+        planned_type=planned_type,
+        source=account,
+        destination_account_id=destination_account_id,
+    )
     if amount <= 0:
         raise ValidationFailed(
             details=[{"field": "amount", "message": "Amount must be greater than zero."}]
@@ -395,6 +485,7 @@ def create_rule(
 
     rule = RecurringRule(
         account_id=account.id,
+        destination_account_id=destination.id if destination else None,
         planned_type=planned_type,
         amount=amount,
         currency=account.currency,
@@ -462,6 +553,7 @@ def generate_occurrences(
         expected_at = _stamp(day, rule.occurrence_hour, owner.timezone)
         planned = PlannedTransaction(
             account_id=rule.account_id,
+            destination_account_id=rule.destination_account_id,
             planned_type=rule.planned_type,
             amount=rule.amount,
             currency=rule.currency,
@@ -623,6 +715,14 @@ def serialize_planned(planned: PlannedTransaction, *, timezone_name: str, today:
             if planned.account
             else None
         ),
+        "destination_account": (
+            {
+                "id": str(planned.destination_account.id),
+                "name": planned.destination_account.name,
+            }
+            if planned.destination_account
+            else None
+        ),
         "category": (
             {"id": str(planned.category.id), "name": planned.category.name}
             if planned.category
@@ -633,6 +733,9 @@ def serialize_planned(planned: PlannedTransaction, *, timezone_name: str, today:
         ),
         "completed_transaction_id": (
             str(planned.completed_transaction_id) if planned.completed_transaction_id else None
+        ),
+        "completed_transfer_id": (
+            str(planned.completed_transfer_id) if planned.completed_transfer_id else None
         ),
     }
 
@@ -656,5 +759,8 @@ def serialize_rule(rule: RecurringRule) -> dict:
         "status": rule.status.value,
         "reminder_days_before": rule.reminder_days_before,
         "account_id": str(rule.account_id),
+        "destination_account_id": (
+            str(rule.destination_account_id) if rule.destination_account_id else None
+        ),
         "category_id": str(rule.category_id) if rule.category_id else None,
     }

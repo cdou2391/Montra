@@ -34,6 +34,7 @@ function PlannedRow({
 }) {
   const [busy, setBusy] = useState(false);
   const isIncome = planned.planned_type === "INCOME";
+  const isTransfer = planned.planned_type === "TRANSFER";
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -55,15 +56,24 @@ function PlannedRow({
           <p className="mt-0.5 truncate text-xs text-content-secondary">
             {formatTime(planned.expected_at)}
             {planned.account ? ` · ${planned.account.name}` : ""}
+            {/* Both sides, since a transfer without its destination is half a
+                sentence. */}
+            {isTransfer && planned.destination_account
+              ? ` → ${planned.destination_account.name}`
+              : ""}
             {planned.source === "RECURRING" ? " · Recurring" : ""}
           </p>
         </div>
         <span
           className={`tabular shrink-0 text-sm font-semibold ${
-            isIncome ? "text-semantic-income" : "text-semantic-expense"
+            isTransfer
+              ? "text-semantic-transfer"
+              : isIncome
+                ? "text-semantic-income"
+                : "text-semantic-expense"
           }`}
         >
-          {isIncome ? "+" : "−"}
+          {isTransfer ? "" : isIncome ? "+" : "−"}
           {formatMoney(planned.amount, planned.currency)}
         </span>
       </div>
@@ -71,7 +81,7 @@ function PlannedRow({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link href={`/planning/${planned.id}/complete`} className="pressable">
           <span className="inline-flex min-h-[36px] items-center rounded-full bg-accent px-3 text-xs font-semibold text-background-primary">
-            {isIncome ? "Mark received" : "Mark paid"}
+            {isTransfer ? "Mark done" : isIncome ? "Mark received" : "Mark paid"}
           </span>
         </Link>
         <Link href={`/planning/${planned.id}/reschedule`} className="pressable pressable-tint rounded-full">
@@ -129,6 +139,8 @@ function Planning() {
     items: rows.filter((r) => r.bucket === b.key),
   })).filter((b) => b.items.length > 0);
 
+  // Transfers are excluded from both: money moving between your own accounts
+  // is neither going out nor coming in.
   const outstanding = rows
     .filter((r) => r.planned_type === "EXPENSE")
     .reduce((sum, r) => sum + Number(r.amount), 0);
@@ -169,14 +181,18 @@ function Planning() {
       ) : (
         <>
           <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-            <div>
-              <span className="text-xs uppercase tracking-wide text-content-muted">
-                Going out
-              </span>
-              <p className="tabular mt-0.5 font-semibold text-semantic-expense">
-                {formatMoney(String(outstanding), currency)}
-              </p>
-            </div>
+            {/* Only shown when there is something to show: a list made only of
+                transfers would otherwise report "going out 0". */}
+            {outstanding > 0 && (
+              <div>
+                <span className="text-xs uppercase tracking-wide text-content-muted">
+                  Going out
+                </span>
+                <p className="tabular mt-0.5 font-semibold text-semantic-expense">
+                  {formatMoney(String(outstanding), currency)}
+                </p>
+              </div>
+            )}
             {incoming > 0 && (
               <div>
                 <span className="text-xs uppercase tracking-wide text-content-muted">

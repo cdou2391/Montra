@@ -52,6 +52,11 @@ class RecurringRule(UUIDPrimaryKey, Timestamped, Base):
     account_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
     )
+    # Only set for TRANSFER rules: the account money moves to. account_id is
+    # the source in that case.
+    destination_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE")
+    )
     planned_type: Mapped[PlannedType] = mapped_column(
         SAEnum(PlannedType, name="planned_type"), nullable=False
     )
@@ -86,6 +91,10 @@ class RecurringRule(UUIDPrimaryKey, Timestamped, Base):
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="recurring_amount_positive"),
+        CheckConstraint(
+            "destination_account_id IS NULL OR destination_account_id <> account_id",
+            name="recurring_transfer_distinct_accounts",
+        ),
         CheckConstraint("interval_value >= 1", name="interval_at_least_one"),
         CheckConstraint("occurrence_hour BETWEEN 0 AND 23", name="occurrence_hour_range"),
         CheckConstraint("end_date IS NULL OR end_date >= start_date", name="end_after_start"),
@@ -100,6 +109,10 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
 
     account_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    # Only set for TRANSFER items; account_id is the source.
+    destination_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE")
     )
     planned_type: Mapped[PlannedType] = mapped_column(
         SAEnum(PlannedType, name="planned_type"), nullable=False
@@ -138,6 +151,11 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
     completed_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL")
     )
+    # A completed transfer is two ledger entries, so it is linked as a transfer
+    # rather than being forced into the single-transaction column.
+    completed_transfer_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("transfers.id", ondelete="SET NULL")
+    )
     original_expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Set on the first successful completion. A replayed key returns the same
@@ -148,12 +166,17 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
-    account = relationship("Account")
+    account = relationship("Account", foreign_keys=[account_id])
+    destination_account = relationship("Account", foreign_keys=[destination_account_id])
     category = relationship("Category")
     rule: Mapped[RecurringRule | None] = relationship()
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="planned_amount_positive"),
+        CheckConstraint(
+            "destination_account_id IS NULL OR destination_account_id <> account_id",
+            name="planned_transfer_distinct_accounts",
+        ),
         # The documented duplicate guard: one occurrence per rule per day.
         UniqueConstraint(
             "recurring_rule_id", "occurrence_date", name="one_occurrence_per_rule_per_day"

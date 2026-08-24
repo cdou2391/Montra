@@ -19,7 +19,7 @@ const FREQUENCIES = [
 
 function NewRule() {
   const router = useRouter();
-  const [type, setType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
+  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState({
@@ -31,6 +31,7 @@ function NewRule() {
     start_date: new Date().toISOString().slice(0, 10),
     end_date: "",
     category_id: "",
+    destination_account_id: "",
     occurrence_hour: "9",
     reminder_days_before: "2",
   });
@@ -45,6 +46,13 @@ function NewRule() {
   }, []);
 
   useEffect(() => {
+    if (type === "TRANSFER") {
+      // Moving your own money between accounts is not spending, so it is not
+      // categorised.
+      setCategories([]);
+      setForm((f) => ({ ...f, category_id: "" }));
+      return;
+    }
     montra.categories(type).then(setCategories);
     setForm((f) => ({ ...f, category_id: "" }));
   }, [type]);
@@ -61,6 +69,8 @@ function NewRule() {
       await montra.createRule({
         planned_type: type,
         account_id: form.account_id,
+        destination_account_id:
+          type === "TRANSFER" ? form.destination_account_id : null,
         amount: form.amount,
         name: form.name,
         frequency: form.frequency,
@@ -87,20 +97,23 @@ function NewRule() {
       <PageHeader title="Add recurring"
         icon="repeat" />
 
-      <div className="mb-5 grid grid-cols-2 gap-2 rounded-control bg-background-secondary p-1">
-        {(["EXPENSE", "INCOME"] as const).map((t) => (
+      <div className="mb-5 grid grid-cols-3 gap-2 rounded-control bg-background-secondary p-1">
+        {(
+          [
+            ["EXPENSE", "Expense", "bg-semantic-expense/15 text-semantic-expense"],
+            ["INCOME", "Income", "bg-semantic-income/15 text-semantic-income"],
+            ["TRANSFER", "Transfer", "bg-semantic-transfer/15 text-semantic-transfer"],
+          ] as const
+        ).map(([value, label, active]) => (
           <button
-            key={t}
-            onClick={() => setType(t)}
-            className={`min-h-[44px] rounded-[10px] text-sm font-semibold transition ${
-              type === t
-                ? t === "EXPENSE"
-                  ? "bg-semantic-expense/15 text-semantic-expense"
-                  : "bg-semantic-income/15 text-semantic-income"
-                : "text-content-secondary"
+            key={value}
+            onClick={() => setType(value)}
+            aria-pressed={type === value}
+            className={`pressable min-h-[44px] rounded-[10px] text-sm font-semibold transition ${
+              type === value ? active : "text-content-secondary"
             }`}
           >
-            {t === "EXPENSE" ? "Expense" : "Income"}
+            {label}
           </button>
         ))}
       </div>
@@ -112,7 +125,9 @@ function NewRule() {
           <Field label="Name">
             <Input
               required
-              placeholder={type === "EXPENSE" ? "Netflix" : "Salary"}
+              placeholder={
+                type === "EXPENSE" ? "Netflix" : type === "INCOME" ? "Salary" : "Monthly savings"
+              }
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
             />
@@ -127,7 +142,7 @@ function NewRule() {
             />
           </Field>
 
-          <Field label="Account">
+          <Field label={type === "TRANSFER" ? "From" : "Account"}>
             <Select
               required
               value={form.account_id}
@@ -141,19 +156,38 @@ function NewRule() {
             </Select>
           </Field>
 
-          <Field label="Category">
-            <Select
-              value={form.category_id}
-              onChange={(e) => update("category_id", e.target.value)}
-            >
-              <option value="">Uncategorised</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {type === "TRANSFER" ? (
+            <Field label="To" hint="Both accounts must use the same currency.">
+              <Select
+                required
+                value={form.destination_account_id}
+                onChange={(e) => update("destination_account_id", e.target.value)}
+              >
+                <option value="">Choose an account</option>
+                {accounts
+                  .filter((a) => a.id !== form.account_id)
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Category">
+              <Select
+                value={form.category_id}
+                onChange={(e) => update("category_id", e.target.value)}
+              >
+                <option value="">Uncategorised</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="How often">
@@ -209,10 +243,20 @@ function NewRule() {
           <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
             Montra keeps the next 90 days of this series in your upcoming list. Each occurrence
             stays a plan until you mark it done — nothing posts automatically.
+            {type === "TRANSFER" &&
+              " A transfer moves money between your own accounts, so it is not counted as spending."}
           </p>
 
           <div className="flex gap-3">
-            <Button type="submit" disabled={busy || !form.account_id} className="flex-1">
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !form.account_id ||
+                (type === "TRANSFER" && !form.destination_account_id)
+              }
+              className="flex-1"
+            >
               {busy ? "Creating…" : "Create series"}
             </Button>
             <Button variant="secondary" onClick={() => router.back()}>

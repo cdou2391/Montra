@@ -159,7 +159,7 @@ export type CurrentUser = {
 
 export type PlannedTransaction = {
   id: string;
-  planned_type: "INCOME" | "EXPENSE";
+  planned_type: "INCOME" | "EXPENSE" | "TRANSFER";
   amount: string;
   currency: string;
   expected_at: string;
@@ -170,15 +170,17 @@ export type PlannedTransaction = {
   source: "ONE_TIME" | "RECURRING";
   bucket: "OVERDUE" | "TODAY" | "TOMORROW" | "THIS_WEEK" | "LATER";
   account: { id: string; name: string } | null;
+  destination_account: { id: string; name: string } | null;
   category: { id: string; name: string } | null;
   recurring_rule_id: string | null;
   completed_transaction_id: string | null;
+  completed_transfer_id: string | null;
 };
 
 export type RecurringRule = {
   id: string;
   name: string;
-  planned_type: "INCOME" | "EXPENSE";
+  planned_type: "INCOME" | "EXPENSE" | "TRANSFER";
   amount: string;
   currency: string;
   frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
@@ -189,6 +191,7 @@ export type RecurringRule = {
   status: "ACTIVE" | "PAUSED" | "ENDED";
   reminder_days_before: number | null;
   account_id: string;
+  destination_account_id: string | null;
   category_id: string | null;
 };
 

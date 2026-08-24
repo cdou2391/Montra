@@ -79,10 +79,14 @@ function CompletePlanned() {
   }
 
   const isIncome = planned.planned_type === "INCOME";
+  const isTransfer = planned.planned_type === "TRANSFER";
 
   return (
     <AppShell>
-      <PageHeader title={isIncome ? "Mark as received" : "Mark as paid"} icon="calendar" />
+      <PageHeader
+        title={isTransfer ? "Confirm transfer" : isIncome ? "Mark as received" : "Mark as paid"}
+        icon="calendar"
+      />
 
       <Card className="mb-4">
         <p className="font-medium">{planned.description}</p>
@@ -91,6 +95,9 @@ function CompletePlanned() {
         </p>
         <p className="mt-1 text-xs text-content-secondary">
           Planned for {planned.occurrence_date}
+          {isTransfer && planned.destination_account
+            ? ` · ${planned.account?.name} → ${planned.destination_account.name}`
+            : ""}
         </p>
       </Card>
 
@@ -99,7 +106,7 @@ function CompletePlanned() {
           {error && <ErrorNotice message={error} />}
 
           <Field
-            label={isIncome ? "Amount received" : "Amount paid"}
+            label={isTransfer ? "Amount" : isIncome ? "Amount received" : "Amount paid"}
             hint="Change it if the real figure differed."
           >
             <AmountInput
@@ -109,7 +116,7 @@ function CompletePlanned() {
             />
           </Field>
 
-          <Field label={isIncome ? "Received at" : "Paid at"}>
+          <Field label={isTransfer ? "Moved at" : isIncome ? "Received at" : "Paid at"}>
             <Input
               type="datetime-local"
               required
@@ -118,6 +125,7 @@ function CompletePlanned() {
             />
           </Field>
 
+          {!isTransfer && (
           <Field label="Account" hint="Change it if the money moved elsewhere.">
             <Select
               value={form.account_id}
@@ -130,15 +138,24 @@ function CompletePlanned() {
               ))}
             </Select>
           </Field>
+          )}
 
           <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
-            This records a real {isIncome ? "income" : "expense"} against your balance. The plan
-            is marked complete and its reminder is cancelled.
+            {isTransfer
+              ? "This moves the money between your own accounts. Your net worth does not change and it is not counted as spending."
+              : `This records a real ${isIncome ? "income" : "expense"} against your balance.`}{" "}
+            The plan is marked complete and its reminder is cancelled.
           </p>
 
           <div className="flex gap-3">
             <Button type="submit" disabled={busy} className="flex-1">
-              {busy ? "Recording…" : isIncome ? "Confirm received" : "Confirm paid"}
+              {busy
+                ? "Recording…"
+                : isTransfer
+                  ? "Confirm transfer"
+                  : isIncome
+                    ? "Confirm received"
+                    : "Confirm paid"}
             </Button>
             <Button variant="secondary" onClick={() => router.back()}>
               Cancel
