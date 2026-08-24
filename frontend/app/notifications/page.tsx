@@ -80,7 +80,7 @@ function Notifications() {
                 onClick={() => {
                   if (n.read_at === null) void montra.markNotificationRead(n.id);
                 }}
-                className="block"
+                className="pressable pressable-surface pressable-tint block rounded-control"
               >
                 {inner}
               </Link>

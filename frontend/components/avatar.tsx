@@ -47,7 +47,7 @@ export function ProfileAvatarLink({
     <Link
       href="/profile"
       aria-label="Your profile"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      className="pressable pressable-tint flex h-11 w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
     >
       <Avatar user={user} />
     </Link>

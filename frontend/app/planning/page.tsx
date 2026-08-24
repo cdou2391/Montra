@@ -69,12 +69,12 @@ function PlannedRow({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Link href={`/planning/${planned.id}/complete`}>
+        <Link href={`/planning/${planned.id}/complete`} className="pressable">
           <span className="inline-flex min-h-[36px] items-center rounded-full bg-accent px-3 text-xs font-semibold text-background-primary">
             {isIncome ? "Mark received" : "Mark paid"}
           </span>
         </Link>
-        <Link href={`/planning/${planned.id}/reschedule`}>
+        <Link href={`/planning/${planned.id}/reschedule`} className="pressable pressable-tint rounded-full">
           <span className="inline-flex min-h-[36px] items-center rounded-full border border-white/10 px-3 text-xs text-content-secondary">
             Reschedule
           </span>
@@ -83,7 +83,7 @@ function PlannedRow({
           <button
             disabled={busy}
             onClick={() => run(() => montra.skipPlanned(planned.id))}
-            className="min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Skip this one
           </button>
@@ -91,7 +91,7 @@ function PlannedRow({
           <button
             disabled={busy}
             onClick={() => run(() => montra.cancelPlanned(planned.id))}
-            className="min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Cancel
           </button>

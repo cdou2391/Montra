@@ -146,7 +146,7 @@ function PayCard() {
                       key={s.label}
                       type="button"
                       onClick={() => update("amount", s.value)}
-                      className="min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary transition hover:bg-white/5 hover:text-content-primary"
+                      className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary"
                     >
                       {s.label}
                     </button>

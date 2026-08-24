@@ -52,7 +52,7 @@ export function Button({
       onClick={onClick}
       // 48px min height keeps every control inside the thumb-friendly target
       // size from UI/UX section 3.5.
-      className={`min-h-[48px] rounded-control px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
+      className={`pressable min-h-[48px] rounded-control px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${styles} ${className}`}
     >
       {children}
     </button>

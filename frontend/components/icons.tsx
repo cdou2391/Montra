@@ -22,7 +22,8 @@ export type IconName =
   | "scale"
   | "transfer"
   | "chevronLeft"
-  | "chevronRight";
+  | "chevronRight"
+  | "logOut";
 
 const PATHS: Record<IconName, string[]> = {
   home: [
@@ -58,6 +59,7 @@ const PATHS: Record<IconName, string[]> = {
   transfer: ["M8 3 4 7l4 4", "M4 7h16", "m16 21 4-4-4-4", "M20 17H4"],
   chevronLeft: ["m15 18-6-6 6-6"],
   chevronRight: ["m9 18 6-6-6-6"],
+  logOut: ["m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"],
 };
 
 export function Icon({

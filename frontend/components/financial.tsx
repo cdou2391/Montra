@@ -71,8 +71,8 @@ export function MetricCard({
 export function AccountCard({ account, hidden }: { account: Account; hidden?: boolean }) {
   const isLiability = account.account_nature === "LIABILITY";
   return (
-    <Link href={`/accounts/${account.id}`} className="block">
-      <Card className="transition hover:bg-surface-elevated">
+    <Link href={`/accounts/${account.id}`} className="pressable pressable-surface block">
+      <Card className="transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="truncate font-medium text-content-primary">{account.name}</p>

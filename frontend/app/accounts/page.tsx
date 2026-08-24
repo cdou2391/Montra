@@ -216,7 +216,7 @@ function Accounts() {
               key={account.id}
               onClick={() => select(i)}
               aria-current={i === index}
-              className={`w-full rounded-card border px-4 py-3 text-left transition ${
+              className={`pressable pressable-surface w-full rounded-card border px-4 py-3 text-left ${
                 i === index
                   ? "border-accent/40 bg-accent-muted"
                   : "border-white/5 bg-surface-primary hover:bg-surface-elevated"

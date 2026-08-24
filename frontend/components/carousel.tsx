@@ -129,12 +129,10 @@ export function CarouselChevron({
       disabled={disabled}
       aria-label={label}
       className="
-        flex h-11 w-7 shrink-0 items-center justify-center rounded-control sm:w-9
-        text-content-secondary transition
-        hover:bg-white/5 hover:text-content-primary
+        pressable pressable-tint flex h-11 w-7 shrink-0 items-center
+        justify-center rounded-control text-content-secondary sm:w-9
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60
-        disabled:opacity-20 disabled:hover:bg-transparent
-        disabled:hover:text-content-secondary
+        disabled:opacity-20 disabled:active:scale-100
       "
     >
       <Icon name={direction === "left" ? "chevronLeft" : "chevronRight"} />

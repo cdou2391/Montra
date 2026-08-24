@@ -38,7 +38,7 @@ function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 border-b border-white/5 py-4 text-left last:border-0 disabled:opacity-50"
+      className="pressable pressable-surface flex w-full items-center justify-between gap-4 border-b border-white/5 py-4 text-left last:border-0 disabled:opacity-50"
     >
       <span className="min-w-0">
         <span className="block text-sm font-medium text-content-primary">{label}</span>

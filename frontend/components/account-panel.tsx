@@ -54,19 +54,19 @@ export function AccountPanel({
       <div className="mt-5 flex flex-wrap gap-2">
         <Link
           href={`/add?account=${account.id}`}
-          className="min-h-[40px] rounded-control bg-accent px-4 text-sm font-semibold leading-10 text-background-primary"
+          className="pressable min-h-[40px] rounded-control bg-accent px-4 text-sm font-semibold leading-10 text-background-primary"
         >
           Add
         </Link>
         <Link
           href={`/transfer?from=${account.id}`}
-          className="min-h-[40px] rounded-control border border-white/15 px-4 text-sm font-medium leading-10 text-content-primary"
+          className="pressable pressable-tint min-h-[40px] rounded-control border border-white/15 px-4 text-sm font-medium leading-10 text-content-primary"
         >
           Transfer
         </Link>
         <Link
           href={`/accounts/${account.id}`}
-          className="min-h-[40px] px-2 text-sm font-medium leading-10 text-accent"
+          className="pressable min-h-[40px] px-2 text-sm font-medium leading-10 text-accent"
         >
           Details
         </Link>

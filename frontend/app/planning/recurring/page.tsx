@@ -69,7 +69,7 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
           <button
             disabled={busy}
             onClick={() => act("pause")}
-            className="min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Pause
           </button>
@@ -78,7 +78,7 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
           <button
             disabled={busy}
             onClick={() => act("resume")}
-            className="min-h-[36px] rounded-full bg-accent px-3 text-xs font-semibold text-background-primary disabled:opacity-40"
+            className="pressable min-h-[36px] rounded-full bg-accent px-3 text-xs font-semibold text-background-primary disabled:opacity-40"
           >
             Resume
           </button>
@@ -87,7 +87,7 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
           <button
             disabled={busy}
             onClick={() => act("end")}
-            className="min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-semantic-expense disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-semantic-expense disabled:opacity-40"
           >
             End series
           </button>

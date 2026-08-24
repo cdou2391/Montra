@@ -4,6 +4,8 @@
 
 @layer base {
   html {
+    /* The platform highlight is replaced by the .pressable states below, which
+       are consistent across iOS and Android rather than each doing its own. */
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -16,5 +18,71 @@
   .tabular {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+  }
+}
+
+@layer components {
+  /**
+   * Touch feedback (UI/UX sections 70-71: "cards lightly depress when tapped",
+   * 150-250ms, subtle).
+   *
+   * Touch has no hover, so the press state carries the whole job of confirming
+   * a tap landed. Hover is layered on top for pointer devices only, so a phone
+   * never gets a hover style stuck on after a tap.
+   */
+  .pressable {
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms ease-out,
+      opacity 150ms ease-out;
+    touch-action: manipulation;
+  }
+
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  /* Slightly less travel on large surfaces, which would otherwise look rubbery. */
+  .pressable-surface:active {
+    transform: scale(0.985);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pressable-tint:hover {
+      background-color: rgb(255 255 255 / 0.05);
+    }
+  }
+
+  /* UI/UX section 73. */
+  @media (prefers-reduced-motion: reduce) {
+    .pressable,
+    .pressable-surface {
+      transition: none;
+    }
+
+    .pressable:active,
+    .pressable-surface:active {
+      transform: none;
+      opacity: 0.75;
+    }
+  }
+}
+
+/* Sheet entrance, within the 150-250ms range of UI/UX section 70. */
+@keyframes sheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

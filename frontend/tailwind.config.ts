@@ -5,6 +5,9 @@ import type { Config } from "tailwindcss";
  * Components reference tokens, never raw hex.
  */
 const config: Config = {
+  // Hover styles only where a real pointer exists, so a tap never leaves one
+  // stuck on a touch device.
+  future: { hoverOnlyWhenSupported: true },
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
