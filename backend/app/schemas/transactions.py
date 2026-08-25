@@ -44,9 +44,13 @@ class TransferCreate(MontraModel):
     destination_amount: Decimal | None = None
     occurred_at: datetime
     notes: str | None = None
+    # Charged to the sender, posted as its own expense line on the source
+    # account rather than being added to the amount that moves.
+    fee_amount: Decimal | None = None
 
     _v_source = amount_validator("source_amount")
     _v_dest = amount_validator("destination_amount")
+    _v_fee = amount_validator("fee_amount")
 
 
 class CategoryCreate(MontraModel):

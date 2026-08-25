@@ -212,3 +212,95 @@ def test_the_payload_says_what_a_fee_belongs_to(db, user, bank_account):
     payload = txn_service.serialize_transaction(fee)
     assert payload["fee_for_transaction_id"] == str(parent.id)
     assert txn_service.serialize_transaction(parent)["fee_for_transaction_id"] is None
+
+
+# ------------------------------------------------------------------- transfers
+
+
+def _move(db, user, source, destination, *, amount="50000", fee=None, notes="MoMo send"):
+    return PostingService(db).transfer_funds(
+        source=source,
+        destination=destination,
+        source_amount=Decimal(amount),
+        destination_amount=Decimal(amount),
+        occurred_at=NOW,
+        actor_id=user.id,
+        notes=notes,
+        fee_amount=Decimal(fee) if fee is not None else None,
+    )
+
+
+def test_a_transfer_fee_comes_off_the_sender(db, user, bank_account, savings_account):
+    """The sender pays the charge, so it is not the destination's problem."""
+    posting = PostingService(db)
+    from_before = posting.balance_of(bank_account)
+    to_before = posting.balance_of(savings_account)
+
+    _move(db, user, bank_account, savings_account, amount="50000", fee="1000")
+    db.commit()
+
+    assert posting.balance_of(bank_account) == from_before - Decimal("51000")
+    # What arrived is what arrived: the fee did not follow the money across.
+    assert posting.balance_of(savings_account) == to_before + Decimal("50000")
+
+
+def test_the_transfer_still_records_the_amount_that_moved(db, user, bank_account, savings_account):
+    transfer = _move(db, user, bank_account, savings_account, amount="50000", fee="1000")
+    db.commit()
+    assert Decimal(transfer.source_amount) == Decimal("50000")
+
+
+def test_a_transfer_fee_is_an_expense_not_a_transfer(db, user, bank_account, savings_account):
+    """Money moved between your own accounts is not spending; the charge is."""
+    _move(db, user, bank_account, savings_account, fee="1000")
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
+    assert fee.transaction_type is TransactionType.EXPENSE
+    assert fee.account_id == bank_account.id
+
+
+def test_the_transfer_fee_hangs_off_the_outgoing_side(db, user, bank_account, savings_account):
+    transfer = _move(db, user, bank_account, savings_account, fee="1000")
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
+    parent = db.get(Transaction, fee.fee_for_transaction_id)
+    assert parent.transfer_id == transfer.id
+    assert parent.account_id == bank_account.id
+
+
+def test_the_transfer_fee_is_named_after_the_transfer(db, user, bank_account, savings_account):
+    _move(db, user, bank_account, savings_account, fee="1000", notes="Rent to landlord")
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
+    assert fee.description == "Rent to landlord — fee"
+
+
+def test_an_unnamed_transfer_still_yields_a_readable_fee(db, user, bank_account, savings_account):
+    _move(db, user, bank_account, savings_account, fee="1000", notes=None)
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
+    assert fee.description == f"Transfer to {savings_account.name} — fee"
+
+
+def test_cancelling_a_transfer_cancels_its_fee(db, user, bank_account, savings_account):
+    """Otherwise you are charged for a movement the ledger no longer shows."""
+    posting = PostingService(db)
+    before = posting.balance_of(bank_account)
+    transfer = _move(db, user, bank_account, savings_account, amount="50000", fee="1000")
+    db.commit()
+
+    posting.cancel_transfer(transfer, actor_id=user.id)
+    db.commit()
+    assert posting.balance_of(bank_account) == before
+
+
+def test_a_transfer_fee_must_be_a_real_amount(db, user, bank_account, savings_account):
+    with pytest.raises(ValidationFailed):
+        _move(db, user, bank_account, savings_account, fee="0")
+
+
+def test_no_fee_on_a_transfer_means_two_lines_only(db, user, bank_account, savings_account):
+    _move(db, user, bank_account, savings_account)
+    db.commit()
+    rows = db.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
+    assert len(rows) == 2

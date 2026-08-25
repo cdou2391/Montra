@@ -210,6 +210,7 @@ class PostingService:
         actor_id: uuid.UUID,
         notes: str | None = None,
         idempotency_key: str | None = None,
+        fee_amount: Decimal | None = None,
     ) -> Transfer:
         """Create a transfer and both of its ledger entries.
 
@@ -230,6 +231,8 @@ class PostingService:
             )
         self._require_positive(source_amount, "source_amount")
         self._require_positive(destination_amount, "destination_amount")
+        if fee_amount is not None:
+            self._require_positive(fee_amount, "fee_amount")
 
         # MVP is same-currency only; the columns already carry both sides so
         # that FX can arrive without a migration.
@@ -270,7 +273,7 @@ class PostingService:
         self.db.add(transfer)
         self.db.flush()
 
-        self._write(
+        outgoing = self._write(
             Posting(source, Operation.TRANSFER_OUT, source_amount, TransactionType.TRANSFER),
             actor_id=actor_id,
             occurred_at=occurred_at,
@@ -286,6 +289,19 @@ class PostingService:
             transfer_id=transfer.id,
             description=notes or f"Transfer from {source.name}",
         )
+
+        if fee_amount is not None:
+            # The sender pays the charge, so it comes off the source account —
+            # and it is an expense, not part of the movement. The amount that
+            # arrived is what arrived; a fee added to the transfer would claim
+            # the destination received it.
+            self._write(
+                Posting(source, Operation.EXPENSE, fee_amount, TransactionType.EXPENSE),
+                actor_id=actor_id,
+                occurred_at=occurred_at,
+                description=f"{notes or f'Transfer to {destination.name}'} — fee",
+                fee_for_transaction_id=outgoing.id,
+            )
         return transfer
 
     def record_loan_principal(
@@ -332,6 +348,17 @@ class PostingService:
         ).all()
         for side in sides:
             side.status = TransactionStatus.CANCELLED
+
+        # A cancelled transfer leaves the balance as if it never happened, so a
+        # surviving fee would charge the user for a movement the ledger no
+        # longer shows.
+        fees = self.db.scalars(
+            select(Transaction).where(
+                Transaction.fee_for_transaction_id.in_([s.id for s in sides])
+            )
+        ).all()
+        for fee in fees:
+            fee.status = TransactionStatus.CANCELLED
         transfer.status = TransferStatus.CANCELLED
         transfer.cancelled_at = utcnow()
         self.db.flush()

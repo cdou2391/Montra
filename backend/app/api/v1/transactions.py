@@ -185,6 +185,7 @@ def create_transfer(
         actor_id=user.id,
         notes=payload.notes,
         idempotency_key=idempotency_key,
+        fee_amount=payload.fee_amount,
     )
     # One commit for the transfer and both ledger entries (Architecture section 23).
     db.commit()

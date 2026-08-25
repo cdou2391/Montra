@@ -24,6 +24,7 @@ export function TransferForm({ defaultSourceId = "" }: { defaultSourceId?: strin
     source_account_id: defaultSourceId,
     destination_account_id: "",
     source_amount: "",
+    fee_amount: "",
     occurred_at: toLocalInputValue(),
     notes: "",
   });
@@ -65,6 +66,9 @@ export function TransferForm({ defaultSourceId = "" }: { defaultSourceId?: strin
           destination_amount: form.source_amount,
           occurred_at: form.occurred_at,
           notes: form.notes || null,
+          // Charged to the sender and posted as its own line, so the amount
+          // above stays what actually arrived.
+          fee_amount: form.fee_amount || null,
         },
         idempotencyKey,
       );
@@ -136,6 +140,16 @@ export function TransferForm({ defaultSourceId = "" }: { defaultSourceId?: strin
             placeholder="0"
             value={form.source_amount}
             onChange={(e) => update("source_amount", e.target.value)}
+          />
+        </Field>
+        <Field
+          label="Fee"
+          hint="Optional. Charged to the sending account as its own line; the amount above is what arrives."
+        >
+          <AmountInput
+            placeholder="0"
+            value={form.fee_amount}
+            onChange={(e) => update("fee_amount", e.target.value)}
           />
         </Field>
         <Field label="When" hint="Defaults to now.">
