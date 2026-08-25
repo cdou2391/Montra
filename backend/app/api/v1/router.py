@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     accounts,
+    attachments,
     auth,
     cards,
     families,
@@ -22,3 +23,4 @@ api_router.include_router(planning.router)
 api_router.include_router(loans.router)
 api_router.include_router(families.router)
 api_router.include_router(reports.router)
+api_router.include_router(attachments.router)

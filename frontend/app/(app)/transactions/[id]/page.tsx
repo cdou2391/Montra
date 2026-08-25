@@ -7,6 +7,7 @@ import { Category, MontraApiError, Transaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MoneyValue } from "@/components/financial";
+import { Attachments } from "@/components/attachments";
 import {
   Button,
   Card,
@@ -198,6 +199,11 @@ export default function TransactionDetail() {
           </div>
         </form>
       </Card>
+
+      <h2 className="mb-3 text-section">Receipts</h2>
+      <div className="mb-5">
+        <Attachments transactionId={id} />
+      </div>
 
       <Button variant="destructive" onClick={() => setConfirming(true)}>
         Delete transaction

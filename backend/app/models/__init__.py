@@ -17,4 +17,5 @@ from app.models.planning import (  # noqa: F401
     RecurringRule,
     Reminder,
 )
+from app.models.records import Attachment, AuditEvent  # noqa: F401
 from app.models.user import Session, User, UserPreference  # noqa: F401

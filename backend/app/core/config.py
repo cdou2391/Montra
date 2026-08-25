@@ -25,6 +25,29 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     cookie_samesite: str = "lax"
 
+    # Object storage for attachments. S3-compatible, so the same code runs
+    # against MinIO locally and a real bucket in production; only the endpoint
+    # and credentials change.
+    s3_endpoint_url: str = "http://minio:9000"
+    s3_public_endpoint_url: str = "http://localhost:8080"
+    s3_region: str = "us-east-1"
+    s3_bucket: str = "montra-attachments"
+    s3_access_key: str = "montra"
+    s3_secret_key: str = "montra-dev-secret"
+    # Long enough to upload a photo on a slow connection, short enough that a
+    # leaked link is worthless by the time it is shared.
+    s3_signed_url_ttl_seconds: int = 900
+
+    # Attachments
+    attachment_max_bytes: int = 10 * 1024 * 1024
+    attachment_allowed_mime_types: str = (
+        "image/jpeg,image/png,image/webp,image/heic,application/pdf"
+    )
+
+    @property
+    def attachment_mime_list(self) -> list[str]:
+        return [m.strip() for m in self.attachment_allowed_mime_types.split(",") if m.strip()]
+
     # HTTP
     cors_origins: str = "http://localhost:3000"
     api_v1_prefix: str = "/api/v1"

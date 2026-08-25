@@ -155,6 +155,20 @@ export type Transaction = {
   created_at?: string;
 };
 
+export type Attachment = {
+  id: string;
+  transaction_id: string | null;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  uploaded: boolean;
+  created_at: string;
+};
+
+type UploadTicket = Attachment & {
+  upload: { url: string; method: string; headers: Record<string, string> };
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -443,6 +457,40 @@ export const montra = {
   updateTransaction: (id: string, payload: Record<string, unknown>) =>
     api.patch<Envelope<Transaction>>(`/transactions/${id}`, payload).then((r) => r.data),
   deleteTransaction: (id: string) => api.delete<void>(`/transactions/${id}`),
+
+  attachments: (transactionId: string) =>
+    api
+      .get<Collection<Attachment>>(`/transactions/${transactionId}/attachments`)
+      .then((r) => r.data),
+  /**
+   * Three steps, because the file never passes through the API: ask for a
+   * link, PUT the bytes straight to storage, then tell the API it landed.
+   */
+  uploadAttachment: async (transactionId: string, file: File): Promise<Attachment> => {
+    const ticket = await api
+      .post<Envelope<UploadTicket>>(`/transactions/${transactionId}/attachments`, {
+        file_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+      })
+      .then((r) => r.data);
+
+    const response = await fetch(ticket.upload.url, {
+      method: ticket.upload.method,
+      headers: ticket.upload.headers,
+      body: file,
+    });
+    if (!response.ok) throw new Error("The upload did not complete.");
+
+    return api
+      .post<Envelope<Attachment>>(`/attachments/${ticket.id}/complete`, {})
+      .then((r) => r.data);
+  },
+  attachmentUrl: (id: string) =>
+    api
+      .get<Envelope<{ url: string; expires_in: number }>>(`/attachments/${id}/download`)
+      .then((r) => r.data.url),
+  deleteAttachment: (id: string) => api.delete<void>(`/attachments/${id}`),
 
   cardSummary: (id: string) =>
     api.get<Envelope<CardSummary>>(`/credit-cards/${id}/summary`).then((r) => r.data),
