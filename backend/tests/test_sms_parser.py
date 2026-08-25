@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.sms_parser import parse, serialize
+from app.services.sms_parser import parse, resolve_accounts, serialize
 
 SENT = (
     "*165*S*200000 RWF transferred to Denise NYIRAMUNINI (250788308765) "
@@ -260,3 +260,126 @@ def test_a_message_with_no_marker_claims_no_account():
 def test_the_channel_is_reported_in_the_payload():
     assert serialize(parse(SENT))["channel"] == "MOBILE_MONEY"
     assert "account" in serialize(parse(SENT))["matched"]
+
+
+# --------------------------------------------------- a bank statement message
+
+
+BK_TRANSFER = (
+    "TRANSFER - EKASH Beneficiary: Cedric RUGAMBA Credited account: 0788863783 "
+    "Debited account: 100020806359 Amount:RWF 250000.00 Transaction Charge:RWF 20 "
+    "Event #:FTCM26237HCMRZABI Status: COMPLETED Date: 2026-08-25 15:28:02.307 "
+    "Channel:MOBILE Available Balance:RWF 1,473,432 For enquiry call BK:250788143000/4455"
+)
+
+
+def test_a_labelled_statement_is_read_field_by_field():
+    result = parse(BK_TRANSFER)
+    assert result.amount == Decimal("250000.00")
+    assert result.currency == "RWF"
+    assert result.counterparty == "Cedric RUGAMBA"
+
+
+def test_the_currency_may_sit_in_front_of_the_number():
+    """RWF 250000.00, not 250000.00 RWF."""
+    assert parse(BK_TRANSFER).amount == Decimal("250000.00")
+
+
+def test_a_transaction_charge_is_a_fee_by_another_name():
+    assert parse(BK_TRANSFER).fee_amount == Decimal("20")
+
+
+def test_an_available_balance_is_a_balance_by_another_name():
+    assert parse(BK_TRANSFER).balance_after == Decimal("1473432")
+
+
+def test_milliseconds_are_dropped_not_choked_on():
+    """The ledger records to the second; the message offers more."""
+    assert parse(BK_TRANSFER).occurred_at == datetime(2026, 8, 25, 15, 28, 2)
+
+
+def test_an_event_number_is_a_reference():
+    assert parse(BK_TRANSFER).reference == "FTCM26237HCMRZABI"
+
+
+def test_both_account_numbers_are_kept():
+    result = parse(BK_TRANSFER)
+    assert result.debited_identifier == "100020806359"
+    assert result.credited_identifier == "0788863783"
+
+
+# ------------------------------------------------------------- matching them
+
+
+class FakeAccount:
+    def __init__(self, name, identifier):
+        self.id = name
+        self.name = name
+        self.account_identifier = identifier
+
+
+def _accounts(*pairs):
+    return [FakeAccount(name, ident) for name, ident in pairs]
+
+
+def test_both_ends_ours_makes_it_a_transfer():
+    """What the bank calls a transfer and what this ledger calls one are
+    different questions; only the account list answers the second."""
+    accounts = _accounts(("BK Current", "100020806359"), ("MTN MoMo", "0788863783"))
+    resolved = resolve_accounts(parse(BK_TRANSFER), accounts)
+    assert resolved["transaction_type"] == "TRANSFER"
+    assert resolved["source_account_id"] == "BK Current"
+    assert resolved["destination_account_id"] == "MTN MoMo"
+
+
+def test_only_the_debited_end_ours_is_spending():
+    """Money that left one of your accounts for somebody else's."""
+    accounts = _accounts(("BK Current", "100020806359"))
+    resolved = resolve_accounts(parse(BK_TRANSFER), accounts)
+    assert resolved["transaction_type"] == "EXPENSE"
+    assert resolved["source_account_id"] == "BK Current"
+    assert resolved["destination_account_id"] is None
+
+
+def test_only_the_credited_end_ours_is_income():
+    accounts = _accounts(("MTN MoMo", "0788863783"))
+    resolved = resolve_accounts(parse(BK_TRANSFER), accounts)
+    assert resolved["transaction_type"] == "INCOME"
+    assert resolved["destination_account_id"] == "MTN MoMo"
+
+
+def test_neither_end_ours_selects_nothing():
+    resolved = resolve_accounts(parse(BK_TRANSFER), _accounts(("Other", "999999")))
+    assert resolved["source_account_id"] is None
+    assert resolved["destination_account_id"] is None
+
+
+def test_a_masked_number_still_matches_on_its_tail():
+    """A message and a stored identifier rarely agree on masking."""
+    accounts = _accounts(("BK Current", "**** 6359"), ("MTN MoMo", "0788863783"))
+    resolved = resolve_accounts(parse(BK_TRANSFER), accounts)
+    assert resolved["source_account_id"] == "BK Current"
+
+
+def test_two_accounts_sharing_a_tail_match_neither():
+    """Selecting the wrong account is worse than selecting none."""
+    accounts = _accounts(("One", "111116359"), ("Two", "222226359"))
+    resolved = resolve_accounts(parse(BK_TRANSFER), accounts)
+    assert resolved["source_account_id"] is None
+
+
+def test_too_few_digits_to_be_sure_matches_nothing():
+    accounts = _accounts(("Short", "59"))
+    assert resolve_accounts(parse(BK_TRANSFER), accounts)["source_account_id"] is None
+
+
+def test_an_account_with_no_identifier_is_never_matched():
+    accounts = _accounts(("Unnumbered", None))
+    assert resolve_accounts(parse(BK_TRANSFER), accounts)["source_account_id"] is None
+
+
+def test_the_earlier_momo_formats_still_resolve_nothing():
+    """They carry no account numbers, so the channel remains the only hint."""
+    resolved = resolve_accounts(parse(SENT), _accounts(("BK Current", "100020806359")))
+    assert resolved["transaction_type"] == "EXPENSE"
+    assert resolved["source_account_id"] is None

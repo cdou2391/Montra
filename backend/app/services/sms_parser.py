@@ -17,15 +17,39 @@ from decimal import Decimal, InvalidOperation
 # Amounts arrive as 200000, 200,000 or 200000.50.
 AMOUNT = r"([\d,]+(?:\.\d{1,2})?)"
 CURRENCY = r"(RWF|USD|EUR|GBP|KES|UGX|TZS)"
+# The same set without a capturing group, for the positions where the currency
+# sits in front of the number and would otherwise shift every later index.
+CURRENCY_NC = r"(?:RWF|USD|EUR|GBP|KES|UGX|TZS)"
 
-TIMESTAMP = re.compile(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)")
-FEE = re.compile(rf"fee[:\s]*{AMOUNT}\s*{CURRENCY}?", re.IGNORECASE)
-BALANCE = re.compile(rf"(?:new\s+)?balance[:\s]*{AMOUNT}\s*{CURRENCY}?", re.IGNORECASE)
-REFERENCE = re.compile(
-    r"(?:financial\s+transaction\s+id|ft\s*id|transaction\s+id|txn\s*id|ref(?:erence)?)"
-    r"[:\s]*([A-Za-z0-9]+)",
+# Milliseconds are matched so they are consumed rather than left dangling,
+# but they are dropped: the ledger records to the second.
+TIMESTAMP = re.compile(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?")
+# Banks and networks label the same thing differently, and some put the
+# currency in front of the number rather than after it.
+FEE = re.compile(
+    rf"(?:fee|transaction\s+charge|charge)[:\s]*(?:{CURRENCY_NC}\s*)?{AMOUNT}\s*{CURRENCY}?",
     re.IGNORECASE,
 )
+BALANCE = re.compile(
+    rf"(?:new|available|current)?\s*balance[:\s]*(?:{CURRENCY_NC}\s*)?{AMOUNT}\s*{CURRENCY}?",
+    re.IGNORECASE,
+)
+REFERENCE = re.compile(
+    r"(?:financial\s+transaction\s+id|ft\s*id|transaction\s+id|txn\s*id|event\s*#|"
+    r"ref(?:erence)?)[:\s#]*([A-Za-z0-9]+)",
+    re.IGNORECASE,
+)
+
+# A statement-style message: labelled fields rather than a sentence. The two
+# account numbers are the useful part — they say which of the user's accounts
+# each end is, which no amount of prose can.
+DEBITED = re.compile(r"debited\s+account[:\s]*([\d*x]{4,})", re.IGNORECASE)
+CREDITED = re.compile(r"credited\s+account[:\s]*([\d*x]{4,})", re.IGNORECASE)
+LABELLED_AMOUNT = re.compile(
+    rf"amount[:\s]*({CURRENCY_NC})?\s*{AMOUNT}\s*{CURRENCY}?", re.I
+)
+BENEFICIARY = re.compile(r"beneficiary[:\s]*([^\n:]{2,60}?)\s*(?:credited|debited|amount|$)", re.I)
+DECLARED_TRANSFER = re.compile(r"^\s*transfer\b", re.IGNORECASE)
 
 # A counterparty runs to the phone number, the timestamp, or a full stop —
 # whichever comes first. Names carry spaces and mixed case, so the boundary
@@ -109,6 +133,7 @@ BANK_MARKERS = (
     re.compile(r"bank\s+of\s+kigali", re.I),
     re.compile(r"\bequity\b|\bcogebanque\b|\bi&m\b", re.I),
     re.compile(r"account\s+(?:number|no\.?)\s*[:\s]*\d", re.I),
+    re.compile(r"(?:debited|credited)\s+account", re.I),
 )
 
 
@@ -130,6 +155,10 @@ def _channel(text: str) -> str | None:
 class ParsedSms:
     transaction_type: str | None = None
     channel: str | None = None
+    # Raw account numbers as the message wrote them. Resolving these to the
+    # user's accounts needs the stored identifiers, which only the API has.
+    debited_identifier: str | None = None
+    credited_identifier: str | None = None
     amount: Decimal | None = None
     currency: str | None = None
     fee_amount: Decimal | None = None
@@ -164,6 +193,44 @@ def _clean_party(raw: str | None) -> str | None:
     return name or None
 
 
+def _read_labelled(text: str, result: ParsedSms) -> None:
+    """Read a statement-style message: Label: value, Label: value.
+
+    Only fills what is actually labelled. The type is left for the caller to
+    settle, because "TRANSFER" in a bank message means money moved — not that
+    it moved between two accounts the *user* owns, which is a question only
+    their account list can answer.
+    """
+    debited = DEBITED.search(text)
+    credited = CREDITED.search(text)
+    if not (debited or credited):
+        return
+
+    result.debited_identifier = debited.group(1) if debited else None
+    result.credited_identifier = credited.group(1) if credited else None
+    result.matched.append("accounts")
+
+    amount = LABELLED_AMOUNT.search(text)
+    if amount:
+        # The currency may sit on either side of the number.
+        result.currency = (amount.group(1) or amount.group(3) or "").upper() or None
+        result.amount = _decimal(amount.group(2))
+
+    party = BENEFICIARY.search(text)
+    if party:
+        result.counterparty = _clean_party(party.group(1))
+
+    if DECLARED_TRANSFER.search(text):
+        # Provisional: refined once the identifiers are matched against real
+        # accounts. A bank calls it a transfer whoever the beneficiary is.
+        result.transaction_type = "TRANSFER"
+        result.matched.append("transfer")
+    elif debited and not credited:
+        result.transaction_type = "EXPENSE"
+    elif credited and not debited:
+        result.transaction_type = "INCOME"
+
+
 def parse(message: str) -> ParsedSms:
     """Read what the message plainly says, and nothing more."""
     result = ParsedSms()
@@ -171,11 +238,22 @@ def parse(message: str) -> ParsedSms:
         return result
 
     text = message.strip()
+
+    # A labelled statement is unambiguous where prose is not, so it is read
+    # first and the sentence patterns are skipped when it succeeds.
+    _read_labelled(text, result)
+
     result.channel = _channel(text)
     if result.channel:
         result.matched.append("account")
 
-    for kind, patterns in (("TRANSFER", TRANSFERS), ("EXPENSE", OUTGOING), ("INCOME", INCOMING)):
+    for kind, patterns in (
+        ("TRANSFER", TRANSFERS),
+        ("EXPENSE", OUTGOING),
+        ("INCOME", INCOMING),
+    ):
+        if result.amount is not None:
+            break  # already read from labelled fields
         for pattern in patterns:
             found = pattern.search(text)
             if not found:
@@ -235,6 +313,8 @@ def serialize(parsed: ParsedSms) -> dict:
         # names a kind rather than an account, because only the client knows
         # which accounts exist.
         "channel": parsed.channel,
+        "debited_identifier": parsed.debited_identifier,
+        "credited_identifier": parsed.credited_identifier,
         "amount": serialize_amount(parsed.amount) if parsed.amount is not None else None,
         "currency": parsed.currency,
         "fee_amount": (
@@ -252,4 +332,58 @@ def serialize(parsed: ParsedSms) -> dict:
         ),
         "reference": parsed.reference,
         "matched": parsed.matched,
+    }
+
+
+# --------------------------------------------------------------- resolution
+
+# Enough of an account number to be sure, without demanding the whole thing:
+# a message may mask all but the tail, and the stored identifier may itself be
+# only the last few characters.
+MATCH_DIGITS = 4
+
+
+def _digits(value: str | None) -> str:
+    return "".join(c for c in (value or "") if c.isdigit())
+
+
+def match_account(identifier: str | None, accounts) -> object | None:
+    """The user's account this number refers to, if exactly one does.
+
+    Compared on trailing digits, because a message and a stored identifier
+    rarely agree on masking. Ambiguity returns nothing: selecting the wrong
+    account is worse than selecting none, and the user is about to look at the
+    form either way.
+    """
+    tail = _digits(identifier)
+    if len(tail) < MATCH_DIGITS:
+        return None
+    tail = tail[-MATCH_DIGITS:]
+
+    hits = [a for a in accounts if _digits(a.account_identifier).endswith(tail)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def resolve_accounts(parsed: ParsedSms, accounts) -> dict:
+    """Turn the message's account numbers into the user's accounts.
+
+    This is what settles the type. A bank calls it a transfer whoever the
+    beneficiary is; it is a transfer *in this ledger* only when both ends are
+    accounts the user holds. One end matching means money genuinely left or
+    arrived, which is spending or income.
+    """
+    source = match_account(parsed.debited_identifier, accounts)
+    destination = match_account(parsed.credited_identifier, accounts)
+
+    kind = parsed.transaction_type
+    if source is not None and destination is not None:
+        kind = "TRANSFER"
+    elif parsed.transaction_type == "TRANSFER":
+        # Declared a transfer by the bank, but only one end is ours.
+        kind = "EXPENSE" if source is not None else "INCOME" if destination is not None else kind
+
+    return {
+        "transaction_type": kind,
+        "source_account_id": str(source.id) if source is not None else None,
+        "destination_account_id": str(destination.id) if destination is not None else None,
     }

@@ -16,14 +16,25 @@ import { Icon } from "@/components/icons";
 import { Button, Field } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
 
+// The parser's own vocabulary, said as a person would. Several markers can
+// describe the same filled field, so the list is deduplicated before it is
+// read back — "the accounts, transfer, account" is not a sentence.
 const FIELD_NAMES: Record<string, string> = {
   expense: "amount",
   income: "amount",
+  transfer: "amount",
+  accounts: "accounts",
+  account: "accounts",
   fee: "fee",
   balance: "balance",
   timestamp: "date and time",
   reference: "reference",
 };
+
+function readableFields(matched: string[]): string {
+  const named = matched.map((m) => FIELD_NAMES[m] ?? m);
+  return [...new Set(named)].join(", ");
+}
 
 export function SmsPaste({
   onParsed,
@@ -88,7 +99,7 @@ export function SmsPaste({
 
       {result?.understood && (
         <p className="mt-3 text-xs text-semantic-income">
-          Filled in the {result.matched.map((m) => FIELD_NAMES[m] ?? m).join(", ")}.
+          Filled in the {readableFields(result.matched)}.
           {result.balance_after
             ? ` The message says the balance is now ${formatMoney(
                 result.balance_after,

@@ -39,6 +39,8 @@ function AddTransactionForm() {
     fee: string | null;
     occurredAt: string | null;
     channel: "MOBILE_MONEY" | "BANK" | null;
+    sourceId: string | null;
+    destinationId: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,9 +124,14 @@ function AddTransactionForm() {
               fee: parsed.fee_amount,
               occurredAt: parsed.occurred_at,
               channel: parsed.channel,
+              sourceId: parsed.source_account_id,
+              destinationId: parsed.destination_account_id,
             });
             return;
           }
+          // A resolved account number beats a guess from the wording.
+          const resolved =
+            parsed.source_account_id ?? parsed.destination_account_id ?? null;
           const onAccount = accountForChannel(accounts, parsed.channel);
           setForm((f) => ({
             ...f,
@@ -136,7 +143,7 @@ function AddTransactionForm() {
             description: parsed.counterparty ?? f.description,
             // A MoMo message is about the wallet; picking it saves the step
             // the user would otherwise take every single time.
-            account_id: onAccount?.id ?? f.account_id,
+            account_id: resolved ?? onAccount?.id ?? f.account_id,
           }));
         }}
       />

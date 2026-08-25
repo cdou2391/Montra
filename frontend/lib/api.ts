@@ -208,6 +208,9 @@ export type ParsedSms = {
   understood: boolean;
   transaction_type: "EXPENSE" | "INCOME" | "TRANSFER" | null;
   channel: "MOBILE_MONEY" | "BANK" | null;
+  /** Resolved server-side from the account numbers in the message. */
+  source_account_id: string | null;
+  destination_account_id: string | null;
   amount: string | null;
   currency: string | null;
   fee_amount: string | null;

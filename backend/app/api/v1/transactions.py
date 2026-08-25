@@ -78,17 +78,28 @@ def list_transactions(
 @router.post("/transactions/parse-sms")
 def parse_sms(
     payload: SmsParseRequest,
+    db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """Read a mobile-money SMS into a draft.
+    """Read a mobile-money or bank SMS into a draft.
 
     Deliberately writes nothing. The client prefills its form and the user
     submits, so a misread message costs a correction rather than a wrong
     balance.
+
+    Account numbers are matched here rather than in the client, because the
+    stored identifiers never leave the server — a listing only carries the
+    masked tail.
     """
     from app.services import sms_parser
 
-    return single(sms_parser.serialize(sms_parser.parse(payload.message)))
+    parsed = sms_parser.parse(payload.message)
+    draft = sms_parser.serialize(parsed)
+
+    accounts = list(db.scalars(authz.visible_accounts(db, user)))
+    draft.update(sms_parser.resolve_accounts(parsed, accounts))
+    db.commit()
+    return single(draft)
 
 
 @router.post("/transactions", status_code=status.HTTP_201_CREATED)

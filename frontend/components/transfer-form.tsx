@@ -29,6 +29,8 @@ export function TransferForm({
     fee?: string | null;
     occurredAt?: string | null;
     channel?: "MOBILE_MONEY" | "BANK" | null;
+    sourceId?: string | null;
+    destinationId?: string | null;
   };
 }) {
   const router = useRouter();
@@ -46,10 +48,12 @@ export function TransferForm({
   useEffect(() => {
     if (!prefill) return;
     setForm((f) => {
-      // Only the sending side: the message names the account it came out of,
-      // and says nothing reliable about which of yours it went into.
-      const from = accountForChannel(accounts, prefill.channel ?? null);
-      const source = from?.id ?? f.source_account_id;
+      // A statement naming both account numbers beats any inference from the
+      // wording: it says which of your accounts each end is.
+      const source =
+        prefill.sourceId ?? accountForChannel(accounts, prefill.channel ?? null)?.id ??
+        f.source_account_id;
+      const destination = prefill.destinationId ?? null;
       return {
         ...f,
         source_amount: prefill.amount ?? f.source_amount,
@@ -58,7 +62,8 @@ export function TransferForm({
         source_account_id: source,
         // The destination cannot stay equal to the new source.
         destination_account_id:
-          f.destination_account_id === source ? "" : f.destination_account_id,
+          destination ??
+          (f.destination_account_id === source ? "" : f.destination_account_id),
       };
     });
   }, [prefill, accounts]);
