@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Account, Family, Invitation, MontraApiError, montra } from "@/lib/api";
+import { Account, AuditEvent, Family, Invitation, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { useFinancialContext } from "@/components/context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ActivityLog } from "@/components/activity-log";
 import { Icon } from "@/components/icons";
 import { formatMoney } from "@/lib/format";
 import {
@@ -192,6 +193,7 @@ function Household({ family, onChanged }: { family: Family; onChanged: () => voi
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [events, setEvents] = useState<AuditEvent[]>([]);
 
   const isOwner = family.role === "OWNER";
 
@@ -203,6 +205,22 @@ function Household({ family, onChanged }: { family: Family; onChanged: () => voi
       .catch(() => setInvitations([]));
   }, [family.id, isOwner]);
   useEffect(load, [load]);
+
+  // Every member can read the trail, owner or not.
+  useEffect(() => {
+    montra
+      .familyActivity(family.id)
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [family.id]);
+
+  // Every member can read the trail, owner or not.
+  useEffect(() => {
+    montra
+      .familyActivity(family.id)
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [family.id]);
 
   async function invite() {
     setBusy(true);
@@ -336,6 +354,13 @@ function Household({ family, onChanged }: { family: Family; onChanged: () => voi
 
       <div className="mb-4">
         <SharingControls onChanged={onChanged} />
+      </div>
+
+      {/* What changed in the household, and who changed it. No amounts — the
+          trail is readable by every member, and the money is not. */}
+      <h2 className="mb-3 text-section">Recent changes</h2>
+      <div className="mb-5">
+        <ActivityLog events={events} />
       </div>
 
       <Button variant="destructive" onClick={() => setLeaveOpen(true)}>

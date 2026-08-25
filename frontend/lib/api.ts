@@ -184,6 +184,16 @@ export type FamilyMember = {
   joined_at: string;
 };
 
+export type AuditEvent = {
+  id: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string | null;
+  actor: { id: string; display_name: string | null } | null;
+  metadata: Record<string, string> | null;
+  created_at: string;
+};
+
 export type Family = {
   id: string;
   name: string;
@@ -522,6 +532,10 @@ export const montra = {
     }),
 
   // ------------------------------------------------------------- household
+  familyActivity: (familyId: string) =>
+    api
+      .get<Collection<AuditEvent>>(`/families/${familyId}/activity`)
+      .then((r) => r.data),
   currentFamily: () =>
     api.get<Envelope<Family | null>>("/families/current").then((r) => r.data),
   createFamily: (name: string, base_currency: string) =>

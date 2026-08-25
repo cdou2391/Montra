@@ -22,6 +22,7 @@ from app.db.enums import (
 )
 from app.models.family import Family, FamilyInvitation, FamilyMembership
 from app.models.user import User
+from app.services import audit
 
 INVITATION_TTL_DAYS = 7
 
@@ -66,6 +67,14 @@ def create_family(db: DbSession, *, user: User, name: str, base_currency: str) -
         raise Conflict(
             "You already belong to a household.", code="ACTIVE_FAMILY_ALREADY_EXISTS"
         ) from exc
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_CREATED,
+        entity_type=audit.FAMILY,
+        entity_id=family.id,
+        family_id=family.id,
+    )
     return family
 
 
@@ -163,6 +172,17 @@ def invite(
     )
     db.add(invitation)
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_MEMBER_INVITED,
+        entity_type=audit.FAMILY,
+        entity_id=family_id,
+        family_id=family_id,
+        # No address: an invitation is visible to the household, and who was
+        # asked is not the household's business until they accept.
+        metadata={"proposed_role": proposed_role.value},
+    )
     return invitation, token
 
 
@@ -228,6 +248,15 @@ def accept_invitation(db: DbSession, *, user: User, token: str) -> FamilyMembers
     invitation.accepted_by = user.id
     invitation.accepted_at = utcnow()
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_MEMBER_JOINED,
+        entity_type=audit.FAMILY,
+        entity_id=invitation.family_id,
+        family_id=invitation.family_id,
+        metadata={"role": membership.role.value},
+    )
     return membership
 
 
@@ -305,6 +334,14 @@ def leave_family(db: DbSession, *, user: User) -> FamilyMembership:
     membership.status = MembershipStatus.LEFT
     membership.left_at = utcnow()
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_MEMBER_LEFT,
+        entity_type=audit.FAMILY,
+        entity_id=membership.family_id,
+        family_id=membership.family_id,
+    )
     return membership
 
 
@@ -331,6 +368,15 @@ def remove_member(
     membership.status = MembershipStatus.REMOVED
     membership.left_at = utcnow()
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_MEMBER_REMOVED,
+        entity_type=audit.FAMILY,
+        entity_id=family_id,
+        family_id=family_id,
+        metadata={"member_user_id": str(member_user_id)},
+    )
     return membership
 
 
@@ -359,6 +405,15 @@ def set_member_role(
         current.role = FamilyRole.ADULT
     membership.role = role
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.FAMILY_ROLE_CHANGED,
+        entity_type=audit.FAMILY,
+        entity_id=family_id,
+        family_id=family_id,
+        metadata={"member_user_id": str(member_user_id), "role": role.value},
+    )
     return membership
 
 

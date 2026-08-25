@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
@@ -17,6 +17,7 @@ from app.schemas.families import (
     InvitationCreate,
     MemberRoleUpdate,
 )
+from app.services import audit
 from app.services import families as family_service
 
 router = APIRouter(tags=["families"])
@@ -175,6 +176,29 @@ def list_members(
         }
         for m, u in family_service.members(db, family_id)
     ]
+    db.commit()
+    return collection(payload, limit=len(payload))
+
+
+@router.get("/families/{family_id}/activity")
+def family_activity(
+    family_id: uuid.UUID,
+    limit: int = Query(default=50, ge=1, le=100),
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """The household's audit trail (Implementation Plan Phase 28).
+
+    Membership is the only requirement to read it: the trail exists so members
+    can see what changed in the household, and it carries no financial detail
+    that would need a narrower audience.
+    """
+    family_service.require_membership(db, user, family_id)
+    events = audit.for_family(db, family_id=family_id, limit=limit)
+    names = {
+        m.user_id: u.display_name or u.email for m, u in family_service.members(db, family_id)
+    }
+    payload = [audit.serialize(e, actor_names=names) for e in events]
     db.commit()
     return collection(payload, limit=len(payload))
 

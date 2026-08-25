@@ -31,6 +31,7 @@ from app.db.enums import (
 from app.models.finance import Account
 from app.models.loans import Loan, LoanPayment
 from app.models.user import User
+from app.services import audit
 from app.services.authz import get_transactable_account
 from app.services.posting import PostingService
 from app.services.recurrence import occurrence_after
@@ -291,6 +292,16 @@ def record_payment(
         advance_schedule(db, loan, paid_on=payment_date)
 
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.LOAN_PAYMENT_RECORDED,
+        entity_type=audit.LOAN,
+        entity_id=loan.id,
+        # No amounts: the payment row holds those, behind the loan's own
+        # permissions.
+        metadata={"payment_id": str(payment.id), "account_id": str(account.id)},
+    )
     return payment
 
 

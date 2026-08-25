@@ -18,6 +18,7 @@ from app.db.enums import (
 )
 from app.models.finance import Account, Transaction
 from app.models.user import User
+from app.services import audit
 from app.services.authz import visible_accounts
 from app.services.credit_cards import apply_card_fields, card_fields_payload, expiry_state
 from app.services.posting import PostingService
@@ -97,6 +98,15 @@ def create_account(
 
     db.add(account)
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.ACCOUNT_CREATED,
+        entity_type=audit.ACCOUNT,
+        entity_id=account.id,
+        family_id=account.family_id,
+        metadata={"account_type": account.account_type.value, "currency": account.currency},
+    )
     return account
 
 
@@ -142,6 +152,14 @@ def archive_account(db: DbSession, account: Account) -> Account:
     account.status = AccountStatus.ARCHIVED
     account.archived_at = utcnow()
     db.flush()
+    audit.record(
+        db,
+        actor=None,
+        event_type=audit.ACCOUNT_ARCHIVED,
+        entity_type=audit.ACCOUNT,
+        entity_id=account.id,
+        family_id=account.family_id,
+    )
     return account
 
 
@@ -279,6 +297,12 @@ def set_visibility(
     Visibility is inherited by everything the account holds, so this one field
     decides what the household can see of its history too (API spec section 18).
     """
+    previous = account.visibility
+    # Un-sharing clears family_id, and an event recorded against the cleared
+    # value would vanish from the household's own trail — which is precisely
+    # the change members most need to see. Attribute it to the household the
+    # account is leaving.
+    previous_family_id = account.family_id
     account.family_id = _resolve_sharing(
         db, user=user, visibility=visibility, family_id=account.family_id
     )
@@ -287,4 +311,21 @@ def set_visibility(
         # A joint account that is no longer shared has nobody to be joint with.
         account.ownership_type = OwnershipType.PERSONAL
     db.flush()
+    # Who can see this account is exactly the kind of change a household needs
+    # a record of, so the direction of travel is named rather than inferred.
+    if visibility is Visibility.PRIVATE:
+        event = audit.ACCOUNT_MADE_PRIVATE
+    elif visibility is Visibility.SHARED:
+        event = audit.ACCOUNT_SHARED
+    else:
+        event = audit.ACCOUNT_VISIBILITY_CHANGED
+    audit.record(
+        db,
+        actor=user,
+        event_type=event,
+        entity_type=audit.ACCOUNT,
+        entity_id=account.id,
+        family_id=account.family_id or previous_family_id,
+        metadata={"from": previous.value, "to": visibility.value},
+    )
     return account

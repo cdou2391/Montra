@@ -20,7 +20,7 @@ from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.db.base import utcnow
 from app.models.records import Attachment
 from app.models.user import User
-from app.services import storage
+from app.services import audit, storage
 from app.services.authz import get_transactable_account
 from app.services.transactions import get_transaction
 
@@ -125,6 +125,14 @@ def confirm_upload(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> At
 
     attachment.uploaded_at = utcnow()
     db.flush()
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.ATTACHMENT_ADDED,
+        entity_type=audit.ATTACHMENT,
+        entity_id=attachment.id,
+        metadata={"transaction_id": str(attachment.transaction_id)},
+    )
     return attachment
 
 
@@ -166,6 +174,16 @@ def delete_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) ->
     storage.delete_object(key=attachment.storage_key)
     attachment.deleted_at = utcnow()
     db.flush()
+    # The file is gone from the bucket for real, so this is the only record
+    # that it was ever there.
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.ATTACHMENT_DELETED,
+        entity_type=audit.ATTACHMENT,
+        entity_id=attachment.id,
+        metadata={"transaction_id": str(attachment.transaction_id)},
+    )
 
 
 def _own_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> Attachment:

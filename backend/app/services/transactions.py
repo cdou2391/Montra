@@ -16,9 +16,10 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.timezone import day_end, day_start, ensure_aware
 from app.db.base import utcnow
-from app.db.enums import TransactionStatus, TransactionType
+from app.db.enums import TransactionStatus, TransactionType, Visibility
 from app.models.finance import Account, Category, Transaction
 from app.models.user import User
+from app.services import audit
 from app.services.authz import get_transactable_account, get_viewable_account, visible_accounts
 from app.services.posting import PostingService
 
@@ -79,7 +80,7 @@ def create_transaction(
         "reference": reference,
     }
     if transaction_type is TransactionType.INCOME:
-        return posting.record_income(
+        txn = posting.record_income(
             account=account,
             amount=amount,
             currency=account.currency,
@@ -87,8 +88,8 @@ def create_transaction(
             actor_id=user.id,
             **fields,
         )
-    if transaction_type is TransactionType.EXPENSE:
-        return posting.record_expense(
+    elif transaction_type is TransactionType.EXPENSE:
+        txn = posting.record_expense(
             account=account,
             amount=amount,
             currency=account.currency,
@@ -96,10 +97,28 @@ def create_transaction(
             actor_id=user.id,
             **fields,
         )
-    raise ValidationFailed(
-        "Adjustments are created through the balance-adjustments endpoint.",
-        code="USE_ADJUSTMENT_ENDPOINT",
+    else:
+        raise ValidationFailed(
+            "Adjustments are created through the balance-adjustments endpoint.",
+            code="USE_ADJUSTMENT_ENDPOINT",
+        )
+
+    # Spending on a shared account is the household's business in a way that
+    # spending on a private one is not, so the two are distinguishable events.
+    audit.record(
+        db,
+        actor=user,
+        event_type=(
+            audit.SHARED_TRANSACTION_CREATED
+            if account.visibility is not Visibility.PRIVATE
+            else audit.TRANSACTION_CREATED
+        ),
+        entity_type=audit.TRANSACTION,
+        entity_id=txn.id,
+        family_id=account.family_id,
+        metadata={"account_id": str(account.id), "transaction_type": transaction_type.value},
     )
+    return txn
 
 
 def _require_own_category(db: DbSession, category_id: uuid.UUID, user: User) -> Category:
@@ -170,9 +189,20 @@ def delete_transaction(db: DbSession, *, user: User, transaction_id: uuid.UUID) 
             "A transfer side cannot be deleted independently. Cancel the transfer instead.",
             code="TRANSFER_SIDE_NOT_DELETABLE",
         )
-    get_transactable_account(db, txn.account_id, user)
+    account = get_transactable_account(db, txn.account_id, user)
     txn.deleted_at = utcnow()
     db.flush()
+    # The row is tombstoned, so the trail is the only thing that will still say
+    # this happened at all.
+    audit.record(
+        db,
+        actor=user,
+        event_type=audit.TRANSACTION_DELETED,
+        entity_type=audit.TRANSACTION,
+        entity_id=txn.id,
+        family_id=account.family_id,
+        metadata={"account_id": str(account.id)},
+    )
 
 
 def list_transactions(

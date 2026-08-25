@@ -333,6 +333,19 @@ class PostingService:
         transfer.status = TransferStatus.CANCELLED
         transfer.cancelled_at = utcnow()
         self.db.flush()
+
+        from app.services import audit
+
+        # Cancelling moves two balances at once, and the transfer row itself
+        # keeps no record of who did it.
+        audit.record(
+            self.db,
+            actor=None,
+            event_type=audit.TRANSFER_CANCELLED,
+            entity_type=audit.TRANSFER,
+            entity_id=transfer.id,
+            metadata={"actor_user_id": str(actor_id)},
+        )
         return transfer
 
     def adjust_balance(
