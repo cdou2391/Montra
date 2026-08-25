@@ -91,9 +91,45 @@ INCOMING = [
 ]
 
 
+# Which kind of account the message is *about* — the one whose balance it
+# reports. A MoMo message announcing a transfer to a bank is still a MoMo
+# message: the wallet is what moved, and the wallet's balance is what it
+# quotes.
+MOMO_MARKERS = (
+    re.compile(r"\*1(?:65|82|85)\*"),          # MTN and Airtel USSD codes
+    re.compile(r"mobile\s*money", re.I),
+    re.compile(r"\bmomo\b", re.I),
+    re.compile(r"airtel\s+money", re.I),
+    re.compile(r"\bft\s*id\b", re.I),          # MTN MoMo transaction id
+    re.compile(r"\byello\b", re.I),
+)
+
+BANK_MARKERS = (
+    re.compile(r"\ba/c\b", re.I),
+    re.compile(r"bank\s+of\s+kigali", re.I),
+    re.compile(r"\bequity\b|\bcogebanque\b|\bi&m\b", re.I),
+    re.compile(r"account\s+(?:number|no\.?)\s*[:\s]*\d", re.I),
+)
+
+
+def _channel(text: str) -> str | None:
+    """MOBILE_MONEY, BANK, or nothing.
+
+    MoMo is checked first and wins outright. Its messages routinely mention a
+    bank as the other end of a movement, and reading that as "this is a bank
+    message" would select the wrong account every time someone tops up.
+    """
+    if any(marker.search(text) for marker in MOMO_MARKERS):
+        return "MOBILE_MONEY"
+    if any(marker.search(text) for marker in BANK_MARKERS):
+        return "BANK"
+    return None
+
+
 @dataclass
 class ParsedSms:
     transaction_type: str | None = None
+    channel: str | None = None
     amount: Decimal | None = None
     currency: str | None = None
     fee_amount: Decimal | None = None
@@ -135,6 +171,9 @@ def parse(message: str) -> ParsedSms:
         return result
 
     text = message.strip()
+    result.channel = _channel(text)
+    if result.channel:
+        result.matched.append("account")
 
     for kind, patterns in (("TRANSFER", TRANSFERS), ("EXPENSE", OUTGOING), ("INCOME", INCOMING)):
         for pattern in patterns:
@@ -192,6 +231,10 @@ def serialize(parsed: ParsedSms) -> dict:
     return {
         "understood": parsed.understood,
         "transaction_type": parsed.transaction_type,
+        # The client matches this to one of the user's accounts; it deliberately
+        # names a kind rather than an account, because only the client knows
+        # which accounts exist.
+        "channel": parsed.channel,
         "amount": serialize_amount(parsed.amount) if parsed.amount is not None else None,
         "currency": parsed.currency,
         "fee_amount": (

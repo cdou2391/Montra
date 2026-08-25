@@ -14,7 +14,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Account, MontraApiError, montra } from "@/lib/api";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
-import { toLocalInputValue } from "@/lib/format";
+import { accountForChannel, toLocalInputValue } from "@/lib/format";
 
 export function TransferForm({
   defaultSourceId = "",
@@ -24,7 +24,12 @@ export function TransferForm({
   /** Values read from a pasted message. The accounts are still the user's to
       choose: a notification says money moved, not which two of your accounts
       it moved between. */
-  prefill?: { amount?: string | null; fee?: string | null; occurredAt?: string | null };
+  prefill?: {
+    amount?: string | null;
+    fee?: string | null;
+    occurredAt?: string | null;
+    channel?: "MOBILE_MONEY" | "BANK" | null;
+  };
 }) {
   const router = useRouter();
 
@@ -40,13 +45,23 @@ export function TransferForm({
 
   useEffect(() => {
     if (!prefill) return;
-    setForm((f) => ({
-      ...f,
-      source_amount: prefill.amount ?? f.source_amount,
-      fee_amount: prefill.fee ?? f.fee_amount,
-      occurred_at: prefill.occurredAt ?? f.occurred_at,
-    }));
-  }, [prefill]);
+    setForm((f) => {
+      // Only the sending side: the message names the account it came out of,
+      // and says nothing reliable about which of yours it went into.
+      const from = accountForChannel(accounts, prefill.channel ?? null);
+      const source = from?.id ?? f.source_account_id;
+      return {
+        ...f,
+        source_amount: prefill.amount ?? f.source_amount,
+        fee_amount: prefill.fee ?? f.fee_amount,
+        occurred_at: prefill.occurredAt ?? f.occurred_at,
+        source_account_id: source,
+        // The destination cannot stay equal to the new source.
+        destination_account_id:
+          f.destination_account_id === source ? "" : f.destination_account_id,
+      };
+    });
+  }, [prefill, accounts]);
   // Generated once per form instance so a double submit cannot post twice.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [files, setFiles] = useState<File[]>([]);

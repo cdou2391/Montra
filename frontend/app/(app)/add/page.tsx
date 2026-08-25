@@ -9,7 +9,7 @@ import { TransferForm } from "@/components/transfer-form";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { SmsPaste } from "@/components/sms-paste";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
-import { toLocalInputValue } from "@/lib/format";
+import { accountForChannel, toLocalInputValue } from "@/lib/format";
 
 /**
  * Add income or expense.
@@ -38,6 +38,7 @@ function AddTransactionForm() {
     amount: string | null;
     fee: string | null;
     occurredAt: string | null;
+    channel: "MOBILE_MONEY" | "BANK" | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -120,9 +121,11 @@ function AddTransactionForm() {
               amount: parsed.amount,
               fee: parsed.fee_amount,
               occurredAt: parsed.occurred_at,
+              channel: parsed.channel,
             });
             return;
           }
+          const onAccount = accountForChannel(accounts, parsed.channel);
           setForm((f) => ({
             ...f,
             amount: parsed.amount ?? f.amount,
@@ -131,6 +134,9 @@ function AddTransactionForm() {
             // value submitted is the moment the message stated.
             occurred_at: parsed.occurred_at ?? f.occurred_at,
             description: parsed.counterparty ?? f.description,
+            // A MoMo message is about the wallet; picking it saves the step
+            // the user would otherwise take every single time.
+            account_id: onAccount?.id ?? f.account_id,
           }));
         }}
       />

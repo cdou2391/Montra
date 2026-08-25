@@ -221,3 +221,42 @@ def test_the_word_your_is_what_decides_it():
     theirs = "50000 RWF transferred to JEAN BOSCO at 2026-08-25 16:00:00."
     assert parse(mine).transaction_type == "TRANSFER"
     assert parse(theirs).transaction_type == "EXPENSE"
+
+
+# ------------------------------------------------------ which account it is about
+
+
+def test_a_momo_message_names_the_wallet():
+    assert parse(SENT).channel == "MOBILE_MONEY"
+    assert parse(RECEIVED).channel == "MOBILE_MONEY"
+
+
+def test_a_momo_transfer_to_a_bank_is_still_a_momo_message():
+    """The wallet is what moved and the wallet's balance is what it quotes.
+    Reading this as a bank message would select the wrong account every time
+    someone moves money out."""
+    assert parse(TO_BANK).channel == "MOBILE_MONEY"
+
+
+def test_a_bank_statement_names_the_bank():
+    message = "Funds transfer of 120000 RWF from A/C ****1234 to A/C ****5678 on 2026-08-25 16:10."
+    assert parse(message).channel == "BANK"
+
+
+@pytest.mark.parametrize(
+    "marker",
+    ["*165*S*", "MTN Mobile Money", "your MoMo wallet", "Airtel Money", "FT Id: 123"],
+)
+def test_the_usual_momo_markers_are_recognised(marker):
+    message = f"{marker} 1000 RWF transferred to JEAN at 2026-08-01 09:00:00."
+    assert parse(message).channel == "MOBILE_MONEY"
+
+
+def test_a_message_with_no_marker_claims_no_account():
+    """Silence is better than picking an account the message never mentioned."""
+    assert parse("You have sent 5000 RWF to JEAN at 2026-08-01 09:00:00.").channel is None
+
+
+def test_the_channel_is_reported_in_the_payload():
+    assert serialize(parse(SENT))["channel"] == "MOBILE_MONEY"
+    assert "account" in serialize(parse(SENT))["matched"]

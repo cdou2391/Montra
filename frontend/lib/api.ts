@@ -204,6 +204,7 @@ type UploadTicket = Attachment & {
 export type ParsedSms = {
   understood: boolean;
   transaction_type: "EXPENSE" | "INCOME" | "TRANSFER" | null;
+  channel: "MOBILE_MONEY" | "BANK" | null;
   amount: string | null;
   currency: string | null;
   fee_amount: string | null;
