@@ -67,12 +67,28 @@ export const api = {
     }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
 // ------------------------------------------------------------------ resources
 
 export type Money = { amount: string; currency: string };
+
+export type ExchangeRate = {
+  id: string;
+  base_currency: string;
+  quote_currency: string;
+  rate: string;
+  as_of: string;
+};
+
+export type CurrenciesInUse = {
+  base_currency: string;
+  currencies: string[];
+  missing: string[];
+};
 
 export type CardExpiry = {
   expires_on: string;
@@ -102,6 +118,9 @@ export type Account = {
   account_nature: "ASSET" | "LIABILITY";
   currency: string;
   balance: string;
+  /** The balance restated in the viewer's base currency; null with no rate. */
+  balance_in_base: string | null;
+  base_currency: string;
   opening_balance: string;
   masked_identifier: string | null;
   visibility: string;
@@ -593,6 +612,15 @@ export const montra = {
     api
       .get<Envelope<Forecast>>(`/forecasts/cash-flow?context=${context}&period=${period}`)
       .then((r) => r.data),
+  exchangeRates: () =>
+    api.get<Collection<ExchangeRate>>("/exchange-rates").then((r) => r.data),
+  currenciesInUse: () =>
+    api
+      .get<Envelope<CurrenciesInUse>>("/exchange-rates/currencies-in-use")
+      .then((r) => r.data),
+  setExchangeRate: (payload: Record<string, unknown>) =>
+    api.put<Envelope<ExchangeRate>>("/exchange-rates", payload).then((r) => r.data),
+  deleteExchangeRate: (id: string) => api.delete<void>(`/exchange-rates/${id}`),
   insights: (context: Context = "personal") =>
     api.get<Collection<Insight>>(`/insights?context=${context}`).then((r) => r.data),
 

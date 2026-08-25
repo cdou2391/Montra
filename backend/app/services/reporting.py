@@ -34,7 +34,7 @@ from app.db.enums import (
 from app.models.finance import Account, Transaction
 from app.models.loans import Loan
 from app.models.user import User
-from app.services import authz
+from app.services import authz, currency
 from app.services.loans import outstanding_principal
 from app.services.posting import PostingService
 
@@ -73,21 +73,42 @@ def _shared_loans(db: DbSession, access: authz.Access) -> list[Loan]:
     )
 
 
-def _position(db: DbSession, accounts: list[Account], loans: list[Loan]) -> dict:
-    """Assets, liabilities and the difference, for one set of records."""
+def _position(
+    db: DbSession, accounts: list[Account], loans: list[Loan], converter=None
+) -> dict:
+    """Assets, liabilities and the difference, for one set of records.
+
+    Everything is converted into the reporting currency first. Adding a dollar
+    balance to a franc one at 1:1 does not give an approximate total, it gives
+    a wrong one — so a balance with no known rate is left out of the sum and
+    named in `unconverted`, for the caller to say so.
+    """
     posting = PostingService(db)
     assets = ZERO
     liabilities = ZERO
+    unconverted: set[str] = set()
+
+    def _in_base(amount: Decimal, currency: str) -> Decimal | None:
+        if converter is None:
+            return amount
+        converted = converter.convert(amount, currency)
+        if converted is None:
+            unconverted.add(currency.upper())
+        return converted
 
     for account in accounts:
-        balance = posting.balance_of(account)
+        balance = _in_base(posting.balance_of(account), account.currency)
+        if balance is None:
+            continue
         if nature_for(account.account_type) is AccountNature.LIABILITY:
             liabilities += balance
         else:
             assets += balance
 
     for loan in loans:
-        outstanding = outstanding_principal(db, loan)
+        outstanding = _in_base(outstanding_principal(db, loan), loan.currency)
+        if outstanding is None:
+            continue
         if loan.direction is LoanDirection.PAYABLE:
             liabilities += outstanding
         else:
@@ -98,6 +119,7 @@ def _position(db: DbSession, accounts: list[Account], loans: list[Loan]) -> dict
         "assets": serialize(assets),
         "liabilities": serialize(liabilities),
         "net_worth": serialize(assets - liabilities),
+        "unconverted_currencies": sorted(unconverted),
     }
 
 
@@ -108,7 +130,7 @@ def net_worth(db: DbSession, *, user: User, context: str = "personal") -> dict:
     if context == "family":
         accounts = list(db.scalars(authz.visible_accounts(db, access, context="family")))
         loans = _loans_in_scope(db, access, "family")
-        payload = _position(db, accounts, loans)
+        payload = _position(db, accounts, loans, currency.converter_for(db, user=user))
         payload.update(
             context="family",
             currency=user.base_currency,
@@ -123,7 +145,8 @@ def net_worth(db: DbSession, *, user: User, context: str = "personal") -> dict:
         for a in db.scalars(authz.visible_accounts(db, access))
         if a.owner_user_id == user.id and a.visibility is not Visibility.SHARED
     ]
-    payload = _position(db, owned, _loans_in_scope(db, access, "personal"))
+    converter = currency.converter_for(db, user=user)
+    payload = _position(db, owned, _loans_in_scope(db, access, "personal"), converter)
 
     shared_accounts = [
         a
@@ -140,7 +163,7 @@ def net_worth(db: DbSession, *, user: User, context: str = "personal") -> dict:
         # member would be a guess dressed up as a number.
         shared=(
             {
-                **_position(db, shared_accounts, shared_loans),
+                **_position(db, shared_accounts, shared_loans, converter),
                 "account_count": len(shared_accounts),
                 "loan_count": len(shared_loans),
             }
@@ -177,10 +200,13 @@ def month_flows(
     )
     start, end = _month_bounds(today)
 
+    converter = currency.converter_for(db, user=user)
+    unconverted: set[str] = set()
+
     totals = {}
     for label, kind in (("income", TransactionType.INCOME), ("expense", TransactionType.EXPENSE)):
-        rows = db.scalars(
-            select(Transaction.amount).where(
+        rows = db.execute(
+            select(Transaction.amount, Transaction.currency).where(
                 Transaction.account_id.in_(account_ids),
                 Transaction.transaction_type == kind,
                 Transaction.status == TransactionStatus.COMPLETED,
@@ -189,7 +215,16 @@ def month_flows(
                 Transaction.occurred_at < day_start(end, user.timezone),
             )
         ).all()
-        totals[label] = sum(rows, ZERO)
+        # Same rule as the balance sheet: a month's spending in two currencies
+        # is not the sum of two raw numbers.
+        running = ZERO
+        for amount, code in rows:
+            converted = converter.convert(Decimal(amount), code)
+            if converted is None:
+                unconverted.add(code.upper())
+                continue
+            running += converted
+        totals[label] = running
 
     saved = totals["income"] - totals["expense"]
     rate = (
@@ -201,6 +236,7 @@ def month_flows(
         "expense": serialize(totals["expense"]),
         "saved": serialize(saved),
         "savings_rate": str(rate) if rate is not None else None,
+        "unconverted_currencies": sorted(unconverted),
     }
 
 

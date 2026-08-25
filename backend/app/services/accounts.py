@@ -242,6 +242,7 @@ def serialize_account(
     *,
     favorite: uuid.UUID | None = None,
     access=None,
+    converter=None,
 ) -> dict:
     from app.core.money import serialize
     from app.services.authz import can_edit, can_transact, resolve
@@ -255,8 +256,16 @@ def serialize_account(
     # account.
     if favorite is None:
         favorite = favorite_account_id(db, user)
+    # Callers serializing a list pass this in, so every row is converted at the
+    # same rate and the page issues one rate lookup rather than one per account.
+    if converter is None:
+        from app.services.currency import converter_for
+
+        converter = converter_for(db, user=user)
+
     posting = PostingService(db)
     balance = posting.balance_of(account)
+    in_base = converter.convert(balance, account.currency)
     return {
         "id": str(account.id),
         "name": account.name,
@@ -264,6 +273,11 @@ def serialize_account(
         "account_nature": nature_for(account.account_type).value,
         "currency": account.currency,
         "balance": serialize(balance),
+        # The balance restated in the viewer's base currency, so a total of
+        # mixed-currency accounts is a real total. None when no rate is known —
+        # a client must leave it out rather than add the raw number.
+        "balance_in_base": serialize(in_base) if in_base is not None else None,
+        "base_currency": user.base_currency,
         "opening_balance": serialize(Decimal(account.opening_balance)),
         "opening_balance_at": account.opening_balance_at.isoformat(),
         "masked_identifier": masked_identifier(account),

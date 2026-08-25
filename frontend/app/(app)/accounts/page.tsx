@@ -99,9 +99,14 @@ export default function Accounts() {
     );
   }
 
+  // The base-currency figure, not the raw balance — see the note on Home.
+  const unconverted = new Set(
+    accounts.filter((a) => a.balance_in_base === null).map((a) => a.currency),
+  );
   const totals = accounts.reduce(
     (acc, a) => {
-      const value = Number(a.balance);
+      if (a.balance_in_base === null) return acc;
+      const value = Number(a.balance_in_base);
       if (a.account_nature === "LIABILITY") acc.owed += value;
       else acc.available += value;
       return acc;
@@ -109,6 +114,7 @@ export default function Accounts() {
     { available: 0, owed: 0 },
   );
 
+  const baseCurrency = accounts[0]?.base_currency ?? accounts[0]?.currency ?? "RWF";
   const rows = active ? activity[active.id] : undefined;
 
   return (
@@ -141,9 +147,12 @@ export default function Accounts() {
             Total available
           </span>
           <p className="mt-0.5">
+            {/* The base currency, not the first account's — the total is in
+                base currency, and labelling it with whichever account happened
+                to sort first would misname it outright. */}
             <MoneyValue
               amount={String(totals.available)}
-              currency={accounts[0].currency}
+              currency={baseCurrency}
               hidden={hidden}
             />
           </p>
@@ -154,12 +163,22 @@ export default function Accounts() {
             <p className="mt-0.5">
               <MoneyValue
                 amount={String(totals.owed)}
-                currency={accounts[0].currency}
+                currency={baseCurrency}
                 tone="expense"
                 hidden={hidden}
               />
             </p>
           </div>
+        )}
+        {unconverted.size > 0 && (
+          <p className="order-last w-full text-xs text-semantic-warning">
+            Not counting your {[...unconverted].join(" and ")} balance
+            {unconverted.size === 1 ? "" : "s"} —{" "}
+            <Link href="/profile" className="pressable underline">
+              set an exchange rate
+            </Link>
+            .
+          </p>
         )}
       </div>
 

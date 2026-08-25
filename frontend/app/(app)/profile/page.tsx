@@ -16,6 +16,7 @@ import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
+import { ExchangeRates } from "@/components/exchange-rates";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -284,6 +285,10 @@ export default function Profile() {
           </>
         )}
       </Card>
+
+      <div className="mb-4">
+        <ExchangeRates />
+      </div>
 
       <Button variant="secondary" onClick={signOut}>
         Sign out

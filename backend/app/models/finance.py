@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -238,4 +239,35 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
         CheckConstraint("amount > 0", name="amount_positive"),
         Index("ix_transactions_account_occurred", "account_id", "occurred_at"),
         Index("ix_transactions_account_status_occurred", "account_id", "status", "occurred_at"),
+    )
+
+
+class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
+    """A rate the user maintains between two currencies.
+
+    Entered by hand rather than fetched: the PRD defers automatic rates, and a
+    balance that changes because a third party moved a number is worse than one
+    the user set deliberately and can explain.
+
+    Reporting only. Data Model section 65 is explicit that a converted value
+    never replaces an original amount — an account in USD holds dollars, and
+    that is what its own screens say.
+    """
+
+    __tablename__ = "exchange_rates"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    quote_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    # One unit of base buys this much quote. Eight places because a rate like
+    # RWF→USD is a very small number and rounding it early loses real money.
+    rate: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "base_currency", "quote_currency", name="user_currency_pair"),
+        CheckConstraint("rate > 0", name="exchange_rate_positive"),
+        CheckConstraint("base_currency <> quote_currency", name="exchange_rate_distinct"),
     )

@@ -52,9 +52,16 @@ export default function Home() {
 
   const currency = user?.base_currency ?? "RWF";
 
+  // Sum the base-currency figure the API worked out, never the raw balance:
+  // adding dollars to francs at 1:1 gives a wrong total, not a rough one. An
+  // account with no rate is left out and named, so the gap is visible.
+  const unconverted = new Set(
+    (accounts ?? []).filter((a) => a.balance_in_base === null).map((a) => a.currency),
+  );
   const totals = (accounts ?? []).reduce(
     (acc, a) => {
-      const value = Number(a.balance);
+      if (a.balance_in_base === null) return acc;
+      const value = Number(a.balance_in_base);
       if (a.account_nature === "LIABILITY") acc.liabilities += value;
       else acc.assets += value;
       return acc;
@@ -111,6 +118,17 @@ export default function Home() {
                 {hidden ? "••••••" : `${currency} ${netWorth.toLocaleString()}`}
               </span>
             </p>
+            {unconverted.size > 0 && (
+              <p className="mt-2 text-xs text-semantic-warning">
+                Not counting your{" "}
+                {[...unconverted].join(" and ")} balance
+                {unconverted.size === 1 ? "" : "s"} —{" "}
+                <Link href="/profile" className="pressable underline">
+                  set an exchange rate
+                </Link>
+                .
+              </p>
+            )}
             <p className="mt-1 text-xs text-content-muted">
               Assets minus what you owe, across {accounts.length} account
               {accounts.length === 1 ? "" : "s"}

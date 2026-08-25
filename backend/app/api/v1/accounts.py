@@ -18,6 +18,7 @@ from app.schemas.accounts import (
     VisibilityUpdate,
 )
 from app.services import accounts as account_service
+from app.services import currency
 from app.services.authz import get_editable_account, get_viewable_account
 from app.services.posting import PostingService
 
@@ -60,7 +61,13 @@ def list_accounts(
         context=context,
     )
     favorite = account_service.favorite_account_id(db, user)
-    payload = [account_service.serialize_account(db, a, user, favorite=favorite) for a in accounts]
+    # One converter for the whole list: every row converted at the same rate,
+    # and one rate lookup instead of one per account.
+    converter = currency.converter_for(db, user=user)
+    payload = [
+        account_service.serialize_account(db, a, user, favorite=favorite, converter=converter)
+        for a in accounts
+    ]
     db.commit()
     return collection(payload, limit=limit)
 
