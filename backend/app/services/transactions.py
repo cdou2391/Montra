@@ -20,6 +20,7 @@ from app.db.enums import TransactionStatus, TransactionType, Visibility
 from app.models.finance import Account, Category, Transaction
 from app.models.user import User
 from app.services import audit
+from app.services import categories as category_service
 from app.services.authz import get_transactable_account, get_viewable_account, visible_accounts
 from app.services.posting import PostingService
 
@@ -126,7 +127,10 @@ def create_transaction(
             currency=account.currency,
             occurred_at=occurred_at,
             actor_id=user.id,
-            category_id=category_id,
+            # Filed as a fee, not as whatever the charge was for. A bank
+            # charge on a grocery run is not money spent on groceries, and
+            # counting it there would quietly inflate that category.
+            category_id=category_service.fee_category_id(db, user_id=user.id),
             description=_fee_description(description, merchant),
             merchant=merchant,
             fee_for_transaction_id=txn.id,

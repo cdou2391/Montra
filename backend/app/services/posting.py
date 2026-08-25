@@ -211,6 +211,7 @@ class PostingService:
         notes: str | None = None,
         idempotency_key: str | None = None,
         fee_amount: Decimal | None = None,
+        fee_category_id: uuid.UUID | None = None,
     ) -> Transfer:
         """Create a transfer and both of its ledger entries.
 
@@ -300,6 +301,7 @@ class PostingService:
                 actor_id=actor_id,
                 occurred_at=occurred_at,
                 description=f"{notes or f'Transfer to {destination.name}'} — fee",
+                category_id=fee_category_id,
                 fee_for_transaction_id=outgoing.id,
             )
         return transfer

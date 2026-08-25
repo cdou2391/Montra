@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.core.errors import ValidationFailed
 from app.db.enums import TransactionType
-from app.models.finance import Transaction
+from app.models.finance import Category, Transaction
 from app.services import transactions as txn_service
 from app.services.posting import PostingService
 
@@ -304,3 +304,78 @@ def test_no_fee_on_a_transfer_means_two_lines_only(db, user, bank_account, savin
     db.commit()
     rows = db.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
     assert len(rows) == 2
+
+
+# ------------------------------------------------------------------ categories
+
+
+def test_a_fee_is_filed_as_a_fee_not_as_what_it_was_charged_on(db, user, bank_account):
+    """A bank charge on a grocery run is not money spent on groceries."""
+    from app.services import categories as category_service
+
+    groceries = db.scalar(
+        select(Category).where(Category.user_id == user.id, Category.name == "Groceries")
+    )
+    parent = txn_service.create_transaction(
+        db,
+        user=user,
+        account_id=bank_account.id,
+        transaction_type=TransactionType.EXPENSE,
+        amount=Decimal("10000"),
+        occurred_at=NOW,
+        category_id=groceries.id,
+        description="Simba Supermarket",
+        fee_amount=Decimal("500"),
+    )
+    db.commit()
+
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id == parent.id))
+    assert fee.category_id == category_service.fee_category_id(db, user_id=user.id)
+    assert fee.category_id != groceries.id
+    # The charge itself keeps the category it was given.
+    assert parent.category_id == groceries.id
+
+
+def test_the_fee_category_ships_with_every_user(db, user):
+    from app.services import categories as category_service
+
+    assert category_service.fee_category_id(db, user_id=user.id) is not None
+
+
+def test_a_user_who_archived_the_category_gets_an_uncategorised_fee(db, user, bank_account):
+    """Their filing choice stands; we do not resurrect a category they removed."""
+    from app.db.enums import CategoryStatus
+    from app.services import categories as category_service
+
+    category = db.scalar(
+        select(Category).where(
+            Category.user_id == user.id,
+            Category.name == category_service.FEE_CATEGORY_NAME,
+        )
+    )
+    category.status = CategoryStatus.ARCHIVED
+    db.commit()
+
+    parent = _spend(db, user, bank_account, fee="500")
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id == parent.id))
+    assert fee.category_id is None
+
+
+def test_a_transfer_fee_is_filed_the_same_way(db, user, bank_account, savings_account):
+    from app.services import categories as category_service
+
+    PostingService(db).transfer_funds(
+        source=bank_account,
+        destination=savings_account,
+        source_amount=Decimal("50000"),
+        destination_amount=Decimal("50000"),
+        occurred_at=NOW,
+        actor_id=user.id,
+        notes="MoMo send",
+        fee_amount=Decimal("1000"),
+        fee_category_id=category_service.fee_category_id(db, user_id=user.id),
+    )
+    db.commit()
+    fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
+    assert fee.category_id == category_service.fee_category_id(db, user_id=user.id)

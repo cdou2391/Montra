@@ -44,6 +44,29 @@ DEFAULT_EXPENSE_CATEGORIES = [
 ]
 
 
+# The category a fee is filed under, whatever the charge it was taken on was
+# for. Part of the default set, so it exists for every user without asking.
+FEE_CATEGORY_NAME = "Banking Fees"
+
+
+def fee_category_id(db: DbSession, *, user_id: uuid.UUID) -> uuid.UUID | None:
+    """The user's fee category, if they still have it.
+
+    Returns None rather than recreating it: a user who archived or renamed the
+    category has said something about how they want their spending filed, and
+    quietly resurrecting it would override that. An uncategorised fee is a
+    smaller problem than a category that will not stay deleted.
+    """
+    return db.scalar(
+        select(Category.id).where(
+            Category.user_id == user_id,
+            Category.name == FEE_CATEGORY_NAME,
+            Category.category_type == CategoryType.EXPENSE,
+            Category.status == CategoryStatus.ACTIVE,
+        )
+    )
+
+
 def create_default_categories(db: DbSession, *, user_id: uuid.UUID) -> list[Category]:
     categories = [
         Category(user_id=user_id, name=name, category_type=CategoryType.INCOME, is_system=True)

@@ -186,6 +186,13 @@ def create_transfer(
         notes=payload.notes,
         idempotency_key=idempotency_key,
         fee_amount=payload.fee_amount,
+        # Resolved here rather than in the posting engine, which knows nothing
+        # about categories and should keep it that way.
+        fee_category_id=(
+            category_service.fee_category_id(db, user_id=user.id)
+            if payload.fee_amount is not None
+            else None
+        ),
     )
     # One commit for the transfer and both ledger entries (Architecture section 23).
     db.commit()
