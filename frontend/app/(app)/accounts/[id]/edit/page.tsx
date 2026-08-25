@@ -8,11 +8,15 @@ import { PageHeader } from "@/components/shell";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 
 /**
- * Card details.
+ * Account details.
  *
- * Everything here is metadata about the plastic rather than about the money:
- * changing it moves no balance and writes no transaction, so the form saves
- * with a plain PATCH and never touches the posting engine.
+ * Everything here is metadata rather than money: changing it moves no balance
+ * and writes no transaction, so the form saves with a plain PATCH and never
+ * touches the posting engine. Cards get the extra fields the plastic needs.
+ *
+ * Currency is the exception, and it is the backend that enforces it — an
+ * account with history cannot change currency, because every amount already
+ * recorded is denominated in the old one.
  */
 export default function EditCardPage() {
   const router = useRouter();
@@ -21,6 +25,9 @@ export default function EditCardPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [form, setForm] = useState({
     name: "",
+    description: "",
+    account_identifier: "",
+    currency: "",
     credit_limit: "",
     statement_closing_day: "",
     payment_due_day: "",
@@ -37,6 +44,9 @@ export default function EditCardPage() {
       const card = a.credit_card;
       setForm({
         name: a.name,
+        description: a.description ?? "",
+        account_identifier: a.masked_identifier ? "" : "",
+        currency: a.currency,
         credit_limit: card?.credit_limit ?? "",
         statement_closing_day: card?.statement_closing_day?.toString() ?? "",
         payment_due_day: card?.payment_due_day?.toString() ?? "",
@@ -50,6 +60,10 @@ export default function EditCardPage() {
   }, [id]);
 
   const isCredit = account?.account_type === "CREDIT_CARD";
+  const isCard = isCredit || account?.account_type === "PREPAID_CARD";
+  // An account that has never been used can still change its currency; one
+  // with history cannot, because its amounts are already in the old one.
+  const currencyLocked = account?.has_activity !== false;
 
   function update(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -63,8 +77,17 @@ export default function EditCardPage() {
     try {
       await montra.updateAccount(id, {
         name: form.name,
-        expiry_month: expiryMonth ? Number(expiryMonth) : null,
-        expiry_year: expiryYear ? Number(expiryYear) : null,
+        description: form.description || null,
+        ...(form.account_identifier
+          ? { account_identifier: form.account_identifier }
+          : {}),
+        ...(currencyLocked ? {} : { currency: form.currency }),
+        ...(isCard
+          ? {
+              expiry_month: expiryMonth ? Number(expiryMonth) : null,
+              expiry_year: expiryYear ? Number(expiryYear) : null,
+            }
+          : {}),
         // Credit terms would be rejected on a prepaid card, and there is
         // nothing there to send anyway.
         ...(isCredit
@@ -92,7 +115,10 @@ export default function EditCardPage() {
 
   return (
     <>
-      <PageHeader title="Card details" icon="creditCard" />
+      <PageHeader
+        title={isCard ? "Card details" : "Account details"}
+        icon={isCard ? "creditCard" : "wallet"}
+      />
 
       <Card>
         <form onSubmit={submit} className="space-y-4">
@@ -107,6 +133,48 @@ export default function EditCardPage() {
           </Field>
 
           <Field
+            label="Description"
+            hint="Optional. A note to tell this account from a similar one."
+          >
+            <Input
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+            />
+          </Field>
+
+          <Field
+            label={isCard ? "Last 4 digits" : "Account number"}
+            hint={
+              account.masked_identifier
+                ? `Currently ${account.masked_identifier}. Leave blank to keep it.`
+                : "Optional. Only the last few characters are ever shown."
+            }
+          >
+            <Input
+              maxLength={20}
+              value={form.account_identifier}
+              onChange={(e) => update("account_identifier", e.target.value)}
+            />
+          </Field>
+
+          <Field
+            label="Currency"
+            hint={
+              currencyLocked
+                ? "Fixed once the account has any history — its amounts are already in this currency."
+                : "Can still change: nothing has been recorded here yet."
+            }
+          >
+            <Input
+              maxLength={3}
+              disabled={currencyLocked}
+              value={form.currency}
+              onChange={(e) => update("currency", e.target.value.toUpperCase())}
+            />
+          </Field>
+
+          {isCard && (
+          <Field
             label="Card expires"
             hint="The month printed on the card. You will be warned two months ahead."
           >
@@ -118,6 +186,7 @@ export default function EditCardPage() {
               onChange={(e) => update("expiry", e.target.value)}
             />
           </Field>
+          )}
 
           {isCredit && (
           <Field label="Credit limit" hint="Needed to show utilization.">

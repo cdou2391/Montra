@@ -243,6 +243,7 @@ def serialize_account(
     favorite: uuid.UUID | None = None,
     access=None,
     converter=None,
+    include_activity: bool = False,
 ) -> dict:
     from app.core.money import serialize
     from app.services.authz import can_edit, can_transact, resolve
@@ -294,6 +295,13 @@ def serialize_account(
             "id": str(user.id),
             "display_name": user.display_name,
         },
+        # Only for the single-account view: it is an extra query per account,
+        # and a list of twenty has no use for it.
+        **(
+            {"has_activity": has_financial_activity(db, account)}
+            if include_activity
+            else {}
+        ),
         "can_edit": can_edit(account, access),
         "can_transact": can_transact(account, access),
         # The balance is already computed above; a card gets its headroom from

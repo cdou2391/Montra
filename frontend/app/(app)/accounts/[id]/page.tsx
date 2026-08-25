@@ -117,9 +117,9 @@ export default function AccountDetail() {
             Reconcile
           </Button>
         )}
-        {(isCard || isPrepaid) && account.can_edit && (
+        {account.can_edit && (
           <Button variant="secondary" onClick={() => router.push(`/accounts/${id}/edit`)}>
-            Card details
+            {isCard || isPrepaid ? "Card details" : "Account details"}
           </Button>
         )}
         {account.can_edit && (

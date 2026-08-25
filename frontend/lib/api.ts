@@ -136,6 +136,9 @@ export type Account = {
   ownership_type: string;
   status: string;
   can_edit: boolean;
+  description: string | null;
+  /** Only present on the single-account view. */
+  has_activity?: boolean;
   expiry: CardExpiry | null;
   can_transact: boolean;
   credit_card: CreditCardFields | null;

@@ -107,7 +107,9 @@ def get_account(
 ) -> dict:
     account = get_viewable_account(db, account_id, user)
     db.commit()
-    return single(account_service.serialize_account(db, account, user))
+    return single(
+        account_service.serialize_account(db, account, user, include_activity=True)
+    )
 
 
 @router.patch("/{account_id}")
