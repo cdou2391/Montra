@@ -256,13 +256,14 @@ def serialize_account(
     if favorite is None:
         favorite = favorite_account_id(db, user)
     posting = PostingService(db)
+    balance = posting.balance_of(account)
     return {
         "id": str(account.id),
         "name": account.name,
         "account_type": account.account_type.value,
         "account_nature": nature_for(account.account_type).value,
         "currency": account.currency,
-        "balance": serialize(posting.balance_of(account)),
+        "balance": serialize(balance),
         "opening_balance": serialize(Decimal(account.opening_balance)),
         "opening_balance_at": account.opening_balance_at.isoformat(),
         "masked_identifier": masked_identifier(account),
@@ -281,7 +282,9 @@ def serialize_account(
         },
         "can_edit": can_edit(account, access),
         "can_transact": can_transact(account, access),
-        "credit_card": card_fields_payload(account),
+        # The balance is already computed above; a card gets its headroom from
+        # it rather than the client subtracting one from the other.
+        "credit_card": card_fields_payload(account, outstanding=balance),
         # Any card can expire, so this sits beside the account rather than
         # inside the credit-card block.
         "expiry": expiry_state(account),

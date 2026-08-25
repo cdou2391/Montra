@@ -53,8 +53,12 @@ export function UtilizationBar({ summary }: { summary: CardSummary }) {
         />
       </div>
       <p className="mt-1.5 text-xs text-content-muted">
-        {caption}
-        {pct > 100 ? " — over your limit" : ""}
+        {summary.available_credit !== null && Number(summary.available_credit) >= 0
+          ? `${formatMoney(summary.available_credit, summary.currency)} still available`
+          : summary.available_credit !== null
+            ? `${formatMoney(String(Math.abs(Number(summary.available_credit))), summary.currency)} over your limit`
+            : caption}
+        {summary.available_credit !== null ? ` · ${caption}` : ""}
       </p>
     </div>
   );

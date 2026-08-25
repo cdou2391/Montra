@@ -15,6 +15,7 @@ import { Account, montra } from "@/lib/api";
 import { MoneyValue } from "@/components/financial";
 import { Icon, accountTypeIcon } from "@/components/icons";
 import { Card, StatusChip } from "@/components/ui";
+import { formatMoney } from "@/lib/format";
 
 /** Star toggle. Optimistic, because a star that lags a tap feels broken. */
 function FavoriteToggle({
@@ -115,6 +116,27 @@ export function AccountPanel({
               hidden={hidden}
             />
           </p>
+          {/* On a card, what is owed is only half the answer; what is left to
+              spend is the half people act on. */}
+          {account.credit_card?.available_credit !== null &&
+            account.credit_card?.available_credit !== undefined && (
+              <p
+                className={`mt-1.5 text-sm ${
+                  Number(account.credit_card.available_credit) < 0
+                    ? "text-semantic-expense"
+                    : "text-content-secondary"
+                }`}
+              >
+                {hidden
+                  ? "••••"
+                  : `${formatMoney(
+                      String(Math.abs(Number(account.credit_card.available_credit))),
+                      account.currency,
+                    )} ${
+                      Number(account.credit_card.available_credit) < 0 ? "over limit" : "left to spend"
+                    }`}
+              </p>
+            )}
         </div>
       </Card>
     </Link>

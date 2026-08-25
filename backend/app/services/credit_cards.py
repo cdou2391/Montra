@@ -106,6 +106,23 @@ def require_credit_card(account: Account) -> Account:
     return account
 
 
+def headroom(outstanding: Decimal, limit: Decimal | None) -> tuple[Decimal | None, Decimal | None]:
+    """What is left to spend, and how much of the limit is used.
+
+    Available credit can legitimately go negative when a card is over its
+    limit. Reporting the real number beats clamping to zero and hiding it.
+    """
+    if limit is None:
+        return None, None
+    available = limit - outstanding
+    utilization = (
+        (outstanding / limit * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if limit > 0
+        else None
+    )
+    return available, utilization
+
+
 def utilization_band(percentage: Decimal | None) -> str | None:
     if percentage is None:
         return None
@@ -141,17 +158,7 @@ def summary(db: DbSession, account: Account, *, today: date | None = None) -> di
     outstanding = posting.balance_of(account)
 
     limit = Decimal(account.credit_limit) if account.credit_limit is not None else None
-    available: Decimal | None = None
-    utilization: Decimal | None = None
-
-    if limit is not None:
-        # Available credit can legitimately go negative when a card is over its
-        # limit. Reporting the real number beats clamping to zero and hiding it.
-        available = limit - outstanding
-        if limit > 0:
-            utilization = (outstanding / limit * 100).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+    available, utilization = headroom(outstanding, limit)
 
     due_date = (
         next_occurrence(account.payment_due_day, today=today)
@@ -270,13 +277,26 @@ def top_up_prepaid(
     )
 
 
-def card_fields_payload(account: Account) -> dict | None:
-    """Card metadata for account serialization, omitted for non-cards."""
+def card_fields_payload(account: Account, *, outstanding: Decimal | None = None) -> dict | None:
+    """Card metadata for account serialization, omitted for non-cards.
+
+    Carries what is left to spend as well as the limit, so a list of accounts
+    can show headroom without a second request per card — and without the
+    client subtracting balances of its own.
+    """
     if account.account_type is not AccountType.CREDIT_CARD:
         return None
     from app.core.money import serialize, serialize_rate
 
+    limit = Decimal(account.credit_limit) if account.credit_limit is not None else None
+    available, utilization = (
+        headroom(outstanding, limit) if outstanding is not None else (None, None)
+    )
+
     return {
+        "available_credit": serialize(available) if available is not None else None,
+        "utilization_percentage": str(utilization) if utilization is not None else None,
+        "utilization_band": utilization_band(utilization),
         "credit_limit": (
             serialize(Decimal(account.credit_limit)) if account.credit_limit is not None else None
         ),

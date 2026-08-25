@@ -300,3 +300,67 @@ def test_top_up_rejects_a_credit_card(db, bank_account, credit_card, user):
             occurred_at=NOW,
         )
     assert exc.value.code == "NOT_A_PREPAID_CARD"
+
+
+# ------------------------------------------------------------------- headroom
+
+
+def test_an_account_listing_says_what_is_left_to_spend(db, user, credit_card):
+    """Without it, a list of cards can only say what is owed — and the client
+    would have to subtract balances to answer the obvious question."""
+    from app.services.accounts import serialize_account
+
+    credit_card.credit_limit = Decimal("3000000")
+    db.commit()
+
+    payload = serialize_account(db, credit_card, user)["credit_card"]
+    # Opening balance on the fixture is 200,000 of debt.
+    assert payload["available_credit"] == "2800000.00"
+    assert payload["credit_limit"] == "3000000.00"
+    assert payload["utilization_percentage"] == "6.67"
+
+
+def test_headroom_shrinks_as_the_card_is_used(db, user, credit_card):
+    from app.services.accounts import serialize_account
+    from app.services.transactions import create_transaction
+
+    credit_card.credit_limit = Decimal("1000000")
+    db.commit()
+    create_transaction(
+        db,
+        user=user,
+        account_id=credit_card.id,
+        transaction_type=TransactionType.EXPENSE,
+        amount=Decimal("300000"),
+        occurred_at=NOW,
+        description="Flights",
+    )
+    db.commit()
+    payload = serialize_account(db, credit_card, user)["credit_card"]
+    assert payload["available_credit"] == "500000.00"
+
+
+def test_a_card_over_its_limit_reports_a_negative_headroom(db, user, credit_card):
+    """Clamping at zero would hide the fact that the card is over."""
+    from app.services.accounts import serialize_account
+
+    credit_card.credit_limit = Decimal("150000")
+    db.commit()
+    payload = serialize_account(db, credit_card, user)["credit_card"]
+    assert payload["available_credit"] == "-50000.00"
+    assert payload["utilization_band"] == "HIGH"
+
+
+def test_a_card_without_a_limit_reports_no_headroom(db, user, credit_card):
+    """Nothing is known, so nothing is claimed."""
+    from app.services.accounts import serialize_account
+
+    payload = serialize_account(db, credit_card, user)["credit_card"]
+    assert payload["available_credit"] is None
+    assert payload["utilization_percentage"] is None
+
+
+def test_a_bank_account_has_no_card_block_at_all(db, user, bank_account):
+    from app.services.accounts import serialize_account
+
+    assert serialize_account(db, bank_account, user)["credit_card"] is None

@@ -69,6 +69,28 @@ export function MetricCard({
   );
 }
 
+/**
+ * What is left to spend on a card.
+ *
+ * The balance beside it answers "how much do I owe"; this answers "how much
+ * can I still put on it", which is the question people act on. Comes from the
+ * API rather than being subtracted here, so one place decides it.
+ */
+function CardHeadroom({ account, hidden }: { account: Account; hidden?: boolean }) {
+  const card = account.credit_card;
+  if (!card || card.available_credit === null) return null;
+
+  const left = Number(card.available_credit);
+  const over = left < 0;
+  return (
+    <p className={`mt-1 text-xs ${over ? "text-semantic-expense" : "text-content-secondary"}`}>
+      {hidden
+        ? "••••"
+        : `${formatMoney(String(Math.abs(left)), account.currency)} ${over ? "over limit" : "left"}`}
+    </p>
+  );
+}
+
 export function AccountCard({ account, hidden }: { account: Account; hidden?: boolean }) {
   const isLiability = account.account_nature === "LIABILITY";
   return (
@@ -103,6 +125,7 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
             <p className="mt-1 text-xs text-content-muted">
               {isLiability ? "Owed" : "Available"}
             </p>
+            <CardHeadroom account={account} hidden={hidden} />
           </div>
         </div>
       </Card>
@@ -115,8 +138,9 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
  *
  * Narrower than the full-width card so several are visible at once, which is
  * the point: the row is for comparing accounts at a glance, not for reading
- * one in detail. Type, masked number and the owed/available label are dropped
- * — the icon carries the type, and the detail screen carries the rest.
+ * one in detail. Type, masked number, the owed/available label and a card's
+ * remaining credit are all dropped — the icon carries the type, and the
+ * account's own screen carries the rest.
  */
 export function AccountTile({ account, hidden }: { account: Account; hidden?: boolean }) {
   return (

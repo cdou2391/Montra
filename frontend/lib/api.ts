@@ -82,6 +82,9 @@ export type CardExpiry = {
 };
 
 export type CreditCardFields = {
+  available_credit: string | null;
+  utilization_percentage: string | null;
+  utilization_band: "NORMAL" | "NEUTRAL" | "WARNING" | "HIGH" | null;
   credit_limit: string | null;
   statement_balance: string | null;
   statement_closing_day: number | null;
