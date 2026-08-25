@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     def attachment_mime_list(self) -> list[str]:
         return [m.strip() for m in self.attachment_allowed_mime_types.split(",") if m.strip()]
 
+    # Exchange rates. Frankfurter and open.er-api need no key; CurrencyFreaks
+    # does, and takes precedence when one is configured because it publishes
+    # far more currencies than the ECB set.
+    currencyfreaks_api_key: str = ""
+
     # HTTP
     cors_origins: str = "http://localhost:3000"
     api_v1_prefix: str = "/api/v1"

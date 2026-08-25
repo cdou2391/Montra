@@ -14,6 +14,7 @@ that moves because a third party changed a number is worse than one the user
 set deliberately and can explain.
 """
 
+import logging
 import uuid
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -24,6 +25,10 @@ from sqlalchemy.orm import Session as DbSession
 from app.core.errors import NotFound, ValidationFailed
 from app.models.finance import ExchangeRate
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
+
+MANUAL = "MANUAL"
 
 QUANTUM = Decimal("0.0001")
 RATE_QUANTUM = Decimal("0.00000001")
@@ -141,6 +146,7 @@ def set_rate(
     if existing is not None:
         existing.rate = rate
         existing.as_of = as_of
+        existing.source = MANUAL
         db.flush()
         return existing
 
@@ -150,6 +156,7 @@ def set_rate(
         quote_currency=quote_currency,
         rate=rate,
         as_of=as_of,
+        source=MANUAL,
     )
     db.add(created)
     db.flush()
@@ -188,6 +195,72 @@ def currencies_in_use(db: DbSession, *, user: User) -> list[str]:
     return sorted({c.upper() for c in rows})
 
 
+# ------------------------------------------------------------- automatic rates
+
+
+def sync_rates(db: DbSession, *, user: User, fetcher=None) -> list[ExchangeRate]:
+    """Refresh this user's rates from the published feed.
+
+    Rates are fetched in the direction they are used — one unit of the foreign
+    currency in the base currency — rather than fetched the other way and
+    inverted. Inverting a rate published to six places throws away precision
+    before the number is ever stored.
+
+    A rate the user typed is left alone. The feed owns what the feed created.
+    """
+    from app.services import fx_feed
+
+    fetcher = fetcher or fx_feed.fetch
+    base = user.base_currency.upper()
+    foreign = [c for c in currencies_in_use(db, user=user) if c != base]
+    if not foreign:
+        return []
+
+    existing = {
+        (r.base_currency, r.quote_currency): r
+        for r in db.scalars(select(ExchangeRate).where(ExchangeRate.user_id == user.id))
+    }
+
+    updated = []
+    for code in foreign:
+        held = existing.get((code, base)) or existing.get((base, code))
+        if held is not None and held.source == MANUAL:
+            # Deliberate input outranks the feed.
+            continue
+
+        result = fetcher(code, [base])
+        pair = result.get(base)
+        if pair is None:
+            continue
+        rate, source = pair
+
+        row = set_rate(
+            db,
+            user=user,
+            base_currency=code,
+            quote_currency=base,
+            rate=rate,
+            as_of=date.today(),
+        )
+        row.source = source
+        db.flush()
+        updated.append(row)
+
+    return updated
+
+
+def sync_all(db: DbSession, *, fetcher=None) -> int:
+    """Refresh every user who holds more than one currency."""
+    total = 0
+    for user in db.scalars(select(User)):
+        try:
+            total += len(sync_rates(db, user=user, fetcher=fetcher))
+        except Exception:  # pragma: no cover - one user must not stop the run
+            logger.exception("rate sync failed for user %s", user.id)
+            db.rollback()
+    return total
+
+
 def serialize(rate: ExchangeRate) -> dict:
     from app.core.money import serialize_rate
 
@@ -197,4 +270,6 @@ def serialize(rate: ExchangeRate) -> dict:
         "quote_currency": rate.quote_currency,
         "rate": serialize_rate(Decimal(rate.rate)),
         "as_of": rate.as_of.isoformat(),
+        "source": rate.source,
+        "automatic": rate.source != MANUAL,
     }

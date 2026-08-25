@@ -62,6 +62,12 @@ celery_app.conf.beat_schedule = {
         "task": "montra.notify_expiring_cards",
         "schedule": crontab(hour=6, minute=30),
     },
+    # Published rates settle overnight; 07:00 means the day's totals are
+    # already current by the time anyone opens the app.
+    "refresh-exchange-rates": {
+        "task": "montra.refresh_exchange_rates",
+        "schedule": crontab(hour=7, minute=0),
+    },
 }
 
 
@@ -151,3 +157,16 @@ def notify_expiring_cards() -> int:
         db.commit()
     logger.info("sent %s card expiry notifications", sent)
     return sent
+
+
+@celery_app.task(name="montra.refresh_exchange_rates")
+def refresh_exchange_rates() -> int:
+    """Pull the day's published rates for every user who holds two currencies."""
+    from app.db.session import SessionLocal
+    from app.services.currency import sync_all
+
+    with SessionLocal() as db:
+        updated = sync_all(db)
+        db.commit()
+    logger.info("refreshed %s exchange rates", updated)
+    return updated

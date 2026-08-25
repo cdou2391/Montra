@@ -57,6 +57,22 @@ def currencies_in_use(
     )
 
 
+@router.post("/exchange-rates/refresh")
+def refresh_rates(
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """Fetch now, rather than waiting for the morning run.
+
+    Adding a foreign account at noon should not mean an uncounted balance
+    until tomorrow.
+    """
+    updated = currency_service.sync_rates(db, user=user)
+    db.commit()
+    payload = [currency_service.serialize(r) for r in updated]
+    return collection(payload, limit=len(payload))
+
+
 @router.put("/exchange-rates", status_code=status.HTTP_200_OK)
 def upsert_rate(
     payload: ExchangeRateUpsert,

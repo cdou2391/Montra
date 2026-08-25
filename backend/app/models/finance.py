@@ -265,6 +265,10 @@ class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
     # RWF→USD is a very small number and rounding it early loses real money.
     rate: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    # Where the number came from. The daily job refreshes what it owns and
+    # leaves a hand-entered rate alone: someone who typed a rate deliberately
+    # should not find it silently replaced overnight.
+    source: Mapped[str] = mapped_column(String(30), nullable=False, default="MANUAL")
 
     __table_args__ = (
         UniqueConstraint("user_id", "base_currency", "quote_currency", name="user_currency_pair"),
