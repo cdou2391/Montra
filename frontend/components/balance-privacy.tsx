@@ -27,6 +27,7 @@ import {
 } from "react";
 
 import { montra } from "@/lib/api";
+import { Icon } from "@/components/icons";
 
 const STORAGE_KEY = "montra.balances-hidden";
 
@@ -101,4 +102,29 @@ export function BalancePrivacyProvider({ children }: { children: ReactNode }) {
 
 export function useBalancePrivacy(): State {
   return useContext(BalancePrivacy);
+}
+
+/**
+ * The show/hide control.
+ *
+ * The glyph depicts the action, not the state — an eye when the amounts are
+ * hidden means "reveal them", which is the convention every password field
+ * uses and what the label beside it says. Showing a crossed-out eye while
+ * things are already hidden would state the obvious and contradict the label.
+ */
+export function BalancePrivacyToggle({ className = "" }: { className?: string }) {
+  const { hidden, toggle } = useBalancePrivacy();
+  const label = hidden ? "Show balances" : "Hide balances";
+
+  return (
+    <button
+      onClick={toggle}
+      aria-pressed={hidden}
+      aria-label={label}
+      title={label}
+      className={`pressable shrink-0 text-content-secondary hover:text-content-primary ${className}`}
+    >
+      <Icon name={hidden ? "eye" : "eyeOff"} size={18} />
+    </button>
+  );
 }

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Account, Transaction, montra } from "@/lib/api";
 import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
-import { useBalancePrivacy } from "@/components/balance-privacy";
+import { BalancePrivacyToggle, useBalancePrivacy } from "@/components/balance-privacy";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { AccountPanel } from "@/components/account-panel";
 import { Icon, accountTypeIcon } from "@/components/icons";
@@ -23,7 +23,7 @@ const RECENT_LIMIT = 6;
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
-  const { hidden, toggle: toggleHidden } = useBalancePrivacy();
+  const { hidden } = useBalancePrivacy();
 
   // Recent activity is cached per account so swiping back and forth does not
   // refetch what we already have.
@@ -137,12 +137,7 @@ export default function Accounts() {
 
       {/* Totals across every account, so swiping never loses the whole picture. */}
       <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <button
-          onClick={toggleHidden}
-          className="order-last ml-auto text-xs text-content-secondary hover:text-content-primary"
-        >
-          {hidden ? "Show balances" : "Hide balances"}
-        </button>
+        <BalancePrivacyToggle className="order-last ml-auto" />
         <div>
           <span className="text-xs uppercase tracking-wide text-content-muted">
             Total available

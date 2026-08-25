@@ -7,7 +7,7 @@ import { Account, Forecast, Insight, Loan, Transaction, montra } from "@/lib/api
 import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { Icon } from "@/components/icons";
-import { useBalancePrivacy } from "@/components/balance-privacy";
+import { BalancePrivacyToggle, useBalancePrivacy } from "@/components/balance-privacy";
 import { useSession } from "@/components/session";
 import { AccountTile, MetricCard, TransactionRow } from "@/components/financial";
 import { InsightList } from "@/components/insights";
@@ -29,7 +29,7 @@ export default function Home() {
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
-  const { hidden, toggle: toggleHidden } = useBalancePrivacy();
+  const { hidden } = useBalancePrivacy();
   const { context, family } = useFinancialContext();
 
   useEffect(() => {
@@ -94,24 +94,7 @@ export default function Home() {
         leading={
           context === "personal" && user ? <ProfileAvatarLink user={user} /> : undefined
         }
-        action={
-          <button
-            onClick={toggleHidden}
-            aria-pressed={hidden}
-            aria-label={hidden ? "Show balances" : "Hide balances"}
-            className="pressable shrink-0 text-xs text-content-secondary hover:text-content-primary"
-          >
-            {/* The avatar and bell share this row. Below sm the control is the
-                glyph alone: the words cost more width than the title can
-                spare, and an eye says this better than "Show" does. */}
-            <span className="sm:hidden">
-              <Icon name={hidden ? "eyeOff" : "eye"} size={18} />
-            </span>
-            <span className="hidden sm:inline">
-              {hidden ? "Show balances" : "Hide balances"}
-            </span>
-          </button>
-        }
+        action={<BalancePrivacyToggle />}
       />
 
       {accounts === null ? (
