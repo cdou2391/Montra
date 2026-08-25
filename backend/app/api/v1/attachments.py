@@ -40,6 +40,26 @@ def request_upload(
     return single({**attachment_service.serialize(attachment), "upload": upload})
 
 
+@router.post("/transfers/{transfer_id}/attachments", status_code=status.HTTP_201_CREATED)
+def request_transfer_upload(
+    transfer_id: uuid.UUID,
+    payload: AttachmentCreate,
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    attachment, upload = attachment_service.request_upload_for_transfer(
+        db,
+        user=user,
+        transfer_id=transfer_id,
+        file_name=payload.file_name,
+        mime_type=payload.mime_type,
+        file_size=payload.file_size,
+    )
+    db.commit()
+    db.refresh(attachment)
+    return single({**attachment_service.serialize(attachment), "upload": upload})
+
+
 @router.post("/attachments/{attachment_id}/complete")
 def complete_upload(
     attachment_id: uuid.UUID,

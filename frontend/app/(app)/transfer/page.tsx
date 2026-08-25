@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 
 import { Account, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
+import { AttachmentPicker } from "@/components/attachment-picker";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 import { toLocalInputValue } from "@/lib/format";
 
@@ -40,6 +41,8 @@ function TransferForm() {
   const destination = accounts.find((a) => a.id === form.destination_account_id);
   const isRepayment = destination?.account_nature === "LIABILITY";
 
+  const [files, setFiles] = useState<File[]>([]);
+
   function update(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -49,7 +52,7 @@ function TransferForm() {
     setBusy(true);
     setError(null);
     try {
-      await montra.createTransfer(
+      const transfer = await montra.createTransfer(
         {
           source_account_id: form.source_account_id,
           destination_account_id: form.destination_account_id,
@@ -60,6 +63,20 @@ function TransferForm() {
         },
         idempotencyKey,
       );
+
+      // The money has moved by this point. A failed receipt must not read as a
+      // failed transfer, so it is reported on its own terms.
+      try {
+        for (const file of files) {
+          await montra.uploadTransferAttachment(transfer.id, file);
+        }
+      } catch {
+        setError("The transfer went through, but the receipt could not be attached.");
+        setFiles([]);
+        setBusy(false);
+        return;
+      }
+
       router.push("/transactions");
       router.refresh();
     } catch (err) {
@@ -129,6 +146,15 @@ function TransferForm() {
           </Field>
           <Field label="Note">
             <Input value={form.notes} onChange={(e) => update("notes", e.target.value)} />
+          </Field>
+          <Field label="Proof of payment" hint="Optional. Images or PDF, up to 10MB.">
+            <AttachmentPicker
+              files={files}
+              onChange={setFiles}
+              onError={setError}
+              disabled={busy}
+              label="Attach proof"
+            />
           </Field>
           <div className="flex gap-3">
             <Button

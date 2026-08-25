@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 
 import { Account, Category, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
+import { AttachmentPicker } from "@/components/attachment-picker";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 import { toLocalInputValue } from "@/lib/format";
 
@@ -29,6 +30,7 @@ function AddTransactionForm() {
     description: "",
     merchant: "",
   });
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +57,7 @@ function AddTransactionForm() {
     setBusy(true);
     setError(null);
     try {
-      await montra.createTransaction({
+      const created = await montra.createTransaction({
         transaction_type: type,
         account_id: form.account_id,
         amount: form.amount,
@@ -64,6 +66,21 @@ function AddTransactionForm() {
         description: form.description || null,
         merchant: form.merchant || null,
       });
+
+      // The transaction is saved by now. If a receipt fails to upload, that is
+      // a separate, smaller problem — and saying "could not save" would be a
+      // lie that costs the user a duplicate entry.
+      try {
+        for (const file of files) {
+          await montra.uploadAttachment(created.id, file);
+        }
+      } catch {
+        setError("The transaction was saved, but the receipt could not be attached.");
+        setFiles([]);
+        setBusy(false);
+        return;
+      }
+
       router.push("/transactions");
       router.refresh();
     } catch (err) {
@@ -155,6 +172,14 @@ function AddTransactionForm() {
               value={form.description}
               placeholder="Simba Supermarket"
               onChange={(e) => update("description", e.target.value)}
+            />
+          </Field>
+          <Field label="Receipt" hint="Optional. Images or PDF, up to 10MB.">
+            <AttachmentPicker
+              files={files}
+              onChange={setFiles}
+              onError={setError}
+              disabled={busy}
             />
           </Field>
           <div className="flex gap-3">

@@ -273,3 +273,79 @@ def test_the_storage_key_never_reaches_the_client(db, user, transaction, bucket)
     payload = attachment_service.serialize(attachment)
     assert "storage_key" not in payload
     assert attachment.storage_key not in str(payload)
+
+
+# --------------------------------------------------------------------- transfers
+
+
+@pytest.fixture
+def transfer(db, user, bank_account, savings_account):
+    from app.services.posting import PostingService
+
+    moved = PostingService(db).transfer_funds(
+        source=bank_account,
+        destination=savings_account,
+        source_amount=Decimal("40000"),
+        destination_amount=Decimal("40000"),
+        occurred_at=NOW,
+        actor_id=user.id,
+    )
+    db.commit()
+    return moved
+
+
+def _transfer_upload(db, user, transfer, **kw):
+    return attachment_service.request_upload_for_transfer(
+        db,
+        user=user,
+        transfer_id=transfer.id,
+        file_name=kw.pop("file_name", "proof.pdf"),
+        mime_type=kw.pop("mime_type", "application/pdf"),
+        file_size=kw.pop("file_size", 2048),
+    )
+
+
+def test_proof_of_payment_lands_on_the_outgoing_side(db, user, transfer, bucket):
+    attachment, _ = _transfer_upload(db, user, transfer)
+    db.commit()
+    from app.models.finance import Transaction
+
+    side = db.get(Transaction, attachment.transaction_id)
+    assert side.account_id == transfer.source_account_id
+
+
+def test_a_transfers_receipt_is_visible_from_either_side(db, user, transfer, bucket):
+    """The receipt describes the movement, not one leg of it."""
+    from sqlalchemy import select as sa_select
+
+    from app.models.finance import Transaction
+
+    attachment, _ = _transfer_upload(db, user, transfer)
+    db.commit()
+    bucket.upload(attachment.storage_key)
+    attachment_service.confirm_upload(db, user=user, attachment_id=attachment.id)
+    db.commit()
+
+    legs = list(
+        db.scalars(sa_select(Transaction).where(Transaction.transfer_id == transfer.id))
+    )
+    assert len(legs) == 2
+    for leg in legs:
+        found = attachment_service.list_for_transaction(
+            db, user=user, transaction_id=leg.id
+        )
+        assert [a.file_name for a in found] == ["proof.pdf"]
+
+
+def test_a_stranger_cannot_attach_to_your_transfer(db, user, other_user, transfer, bucket):
+    with pytest.raises(NotFound):
+        _transfer_upload(db, other_user, transfer)
+    assert bucket.signed == []
+
+
+def test_attaching_to_a_transfer_that_does_not_exist(db, user, bucket):
+    class Missing:
+        id = uuid.uuid4()
+
+    with pytest.raises(NotFound):
+        _transfer_upload(db, user, Missing())

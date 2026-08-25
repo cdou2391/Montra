@@ -496,6 +496,27 @@ export const montra = {
       .post<Envelope<Attachment>>(`/attachments/${ticket.id}/complete`, {})
       .then((r) => r.data);
   },
+  /** Same three steps, but the receipt belongs to a transfer's outgoing side. */
+  uploadTransferAttachment: async (transferId: string, file: File): Promise<Attachment> => {
+    const ticket = await api
+      .post<Envelope<UploadTicket>>(`/transfers/${transferId}/attachments`, {
+        file_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+      })
+      .then((r) => r.data);
+
+    const response = await fetch(ticket.upload.url, {
+      method: ticket.upload.method,
+      headers: ticket.upload.headers,
+      body: file,
+    });
+    if (!response.ok) throw new Error("The upload did not complete.");
+
+    return api
+      .post<Envelope<Attachment>>(`/attachments/${ticket.id}/complete`, {})
+      .then((r) => r.data);
+  },
   attachmentUrl: (id: string) =>
     api
       .get<Envelope<{ url: string; expires_in: number }>>(`/attachments/${id}/download`)
@@ -527,9 +548,11 @@ export const montra = {
     api.post<Envelope<unknown>>(`/accounts/${id}/balance-adjustments`, payload),
 
   createTransfer: (payload: Record<string, unknown>, idempotencyKey: string) =>
-    api.post<Envelope<unknown>>("/transfers", payload, {
-      "Idempotency-Key": idempotencyKey,
-    }),
+    api
+      .post<Envelope<{ id: string }>>("/transfers", payload, {
+        "Idempotency-Key": idempotencyKey,
+      })
+      .then((r) => r.data),
 
   // ------------------------------------------------------------- household
   familyActivity: (familyId: string) =>

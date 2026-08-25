@@ -92,6 +92,9 @@ export default function TransactionDetail() {
 
   if (!txn) return <Skeleton className="h-64 w-full" />;
 
+  // A real transfer leg, as opposed to a loan payment that merely posts as a
+  // transfer: the ledger refuses to edit one side of a movement on its own.
+  const isTransferSide = txn.transfer_id !== null;
   const isTransfer = txn.transaction_type === "TRANSFER";
 
   return (
@@ -154,6 +157,13 @@ export default function TransactionDetail() {
 
       <h2 className="mb-3 text-section">Details</h2>
       <Card className="mb-5">
+        {isTransferSide ? (
+          <p className="text-sm text-content-secondary">
+            This is one side of a transfer. Editing it alone would leave the two
+            sides disagreeing, so change it by cancelling the transfer and
+            making it again.
+          </p>
+        ) : (
         <form onSubmit={save} className="space-y-4">
           {error && <ErrorNotice message={error} />}
           <Field label="Description">
@@ -198,6 +208,7 @@ export default function TransactionDetail() {
             </Button>
           </div>
         </form>
+        )}
       </Card>
 
       <h2 className="mb-3 text-section">Receipts</h2>

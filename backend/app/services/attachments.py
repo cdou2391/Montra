@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.core.config import settings
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.db.base import utcnow
+from app.models.finance import Transaction
 from app.models.records import Attachment
 from app.models.user import User
 from app.services import audit, storage
@@ -91,6 +92,47 @@ def request_upload(
     return attachment, storage.signed_upload_url(key=key, content_type=mime_type)
 
 
+def request_upload_for_transfer(
+    db: DbSession,
+    *,
+    user: User,
+    transfer_id: uuid.UUID,
+    file_name: str,
+    mime_type: str,
+    file_size: int,
+) -> tuple[Attachment, dict]:
+    """Attach proof of payment to a transfer.
+
+    A transfer is two transactions, and the model attaches to one of them
+    (Data Model section 42 warns off adding more nullable keys). The receipt
+    goes on the outgoing side, which is where proof of payment belongs — and
+    reading a transfer's attachments finds it from either side.
+    """
+    from app.models.finance import Transfer
+
+    transfer = db.get(Transfer, transfer_id)
+    if transfer is None:
+        raise NotFound("Transfer not found.", code="TRANSFER_NOT_FOUND")
+
+    source_side = db.scalar(
+        select(Transaction).where(
+            Transaction.transfer_id == transfer.id,
+            Transaction.account_id == transfer.source_account_id,
+        )
+    )
+    if source_side is None:  # pragma: no cover - a transfer always has both legs
+        raise NotFound("Transfer not found.", code="TRANSFER_NOT_FOUND")
+
+    return request_upload(
+        db,
+        user=user,
+        transaction_id=source_side.id,
+        file_name=file_name,
+        mime_type=mime_type,
+        file_size=file_size,
+    )
+
+
 def confirm_upload(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> Attachment:
     """Mark an attachment usable, once the object is really there.
 
@@ -139,13 +181,27 @@ def confirm_upload(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> At
 def list_for_transaction(
     db: DbSession, *, user: User, transaction_id: uuid.UUID
 ) -> list[Attachment]:
-    """Everything attached to a transaction the user may see."""
-    get_transaction(db, transaction_id, user)
+    """Everything attached to a transaction the user may see.
+
+    A transfer's receipt is stored on its outgoing side, but it describes the
+    whole movement — so opening either side finds it, rather than the
+    destination looking mysteriously empty.
+    """
+    transaction = get_transaction(db, transaction_id, user)
+
+    ids = [transaction.id]
+    if transaction.transfer_id is not None:
+        ids = list(
+            db.scalars(
+                select(Transaction.id).where(Transaction.transfer_id == transaction.transfer_id)
+            )
+        )
+
     return list(
         db.scalars(
             select(Attachment)
             .where(
-                Attachment.transaction_id == transaction_id,
+                Attachment.transaction_id.in_(ids),
                 Attachment.deleted_at.is_(None),
                 Attachment.uploaded_at.is_not(None),
             )
