@@ -31,6 +31,18 @@ const FIELD_NAMES: Record<string, string> = {
   reference: "reference",
 };
 
+/** Account numbers the message named that we could not place. */
+function unplaced(result: ParsedSms): string[] {
+  const out: string[] = [];
+  if (result.debited_identifier && !result.source_account_id) {
+    out.push(result.debited_identifier);
+  }
+  if (result.credited_identifier && !result.destination_account_id) {
+    out.push(result.credited_identifier);
+  }
+  return out;
+}
+
 function readableFields(matched: string[]): string {
   const named = matched.map((m) => FIELD_NAMES[m] ?? m);
   return [...new Set(named)].join(", ");
@@ -94,6 +106,17 @@ export function SmsPaste({
           {/* Explicit rather than silent: a form that quietly stays blank looks
               like the button did nothing. */}
           That message was not recognised. Fill the form in below instead.
+        </p>
+      )}
+
+      {result?.understood && unplaced(result).length > 0 && (
+        <p className="mt-3 text-xs text-semantic-warning">
+          {/* Naming the number is what makes this actionable: it is the value
+              to paste into Account details. */}
+          {unplaced(result).join(" and ")}{" "}
+          {unplaced(result).length === 1 ? "matches" : "match"} none of your
+          accounts. Pick the account below, or store that number under Account
+          details so it is recognised next time.
         </p>
       )}
 

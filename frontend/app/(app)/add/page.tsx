@@ -41,6 +41,8 @@ function AddTransactionForm() {
     channel: "MOBILE_MONEY" | "BANK" | null;
     sourceId: string | null;
     destinationId: string | null;
+    unmatchedSource: string | null;
+    unmatchedDestination: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -126,6 +128,17 @@ function AddTransactionForm() {
               channel: parsed.channel,
               sourceId: parsed.source_account_id,
               destinationId: parsed.destination_account_id,
+              // A number the message named but we could not place. The form
+              // must not quietly fall back to a default account: pointing at
+              // the wrong one is worse than pointing at none.
+              unmatchedSource:
+                parsed.debited_identifier && !parsed.source_account_id
+                  ? parsed.debited_identifier
+                  : null,
+              unmatchedDestination:
+                parsed.credited_identifier && !parsed.destination_account_id
+                  ? parsed.credited_identifier
+                  : null,
             });
             return;
           }

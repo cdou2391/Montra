@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { Account, MontraApiError, montra } from "@/lib/api";
 import { AttachmentPicker } from "@/components/attachment-picker";
@@ -31,6 +31,9 @@ export function TransferForm({
     channel?: "MOBILE_MONEY" | "BANK" | null;
     sourceId?: string | null;
     destinationId?: string | null;
+    /** Numbers the message named that match none of the user's accounts. */
+    unmatchedSource?: string | null;
+    unmatchedDestination?: string | null;
   };
 }) {
   const router = useRouter();
@@ -51,9 +54,16 @@ export function TransferForm({
       // A statement naming both account numbers beats any inference from the
       // wording: it says which of your accounts each end is.
       const source =
-        prefill.sourceId ?? accountForChannel(accounts, prefill.channel ?? null)?.id ??
-        f.source_account_id;
-      const destination = prefill.destinationId ?? null;
+        prefill.sourceId ??
+        (prefill.unmatchedSource
+          ? ""
+          : (accountForChannel(accounts, prefill.channel ?? null)?.id ??
+            f.source_account_id));
+      // Named but unplaceable: blank it, so the user has to choose rather
+      // than inheriting whichever account happened to sort second.
+      // Named but unplaceable: blank it, so the user has to choose rather
+      // than inheriting whichever account happened to sort second.
+      const destination = prefill.destinationId ?? (prefill.unmatchedDestination ? "" : null);
       return {
         ...f,
         source_amount: prefill.amount ?? f.source_amount,
@@ -73,13 +83,23 @@ export function TransferForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Whether a pasted message governs this form. The accounts arrive
+  // asynchronously and used to fill any blank field with a positional default
+  // — which quietly overwrote a blank left *on purpose* because the message
+  // named an account we could not place, and pointed "To" at whichever
+  // account happened to sort second.
+  const governed = useRef(Boolean(prefill));
+  governed.current = Boolean(prefill);
+
   useEffect(() => {
     montra.accounts().then((list) => {
       setAccounts(list);
       setForm((f) => ({
         ...f,
-        source_account_id: f.source_account_id || list[0]?.id || "",
-        destination_account_id: f.destination_account_id || list[1]?.id || "",
+        source_account_id:
+          f.source_account_id || (governed.current ? "" : list[0]?.id || ""),
+        destination_account_id:
+          f.destination_account_id || (governed.current ? "" : list[1]?.id || ""),
       }));
     });
   }, []);
@@ -138,12 +158,20 @@ export function TransferForm({
     <Card>
       <form onSubmit={submit} className="space-y-4">
         {error && <ErrorNotice message={error} />}
-        <Field label="From">
+        <Field
+          label="From"
+          hint={
+            prefill?.unmatchedSource && !form.source_account_id
+              ? `The message debited ${prefill.unmatchedSource}, which matches none of your accounts.`
+              : undefined
+          }
+        >
           <Select
             required
             value={form.source_account_id}
             onChange={(e) => update("source_account_id", e.target.value)}
           >
+            <option value="">Choose an account</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -154,9 +182,11 @@ export function TransferForm({
         <Field
           label="To"
           hint={
-            isRepayment
-              ? "Paying this card reduces what you owe; your net worth does not change."
-              : undefined
+            prefill?.unmatchedDestination && !form.destination_account_id
+              ? `The message credited ${prefill.unmatchedDestination}, which matches none of your accounts. Choose it, or add that number under Account details.`
+              : isRepayment
+                ? "Paying this card reduces what you owe; your net worth does not change."
+                : undefined
           }
         >
           <Select
@@ -164,6 +194,7 @@ export function TransferForm({
             value={form.destination_account_id}
             onChange={(e) => update("destination_account_id", e.target.value)}
           >
+            <option value="">Choose an account</option>
             {accounts
               .filter((a) => a.id !== form.source_account_id)
               .map((a) => (
@@ -214,7 +245,7 @@ export function TransferForm({
         <div className="flex gap-3">
           <Button
             type="submit"
-            disabled={busy || !form.destination_account_id}
+            disabled={busy || !form.source_account_id || !form.destination_account_id}
             className="flex-1"
           >
             {busy ? "Transferring…" : "Confirm transfer"}

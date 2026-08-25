@@ -211,6 +211,8 @@ export type ParsedSms = {
   /** Resolved server-side from the account numbers in the message. */
   source_account_id: string | null;
   destination_account_id: string | null;
+  debited_identifier: string | null;
+  credited_identifier: string | null;
   amount: string | null;
   currency: string | null;
   fee_amount: string | null;
