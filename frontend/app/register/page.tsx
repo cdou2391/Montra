@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { MontraApiError, montra } from "@/lib/api";
+import { Logo } from "@/components/logo";
 import { Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 
 const CURRENCIES = ["RWF", "USD", "EUR", "GBP", "KES", "UGX", "TZS"];
@@ -55,6 +56,10 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
+      <div className="mb-5 flex items-center gap-3">
+        <Logo size={40} />
+        <span className="text-title text-content-primary">Montra</span>
+      </div>
       <h1 className="mb-2 text-title">Create your account</h1>
       <p className="mb-6 text-sm text-content-secondary">
         One place for what you have, what you owe, and what is coming next.

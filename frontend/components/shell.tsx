@@ -14,6 +14,7 @@ import { ReactNode, useState } from "react";
 import { montra } from "@/lib/api";
 import { NotificationBell } from "@/components/notification-bell";
 import { Icon, IconName } from "@/components/icons";
+import { Logo } from "@/components/logo";
 import { BottomSheet } from "@/components/sheet";
 
 const NAV: { href: string; label: string; icon: IconName; primary?: boolean }[] = [
@@ -75,7 +76,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh lg:flex">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 border-r border-white/5 bg-background-secondary p-5 lg:block">
-        <p className="px-2 text-title text-content-primary">Montra</p>
+        <div className="flex items-center gap-2.5 px-2">
+          <Logo size={28} />
+          <p className="text-title text-content-primary">Montra</p>
+        </div>
         <nav className="mt-8 space-y-1">
           {[...NAV.filter((i) => !i.primary), ...MORE_ITEMS].map((item) => (
             <Link

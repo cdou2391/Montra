@@ -5,6 +5,10 @@ import "@/styles/globals.css";
 export const metadata: Metadata = {
   title: "Montra",
   description: "Personal and household finance tracking.",
+  // Next serves app/icon.svg and app/apple-icon.png automatically; naming the
+  // manifest here is what makes the app installable.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Montra", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
