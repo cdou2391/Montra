@@ -16,7 +16,16 @@ import { AttachmentPicker } from "@/components/attachment-picker";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 import { toLocalInputValue } from "@/lib/format";
 
-export function TransferForm({ defaultSourceId = "" }: { defaultSourceId?: string }) {
+export function TransferForm({
+  defaultSourceId = "",
+  prefill,
+}: {
+  defaultSourceId?: string;
+  /** Values read from a pasted message. The accounts are still the user's to
+      choose: a notification says money moved, not which two of your accounts
+      it moved between. */
+  prefill?: { amount?: string | null; fee?: string | null; occurredAt?: string | null };
+}) {
   const router = useRouter();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -28,6 +37,16 @@ export function TransferForm({ defaultSourceId = "" }: { defaultSourceId?: strin
     occurred_at: toLocalInputValue(),
     notes: "",
   });
+
+  useEffect(() => {
+    if (!prefill) return;
+    setForm((f) => ({
+      ...f,
+      source_amount: prefill.amount ?? f.source_amount,
+      fee_amount: prefill.fee ?? f.fee_amount,
+      occurred_at: prefill.occurredAt ?? f.occurred_at,
+    }));
+  }, [prefill]);
   // Generated once per form instance so a double submit cannot post twice.
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [files, setFiles] = useState<File[]>([]);

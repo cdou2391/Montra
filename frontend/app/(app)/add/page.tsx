@@ -34,6 +34,11 @@ function AddTransactionForm() {
     fee_amount: "",
   });
   const [files, setFiles] = useState<File[]>([]);
+  const [transferPrefill, setTransferPrefill] = useState<{
+    amount: string | null;
+    fee: string | null;
+    occurredAt: string | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -104,6 +109,32 @@ function AddTransactionForm() {
       <PageHeader title="Add transaction"
         icon="plus" />
 
+      {/* Above the tabs, because the message decides which tab applies. Asking
+          the user to choose first and then pasting something that contradicts
+          them would be the wrong way round. */}
+      <SmsPaste
+        onParsed={(parsed) => {
+          if (parsed.transaction_type) setType(parsed.transaction_type);
+          if (parsed.transaction_type === "TRANSFER") {
+            setTransferPrefill({
+              amount: parsed.amount,
+              fee: parsed.fee_amount,
+              occurredAt: parsed.occurred_at,
+            });
+            return;
+          }
+          setForm((f) => ({
+            ...f,
+            amount: parsed.amount ?? f.amount,
+            fee_amount: parsed.fee_amount ?? f.fee_amount,
+            // Held in full, seconds included: the input shows minutes but the
+            // value submitted is the moment the message stated.
+            occurred_at: parsed.occurred_at ?? f.occurred_at,
+            description: parsed.counterparty ?? f.description,
+          }));
+        }}
+      />
+
       {/* Money leaving, money arriving, money moving between your own
           accounts — all three are "recording something", so all three start
           here. A transfer is not a transaction the ledger can post directly,
@@ -130,28 +161,11 @@ function AddTransactionForm() {
       </div>
 
       {type === "TRANSFER" && (
-        <TransferForm defaultSourceId={params.get("account") ?? ""} />
-      )}
-
-      {/* Only for the two kinds a notification describes; a transfer between
-          your own accounts does not arrive as one. */}
-      {type !== "TRANSFER" && (
-        <SmsPaste
-          onParsed={(parsed) => {
-            if (parsed.transaction_type) setType(parsed.transaction_type);
-            setForm((f) => ({
-              ...f,
-              amount: parsed.amount ?? f.amount,
-              fee_amount: parsed.fee_amount ?? f.fee_amount,
-              // Held in full, seconds included: the input shows minutes but
-              // the value submitted is the moment the message stated.
-              occurred_at: parsed.occurred_at ?? f.occurred_at,
-              description: parsed.counterparty ?? f.description,
-            }));
-          }}
+        <TransferForm
+          defaultSourceId={params.get("account") ?? ""}
+          prefill={transferPrefill ?? undefined}
         />
       )}
-
       {type !== "TRANSFER" && (
       <Card>
         <form onSubmit={submit} className="space-y-4">

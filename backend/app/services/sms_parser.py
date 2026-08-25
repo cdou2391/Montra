@@ -35,6 +35,42 @@ PARTY_TAIL = r"([^()\d.]{2,60}?)\s*(?:\(|\bat\b|\.|$)"
 # Both orders occur in the wild: "200000 RWF transferred to X" and "You have
 # sent 5,000 RWF to X". Amount-first is listed first so the more specific
 # network wording wins when a message could arguably match either.
+# Money moving between the user's own accounts. These are checked first,
+# because "transferred to your bank account" would otherwise read as money
+# leaving for someone else — the difference is the word "your".
+#
+# It only claims a transfer when the message says so plainly. A payment to a
+# person who happens to be you is indistinguishable from a payment to anyone
+# else, and guessing there would misfile real spending.
+OWN_ACCOUNT = r"(?:your|my|own)\s+(?:\w+\s+){0,3}(?:account|wallet|momo|mobile\s+money|a/c)"
+
+TRANSFERS = [
+    re.compile(
+        rf"{AMOUNT}\s*{CURRENCY}\s+(?:has been\s+)?(?:transferred|moved|sent)\s+(?:to|from)\s+"
+        rf"{OWN_ACCOUNT}",
+        re.I,
+    ),
+    re.compile(
+        rf"(?:you have\s+)?(?:transferred|moved)\s+{AMOUNT}\s*{CURRENCY}\s+(?:to|from)\s+"
+        rf"{OWN_ACCOUNT}",
+        re.I,
+    ),
+    re.compile(
+        rf"(?:funds\s+)?transfer\s+of\s+{AMOUNT}\s*{CURRENCY}\s+from\s+"
+        rf"(?:a/c|account)[\s\w*]*\s+to\s+(?:a/c|account)",
+        re.I,
+    ),
+    re.compile(
+        rf"{AMOUNT}\s*{CURRENCY}\s+(?:has been\s+)?(?:deposited|credited)\s+(?:in)?to\s+"
+        rf"{OWN_ACCOUNT}\s+from\s+{OWN_ACCOUNT}",
+        re.I,
+    ),
+    re.compile(
+        rf"(?:bank\s+to\s+wallet|wallet\s+to\s+bank)[^\d]{{0,40}}{AMOUNT}\s*{CURRENCY}",
+        re.I,
+    ),
+]
+
 OUTGOING = [
     re.compile(rf"{AMOUNT}\s*{CURRENCY}\s+(?:has been\s+)?transferred\s+to\s+{PARTY_TAIL}", re.I),
     re.compile(rf"{AMOUNT}\s*{CURRENCY}\s+(?:has been\s+)?sent\s+to\s+{PARTY_TAIL}", re.I),
@@ -100,7 +136,7 @@ def parse(message: str) -> ParsedSms:
 
     text = message.strip()
 
-    for kind, patterns in (("EXPENSE", OUTGOING), ("INCOME", INCOMING)):
+    for kind, patterns in (("TRANSFER", TRANSFERS), ("EXPENSE", OUTGOING), ("INCOME", INCOMING)):
         for pattern in patterns:
             found = pattern.search(text)
             if not found:
@@ -109,7 +145,7 @@ def parse(message: str) -> ParsedSms:
             result.transaction_type = kind
             result.amount = _decimal(groups[0])
             result.currency = (groups[1] or "").upper() or None
-            if len(groups) > 2:
+            if len(groups) > 2 and groups[2]:
                 result.counterparty = _clean_party(groups[2])
             result.matched.append(kind.lower())
             break

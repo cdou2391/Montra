@@ -166,3 +166,58 @@ def test_the_payload_shape_is_stable_for_an_unreadable_message():
     assert payload["understood"] is False
     assert payload["amount"] is None
     assert payload["occurred_at"] is None
+
+
+# ------------------------------------------------------- your own accounts
+
+
+TO_BANK = (
+    "*165*S*50000 RWF transferred to your bank account at 2026-08-25 16:00:00. "
+    "Fee: 500RWF. Balance: 2607RWF."
+)
+
+
+def test_moving_money_to_your_own_account_reads_as_a_transfer():
+    """The difference from an expense is the word "your" — money that left the
+    wallet but not the household."""
+    result = parse(TO_BANK)
+    assert result.transaction_type == "TRANSFER"
+    assert result.amount == Decimal("50000")
+    assert result.fee_amount == Decimal("500")
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "You have transferred 75000 RWF to your MTN Mobile Money account at 2026-08-25 16:05:00.",
+        "Funds transfer of 120000 RWF from A/C ****1234 to A/C ****5678 on 2026-08-25 16:10.",
+        "30000 RWF has been deposited to your bank account from your MoMo wallet at "
+        "2026-08-25 16:20:00.",
+    ],
+)
+def test_other_own_account_wordings(message):
+    assert parse(message).transaction_type == "TRANSFER"
+
+
+def test_a_transfer_claims_no_counterparty():
+    """There is no other party — both ends are yours — so the field stays
+    empty rather than being filled with "your bank account"."""
+    assert parse(TO_BANK).counterparty is None
+
+
+def test_paying_a_person_is_still_an_expense():
+    """A transfer is only claimed when the message plainly says own-account.
+    Money to a named person is spending, whoever they are."""
+    assert parse(SENT).transaction_type == "EXPENSE"
+
+
+def test_receiving_from_a_person_is_still_income():
+    assert parse(RECEIVED).transaction_type == "INCOME"
+
+
+def test_the_word_your_is_what_decides_it():
+    """Same sentence, one word apart."""
+    mine = "50000 RWF transferred to your bank account at 2026-08-25 16:00:00."
+    theirs = "50000 RWF transferred to JEAN BOSCO at 2026-08-25 16:00:00."
+    assert parse(mine).transaction_type == "TRANSFER"
+    assert parse(theirs).transaction_type == "EXPENSE"
