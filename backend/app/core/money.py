@@ -40,3 +40,22 @@ def serialize_rate(value: Decimal) -> str:
     :f to keep plain notation.
     """
     return f"{Decimal(value).normalize():f}"
+
+
+ZERO_DECIMAL_CURRENCIES = {"RWF", "JPY", "KRW", "VND", "UGX", "BIF"}
+
+
+def format_money(value: Decimal, currency: str) -> str:
+    """Render an amount as prose, the way the UI writes it.
+
+    Most amounts leave the API as bare strings for the client to format. These
+    are the exception: insight and warning text is composed as a sentence
+    server-side, so the number inside it has to arrive already readable.
+    """
+    quantum = Decimal("1") if currency in ZERO_DECIMAL_CURRENCIES else DISPLAY_QUANTUM
+    amount = value.quantize(quantum, rounding=ROUND_HALF_UP)
+    sign = "-" if amount < 0 else ""
+    whole, _, fraction = f"{abs(amount):f}".partition(".")
+    grouped = f"{int(whole):,}"
+    body = grouped if not fraction else f"{grouped}.{fraction}"
+    return f"{sign}{currency} {body}"

@@ -223,6 +223,9 @@ export default function Planning() {
           <div className="flex items-center gap-3">
             {/* Hidden on the narrowest phones so the page title is not
                 crushed; still reachable from More. */}
+            <Link href="/planning/forecast" className="hidden text-xs text-accent sm:inline">
+              Forecast
+            </Link>
             <Link href="/planning/recurring" className="hidden text-xs text-accent sm:inline">
               Recurring
             </Link>

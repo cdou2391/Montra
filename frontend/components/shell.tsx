@@ -46,6 +46,12 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
   },
   { href: "/transactions", label: "Activity", icon: "list", hint: "Every transaction" },
   {
+    href: "/planning/forecast",
+    label: "Forecast",
+    icon: "trendingUp",
+    hint: "Where your balance is heading",
+  },
+  {
     href: "/planning/recurring",
     label: "Recurring",
     icon: "repeat",

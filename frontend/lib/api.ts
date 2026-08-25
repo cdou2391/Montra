@@ -204,6 +204,43 @@ export type Dashboard = {
   upcoming: PlannedTransaction[];
   recent: Transaction[];
   loans?: LoanPaymentDue[];
+  insights: Insight[];
+};
+
+export type ForecastPoint = { date: string; projected_balance: string };
+
+export type ForecastWarning = {
+  account_id: string;
+  account_name: string;
+  date: string;
+  projected_balance: string;
+  message: string;
+};
+
+export type Forecast = {
+  context: "personal" | "family";
+  period: "7d" | "30d";
+  currency: string;
+  starting_balance: string;
+  projected_ending_balance: string;
+  upcoming_income: string;
+  upcoming_expenses: string;
+  net_change: string;
+  points: ForecastPoint[];
+  warnings: ForecastWarning[];
+};
+
+export type Insight = {
+  code: string;
+  title: string;
+  detail: string;
+  tone: "positive" | "neutral" | "warning" | "negative";
+  currency?: string;
+  value?: string;
+  account_id?: string;
+  category?: string;
+  count?: number;
+  change_percent?: string;
 };
 
 export type CurrentUser = {
@@ -442,6 +479,13 @@ export const montra = {
     api
       .patch<Envelope<Account>>(`/accounts/${accountId}/visibility`, { visibility })
       .then((r) => r.data),
+
+  forecast: (context: Context = "personal", period: "7d" | "30d" = "30d") =>
+    api
+      .get<Envelope<Forecast>>(`/forecasts/cash-flow?context=${context}&period=${period}`)
+      .then((r) => r.data),
+  insights: (context: Context = "personal") =>
+    api.get<Collection<Insight>>(`/insights?context=${context}`).then((r) => r.data),
 
   // ------------------------------------------------------------- reporting
   dashboard: (context: Context = "personal") =>

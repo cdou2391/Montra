@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Account, Loan, Transaction, montra } from "@/lib/api";
+import { Account, Forecast, Insight, Loan, Transaction, montra } from "@/lib/api";
 import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { AccountCard, MetricCard, TransactionRow } from "@/components/financial";
+import { InsightList } from "@/components/insights";
+import { ForecastChart } from "@/components/forecast-chart";
+import { formatMoney } from "@/lib/format";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { ProfileAvatarLink } from "@/components/avatar";
 
@@ -22,6 +25,8 @@ export default function Home() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [recent, setRecent] = useState<Transaction[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [forecast, setForecast] = useState<Forecast | null>(null);
   const [hidden, setHidden] = useState(false);
   const { context, family } = useFinancialContext();
 
@@ -31,6 +36,14 @@ export default function Home() {
     // net worth is wrong without them.
     if (context === "personal") montra.loans().then(setLoans).catch(() => setLoans([]));
     else setLoans([]);
+    montra
+      .forecast(context, "30d")
+      .then(setForecast)
+      .catch(() => setForecast(null));
+    montra
+      .insights(context)
+      .then(setInsights)
+      .catch(() => setInsights([]));
     montra
       .transactions(`?limit=5&context=${context}`)
       .then((r) => setRecent(r.data))
@@ -126,6 +139,55 @@ export default function Home() {
               hidden={hidden}
             />
           </div>
+
+          {forecast && forecast.points.length > 1 && (
+            <section className="mb-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-section">Next 30 days</h2>
+                <Link href="/planning/forecast" className="pressable text-xs text-accent">
+                  Details
+                </Link>
+              </div>
+              <Card>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  {/* Smaller than the net-worth headline above it: this is a
+                      projection, and should not outshout the real figure. */}
+                  <p className="tabular text-lg font-semibold text-content-primary">
+                    {hidden
+                      ? "••••••"
+                      : formatMoney(forecast.projected_ending_balance, forecast.currency)}
+                  </p>
+                  {/* Direction is stated in words as well as by the arrow, so
+                      it does not depend on reading the chart. */}
+                  <p
+                    className={`text-xs ${
+                      Number(forecast.net_change) < 0
+                        ? "text-semantic-expense"
+                        : "text-semantic-income"
+                    }`}
+                  >
+                    {Number(forecast.net_change) < 0 ? "Down " : "Up "}
+                    {hidden
+                      ? "•••"
+                      : formatMoney(
+                          String(Math.abs(Number(forecast.net_change))),
+                          forecast.currency,
+                        )}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <ForecastChart forecast={forecast} />
+                </div>
+              </Card>
+            </section>
+          )}
+
+          {insights.length > 0 && (
+            <section className="mb-6">
+              <h2 className="mb-3 text-section">Worth knowing</h2>
+              <InsightList insights={insights} />
+            </section>
+          )}
 
           <section className="mb-6">
             <div className="mb-3 flex items-center justify-between">

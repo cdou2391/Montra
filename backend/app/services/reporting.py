@@ -247,4 +247,8 @@ def dashboard(db: DbSession, *, user: User, context: str = "personal") -> dict:
         payload["loans"] = loan_service.upcoming_payments(
             db, user=user, today=today, horizon_days=30
         )
+
+    from app.services.insights import generate as generate_insights
+
+    payload["insights"] = generate_insights(db, user=user, context=context)
     return payload

@@ -9,6 +9,7 @@
  */
 
 export type IconName =
+  | "alertTriangle"
   | "home"
   | "wallet"
   | "calendar"
@@ -111,6 +112,11 @@ const PATHS: Record<IconName, string[]> = {
     "M8 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2",
   ],
   trendingUp: ["M16 7h6v6", "m22 7-8.5 8.5-5-5L2 17"],
+  alertTriangle: [
+    "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+    "M12 9v4",
+    "M12 17h.01",
+  ],
   shapes: [
     "M8.3 10a.7.7 0 0 1-.6-1l4-6.5a.7.7 0 0 1 1.2 0l4 6.5a.7.7 0 0 1-.6 1z",
     "M17.5 14a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z",
