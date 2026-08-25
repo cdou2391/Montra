@@ -201,6 +201,19 @@ type UploadTicket = Attachment & {
   upload: { url: string; method: string; headers: Record<string, string> };
 };
 
+export type ParsedSms = {
+  understood: boolean;
+  transaction_type: "EXPENSE" | "INCOME" | null;
+  amount: string | null;
+  currency: string | null;
+  fee_amount: string | null;
+  occurred_at: string | null;
+  counterparty: string | null;
+  balance_after: string | null;
+  reference: string | null;
+  matched: string[];
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -492,6 +505,8 @@ export const montra = {
 
   transactions: (query = "") =>
     api.get<Collection<Transaction>>(`/transactions${query}`),
+  parseSms: (message: string) =>
+    api.post<Envelope<ParsedSms>>("/transactions/parse-sms", { message }).then((r) => r.data),
   createTransaction: (payload: Record<string, unknown>) =>
     api.post<Envelope<Transaction>>("/transactions", payload).then((r) => r.data),
   transaction: (id: string) =>

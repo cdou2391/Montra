@@ -53,6 +53,13 @@ class TransferCreate(MontraModel):
     _v_fee = amount_validator("fee_amount")
 
 
+class SmsParseRequest(MontraModel):
+    """A pasted notification. Long enough for a wordy one, capped so the
+    endpoint is not a place to post essays."""
+
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class CategoryCreate(MontraModel):
     name: str = Field(min_length=1, max_length=120)
     category_type: str

@@ -17,6 +17,7 @@ from app.models.finance import Category, Transfer
 from app.models.user import User
 from app.schemas.transactions import (
     CategoryCreate,
+    SmsParseRequest,
     TransactionCreate,
     TransactionUpdate,
     TransferCreate,
@@ -72,6 +73,22 @@ def list_transactions(
     return collection(
         [txn_service.serialize_transaction(t) for t in rows], limit=limit, next_cursor=next_cursor
     )
+
+
+@router.post("/transactions/parse-sms")
+def parse_sms(
+    payload: SmsParseRequest,
+    user: User = Depends(current_user),
+) -> dict:
+    """Read a mobile-money SMS into a draft.
+
+    Deliberately writes nothing. The client prefills its form and the user
+    submits, so a misread message costs a correction rather than a wrong
+    balance.
+    """
+    from app.services import sms_parser
+
+    return single(sms_parser.serialize(sms_parser.parse(payload.message)))
 
 
 @router.post("/transactions", status_code=status.HTTP_201_CREATED)

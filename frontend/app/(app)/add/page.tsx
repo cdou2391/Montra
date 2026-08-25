@@ -7,6 +7,7 @@ import { Account, Category, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { TransferForm } from "@/components/transfer-form";
 import { AttachmentPicker } from "@/components/attachment-picker";
+import { SmsPaste } from "@/components/sms-paste";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 import { toLocalInputValue } from "@/lib/format";
 
@@ -130,6 +131,25 @@ function AddTransactionForm() {
 
       {type === "TRANSFER" && (
         <TransferForm defaultSourceId={params.get("account") ?? ""} />
+      )}
+
+      {/* Only for the two kinds a notification describes; a transfer between
+          your own accounts does not arrive as one. */}
+      {type !== "TRANSFER" && (
+        <SmsPaste
+          onParsed={(parsed) => {
+            if (parsed.transaction_type) setType(parsed.transaction_type);
+            setForm((f) => ({
+              ...f,
+              amount: parsed.amount ?? f.amount,
+              fee_amount: parsed.fee_amount ?? f.fee_amount,
+              // Held in full, seconds included: the input shows minutes but
+              // the value submitted is the moment the message stated.
+              occurred_at: parsed.occurred_at ?? f.occurred_at,
+              description: parsed.counterparty ?? f.description,
+            }));
+          }}
+        />
       )}
 
       {type !== "TRANSFER" && (
