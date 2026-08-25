@@ -10,6 +10,9 @@
 
 export type IconName =
   | "alertTriangle"
+  | "filter"
+  | "paperclip"
+  | "trash"
   | "home"
   | "wallet"
   | "calendar"
@@ -112,6 +115,11 @@ const PATHS: Record<IconName, string[]> = {
     "M8 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2",
   ],
   trendingUp: ["M16 7h6v6", "m22 7-8.5 8.5-5-5L2 17"],
+  filter: ["M3 5h18", "M7 12h10", "M10 19h4"],
+  paperclip: [
+    "M21.4 11.1 12.3 20.2a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5",
+  ],
+  trash: ["M3 6h18", "M8 6V4h8v2", "M19 6l-1 14H6L5 6", "M10 11v6", "M14 11v6"],
   alertTriangle: [
     "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
     "M12 9v4",

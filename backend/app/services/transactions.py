@@ -181,6 +181,7 @@ def list_transactions(
     user: User,
     account_id: uuid.UUID | None = None,
     category_id: uuid.UUID | None = None,
+    owner_id: uuid.UUID | None = None,
     transaction_type: TransactionType | None = None,
     status: TransactionStatus | None = None,
     date_from: date | None = None,
@@ -212,6 +213,15 @@ def list_transactions(
         stmt = stmt.where(Transaction.account_id == account_id)
     if category_id is not None:
         stmt = stmt.where(Transaction.category_id == category_id)
+    if owner_id is not None:
+        # Whose money moved, in a household where several people's accounts are
+        # in view. Narrowing to accounts they own is enough: the visibility
+        # scope above has already excluded anything private to them.
+        stmt = stmt.where(
+            Transaction.account_id.in_(
+                select(Account.id).where(Account.owner_user_id == owner_id)
+            )
+        )
     if transaction_type is not None:
         stmt = stmt.where(Transaction.transaction_type == transaction_type)
     if status is not None:

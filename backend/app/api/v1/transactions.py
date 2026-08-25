@@ -37,6 +37,7 @@ router = APIRouter(tags=["transactions"])
 def list_transactions(
     account_id: str | None = None,
     category_id: str | None = None,
+    owner_id: str | None = None,
     type: TransactionType | None = None,  # noqa: A002
     status_filter: TransactionStatus | None = Query(default=None, alias="status"),
     date_from: date | None = None,
@@ -55,6 +56,7 @@ def list_transactions(
         user=user,
         account_id=parse_uuid(account_id, "account_id"),
         category_id=parse_uuid(category_id, "category_id"),
+        owner_id=parse_uuid(owner_id, "owner_id"),
         transaction_type=type,
         status=status_filter,
         date_from=date_from,

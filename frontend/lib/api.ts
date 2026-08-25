@@ -150,6 +150,9 @@ export type Transaction = {
   merchant: string | null;
   category: { id: string; name: string } | null;
   transfer_id: string | null;
+  notes?: string | null;
+  reference?: string | null;
+  created_at?: string;
 };
 
 export type Category = {
@@ -435,6 +438,10 @@ export const montra = {
     api.get<Collection<Transaction>>(`/transactions${query}`),
   createTransaction: (payload: Record<string, unknown>) =>
     api.post<Envelope<Transaction>>("/transactions", payload).then((r) => r.data),
+  transaction: (id: string) =>
+    api.get<Envelope<Transaction>>(`/transactions/${id}`).then((r) => r.data),
+  updateTransaction: (id: string, payload: Record<string, unknown>) =>
+    api.patch<Envelope<Transaction>>(`/transactions/${id}`, payload).then((r) => r.data),
   deleteTransaction: (id: string) => api.delete<void>(`/transactions/${id}`),
 
   cardSummary: (id: string) =>
