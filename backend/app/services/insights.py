@@ -220,7 +220,7 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
 
     # --- cards approaching their expiry ----------------------------------
     for account in accounts:
-        if account.account_type is not AccountType.CREDIT_CARD:
+        if account.account_type not in credit_cards.CARD_ACCOUNT_TYPES:
             continue
         state = credit_cards.expiry_state(account, today=today)
         if state is None or state["status"] == "VALID":
@@ -228,13 +228,11 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
         days = state["days_remaining"]
         if days < 0:
             title = f"{account.name} has expired"
-            detail = "Replace it, or archive the account if it is gone."
         elif days == 0:
             title = f"{account.name} expires today"
-            detail = "Today is the last day it will work."
         else:
             title = f"{account.name} expires in {days} day{'s' if days != 1 else ''}"
-            detail = "Order a replacement before recurring charges start failing."
+        detail = state["advice"]
         insights.append(
             _insight(
                 "card_expiring",

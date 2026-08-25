@@ -44,6 +44,9 @@ function NewAccountForm() {
   const [busy, setBusy] = useState(false);
 
   const isLiability = form.account_type === "CREDIT_CARD";
+  // A prepaid card is an asset and has no credit terms, but the plastic still
+  // expires.
+  const isCard = isLiability || form.account_type === "PREPAID_CARD";
 
   function update(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -60,6 +63,12 @@ function NewAccountForm() {
       await montra.createAccount({
         ...base,
         account_identifier: base.account_identifier || null,
+        ...(isCard && expiry
+          ? {
+              expiry_month: expiryMonth ? Number(expiryMonth) : null,
+              expiry_year: expiryYear ? Number(expiryYear) : null,
+            }
+          : {}),
         ...(isLiability
           ? {
               credit_limit: credit_limit || null,
@@ -69,8 +78,6 @@ function NewAccountForm() {
                 : null,
               minimum_payment: minimum_payment || null,
               interest_rate: interest_rate || null,
-              expiry_month: expiryMonth ? Number(expiryMonth) : null,
-              expiry_year: expiryYear ? Number(expiryYear) : null,
             }
           : {}),
       });
@@ -150,6 +157,24 @@ function NewAccountForm() {
             />
           </Field>
 
+          {isCard && (
+            <Field
+              label="Card expires"
+              hint="The month printed on the card. You will be warned two months ahead."
+            >
+              {/* month gives a native month picker where one exists and a
+                  plain YYYY-MM field where it does not; either way the value
+                  is unambiguous, unlike a hand-typed MM/YY. */}
+              <Input
+                type="month"
+                min="2000-01"
+                max="2100-12"
+                value={form.expiry}
+                onChange={(e) => update("expiry", e.target.value)}
+              />
+            </Field>
+          )}
+
           {isLiability && (
             <fieldset className="space-y-4 rounded-control border border-white/10 p-4">
               <legend className="px-1 text-xs uppercase tracking-wide text-content-muted">
@@ -183,22 +208,6 @@ function NewAccountForm() {
                   />
                 </Field>
               </div>
-
-              <Field
-                label="Expires"
-                hint="The month printed on the card. You will be warned two months ahead."
-              >
-                {/* month gives a native month picker where one exists and a
-                    plain YYYY-MM field where it does not; either way the value
-                    is unambiguous, unlike a hand-typed MM/YY. */}
-                <Input
-                  type="month"
-                  min="2000-01"
-                  max="2100-12"
-                  value={form.expiry}
-                  onChange={(e) => update("expiry", e.target.value)}
-                />
-              </Field>
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Minimum payment">

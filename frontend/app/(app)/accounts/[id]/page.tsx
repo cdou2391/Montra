@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Account, CardSummary, Transaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { MoneyValue, TransactionRow } from "@/components/financial";
-import { CreditCardSummaryCard } from "@/components/credit-card";
+import { CreditCardSummaryCard, ExpiryNotice } from "@/components/credit-card";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 export default function AccountDetail() {
@@ -86,6 +86,11 @@ export default function AccountDetail() {
             {account.masked_identifier && (
               <p className="mt-1 text-xs text-content-muted">{account.masked_identifier}</p>
             )}
+            {account.expiry && (
+              <div className="mt-4">
+                <ExpiryNotice expiry={account.expiry} />
+              </div>
+            )}
           </Card>
         )}
       </div>
@@ -112,7 +117,7 @@ export default function AccountDetail() {
             Reconcile
           </Button>
         )}
-        {isCard && account.can_edit && (
+        {(isCard || isPrepaid) && account.can_edit && (
           <Button variant="secondary" onClick={() => router.push(`/accounts/${id}/edit`)}>
             Card details
           </Button>

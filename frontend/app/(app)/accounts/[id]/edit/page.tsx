@@ -42,13 +42,14 @@ export default function EditCardPage() {
         payment_due_day: card?.payment_due_day?.toString() ?? "",
         minimum_payment: card?.minimum_payment ?? "",
         interest_rate: card?.interest_rate ?? "",
-        expiry:
-          card?.expiry_month && card?.expiry_year
-            ? `${card.expiry_year}-${String(card.expiry_month).padStart(2, "0")}`
-            : "",
+        // Prepaid cards carry no credit-card block, so the expiry is read
+        // from the account itself.
+        expiry: a.expiry ? a.expiry.expires_on.slice(0, 7) : "",
       });
     });
   }, [id]);
+
+  const isCredit = account?.account_type === "CREDIT_CARD";
 
   function update(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -62,15 +63,21 @@ export default function EditCardPage() {
     try {
       await montra.updateAccount(id, {
         name: form.name,
-        credit_limit: form.credit_limit || null,
-        statement_closing_day: form.statement_closing_day
-          ? Number(form.statement_closing_day)
-          : null,
-        payment_due_day: form.payment_due_day ? Number(form.payment_due_day) : null,
-        minimum_payment: form.minimum_payment || null,
-        interest_rate: form.interest_rate || null,
         expiry_month: expiryMonth ? Number(expiryMonth) : null,
         expiry_year: expiryYear ? Number(expiryYear) : null,
+        // Credit terms would be rejected on a prepaid card, and there is
+        // nothing there to send anyway.
+        ...(isCredit
+          ? {
+              credit_limit: form.credit_limit || null,
+              statement_closing_day: form.statement_closing_day
+                ? Number(form.statement_closing_day)
+                : null,
+              payment_due_day: form.payment_due_day ? Number(form.payment_due_day) : null,
+              minimum_payment: form.minimum_payment || null,
+              interest_rate: form.interest_rate || null,
+            }
+          : {}),
       });
       router.push(`/accounts/${id}`);
       router.refresh();
@@ -100,7 +107,7 @@ export default function EditCardPage() {
           </Field>
 
           <Field
-            label="Expires"
+            label="Card expires"
             hint="The month printed on the card. You will be warned two months ahead."
           >
             <Input
@@ -112,6 +119,7 @@ export default function EditCardPage() {
             />
           </Field>
 
+          {isCredit && (
           <Field label="Credit limit" hint="Needed to show utilization.">
             <AmountInput
               value={form.credit_limit}
@@ -119,6 +127,9 @@ export default function EditCardPage() {
             />
           </Field>
 
+          )}
+
+          {isCredit && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Statement closes" hint="Day of month">
               <Input
@@ -140,6 +151,9 @@ export default function EditCardPage() {
             </Field>
           </div>
 
+          )}
+
+          {isCredit && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Minimum payment">
               <AmountInput
@@ -158,6 +172,7 @@ export default function EditCardPage() {
               />
             </Field>
           </div>
+          )}
 
           <div className="flex gap-3">
             <Button type="submit" disabled={busy} className="flex-1">

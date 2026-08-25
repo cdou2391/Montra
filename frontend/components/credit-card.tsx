@@ -99,9 +99,7 @@ export function ExpiryNotice({ expiry }: { expiry: CardExpiry | null }) {
               : `Expires in ${days} day${days === 1 ? "" : "s"}`}
         </p>
         <p className="mt-0.5 text-xs text-content-secondary">
-          {expired
-            ? "Recurring charges on this card will be failing."
-            : `Good until ${on}. Move recurring charges before then.`}
+          {expired ? expiry.advice : `Good until ${on}. ${expiry.advice}`}
         </p>
       </div>
     </div>

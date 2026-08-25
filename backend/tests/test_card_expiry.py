@@ -6,9 +6,11 @@ warning arrives before that happens, and arrives once.
 """
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import pytest
 
+from app.core.errors import ValidationFailed
 from app.db.enums import NotificationType
 from app.models.planning import Notification
 from app.services import credit_cards
@@ -145,6 +147,61 @@ def test_another_user_is_not_told_about_your_card(db, credit_card, other_user):
     assert _notifications(db, other_user) == []
 
 
+# --------------------------------------------------------------- prepaid cards
+
+
+def test_a_prepaid_card_expires_the_same_way(db, prepaid_card):
+    """The plastic expires whether or not there is credit behind it."""
+    _set_expiry(db, prepaid_card, 8, 2026)
+    state = credit_cards.expiry_state(prepaid_card, today=date(2026, 7, 15))
+    assert state["expires_on"] == "2026-08-31"
+    assert state["status"] == "EXPIRING"
+
+
+def test_a_prepaid_card_is_announced_too(db, prepaid_card, user):
+    _set_expiry(db, prepaid_card, 8, 2026)
+    assert credit_cards.notify_expiring_cards(db, today=date(2026, 7, 15)) == 1
+    db.commit()
+    sent = _notifications(db, user)
+    assert len(sent) == 1
+    # A prepaid card holds money you stand to lose; a credit card holds charges
+    # you need to move. The advice should not be the same.
+    assert "Spend or move the balance" in sent[0].body
+
+
+def test_an_expiry_may_be_set_on_a_prepaid_card(db, prepaid_card):
+    credit_cards.apply_card_fields(prepaid_card, {"expiry_month": 8, "expiry_year": 2026})
+    assert prepaid_card.expiry_month == 8
+
+
+def test_credit_only_fields_are_still_refused_on_a_prepaid_card(db, prepaid_card):
+    """A prepaid card has no credit limit to speak of."""
+    with pytest.raises(ValidationFailed) as exc:
+        credit_cards.apply_card_fields(prepaid_card, {"credit_limit": Decimal("100")})
+    assert exc.value.code == "NOT_A_CREDIT_CARD"
+
+
+def test_an_expiry_is_still_refused_on_a_bank_account(db, bank_account):
+    with pytest.raises(ValidationFailed) as exc:
+        credit_cards.apply_card_fields(bank_account, {"expiry_month": 8, "expiry_year": 2026})
+    assert exc.value.code == "NOT_A_CARD"
+
+
+def test_an_expiry_can_be_cleared(db, credit_card):
+    """Recorded by mistake has to be undoable."""
+    _set_expiry(db, credit_card, 8, 2026)
+    credit_cards.apply_card_fields(credit_card, {"expiry_month": None, "expiry_year": None})
+    assert credit_cards.expiry_date(credit_card) is None
+
+
+def test_both_kinds_of_card_are_listed_together(db, credit_card, prepaid_card):
+    _set_expiry(db, credit_card, 8, 2026)
+    _set_expiry(db, prepaid_card, 7, 2026)
+    found = credit_cards.expiring_cards(db, today=date(2026, 7, 15))
+    # Oldest expiry first, so the most urgent leads.
+    assert [c.name for c, _ in found] == ["Prepaid Visa", "BK Visa"]
+
+
 # ------------------------------------------------------------------- surfacing
 
 
@@ -154,6 +211,16 @@ def test_the_card_payload_carries_the_resolved_date(db, credit_card):
     payload = credit_cards.summary(db, credit_card, today=date(2026, 7, 15))
     assert payload["expiry"]["expires_on"] == "2026-08-31"
     assert payload["expiry"]["status"] == "EXPIRING"
+
+
+def test_the_account_payload_carries_expiry_for_any_card(db, prepaid_card, user):
+    """Prepaid cards have no credit-card block to hide an expiry inside."""
+    from app.services.accounts import serialize_account
+
+    _set_expiry(db, prepaid_card, 8, 2026)
+    payload = serialize_account(db, prepaid_card, user)
+    assert payload["credit_card"] is None
+    assert payload["expiry"]["expires_on"] == "2026-08-31"
 
 
 def test_an_expiring_card_stays_visible_as_an_insight(db, credit_card, user):
@@ -168,3 +235,18 @@ def test_an_expiring_card_stays_visible_as_an_insight(db, credit_card, user):
     ]
     assert len(found) == 1
     assert found[0]["tone"] in {"warning", "negative"}
+
+
+def test_the_advice_matches_what_the_card_holds(db, credit_card, prepaid_card):
+    """A prepaid card has money on it to lose, not charges to move."""
+    _set_expiry(db, credit_card, 8, 2026)
+    _set_expiry(db, prepaid_card, 8, 2026)
+    today = date(2026, 7, 15)
+    assert "recurring charges" in credit_cards.expiry_state(credit_card, today=today)["advice"]
+    assert "balance" in credit_cards.expiry_state(prepaid_card, today=today)["advice"]
+
+
+def test_the_advice_changes_once_it_is_too_late(db, prepaid_card):
+    _set_expiry(db, prepaid_card, 6, 2026)
+    advice = credit_cards.expiry_state(prepaid_card, today=date(2026, 8, 25))["advice"]
+    assert "no longer be reachable" in advice

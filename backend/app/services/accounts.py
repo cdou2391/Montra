@@ -19,7 +19,7 @@ from app.db.enums import (
 from app.models.finance import Account, Transaction
 from app.models.user import User
 from app.services.authz import visible_accounts
-from app.services.credit_cards import apply_card_fields, card_fields_payload
+from app.services.credit_cards import apply_card_fields, card_fields_payload, expiry_state
 from app.services.posting import PostingService
 
 
@@ -264,6 +264,9 @@ def serialize_account(
         "can_edit": can_edit(account, access),
         "can_transact": can_transact(account, access),
         "credit_card": card_fields_payload(account),
+        # Any card can expire, so this sits beside the account rather than
+        # inside the credit-card block.
+        "expiry": expiry_state(account),
         "is_favorite": favorite == account.id,
     }
 

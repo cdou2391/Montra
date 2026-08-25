@@ -78,6 +78,7 @@ export type CardExpiry = {
   expires_on: string;
   days_remaining: number;
   status: "VALID" | "EXPIRING" | "EXPIRED";
+  advice: string;
 };
 
 export type CreditCardFields = {
@@ -89,7 +90,6 @@ export type CreditCardFields = {
   interest_rate: string | null;
   expiry_month: number | null;
   expiry_year: number | null;
-  expiry: CardExpiry | null;
 };
 
 export type Account = {
@@ -105,6 +105,7 @@ export type Account = {
   ownership_type: string;
   status: string;
   can_edit: boolean;
+  expiry: CardExpiry | null;
   can_transact: boolean;
   credit_card: CreditCardFields | null;
   is_favorite: boolean;

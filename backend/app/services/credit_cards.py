@@ -28,6 +28,32 @@ from app.services.posting import PostingService
 UTILIZATION_BANDS = ((30, "NORMAL"), (60, "NEUTRAL"), (80, "WARNING"))
 
 
+# Both kinds of plastic carry an expiry date. Everything else in this module is
+# credit-specific, but an expiry belongs to the card, not to how it is funded.
+CARD_ACCOUNT_TYPES = (AccountType.CREDIT_CARD, AccountType.PREPAID_CARD)
+
+
+def _expiry_advice(account: Account, *, expired: bool) -> str:
+    prepaid = account.account_type is AccountType.PREPAID_CARD
+    if expired:
+        if prepaid:
+            return "Any balance left on it may no longer be reachable."
+        return "Recurring charges on this card will be failing."
+    if prepaid:
+        return "Spend or move the balance before then."
+    return "Order a replacement and move any recurring charges across."
+
+
+def require_card(account: Account) -> Account:
+    if account.account_type not in CARD_ACCOUNT_TYPES:
+        raise ValidationFailed(
+            "This account is not a card.",
+            code="NOT_A_CARD",
+            details=[{"field": "account_id", "message": "Expected a card account."}],
+        )
+    return account
+
+
 # How much warning is useful before a card stops working: long enough to order
 # a replacement and move recurring charges across, short enough that the notice
 # still feels current.
@@ -63,6 +89,10 @@ def expiry_state(account: Account, *, today: date | None = None) -> dict | None:
         "expires_on": expires_on.isoformat(),
         "days_remaining": days_remaining,
         "status": status,
+        # What to do about it depends on what the card holds: a credit card
+        # carries charges to move, a prepaid card carries money to lose. The
+        # rule lives here so the notification and the screen cannot drift.
+        "advice": _expiry_advice(account, expired=status == "EXPIRED"),
     }
 
 
@@ -267,17 +297,25 @@ def card_fields_payload(account: Account) -> dict | None:
         ),
         "expiry_month": account.expiry_month,
         "expiry_year": account.expiry_year,
-        "expiry": expiry_state(account),
     }
 
 
+# An expiry date applies to any card; the rest describes a line of credit.
+EXPIRY_FIELDS = frozenset({"expiry_month", "expiry_year"})
+
+
 def apply_card_fields(account: Account, values: dict) -> None:
-    """Set card metadata, rejecting it on accounts that are not cards."""
-    supplied = {k: v for k, v in values.items() if v is not None}
-    if not supplied:
+    """Set card metadata, rejecting it on accounts it cannot describe."""
+    if not values:
         return
-    require_credit_card(account)
-    for field, value in supplied.items():
+    named = {k for k, v in values.items() if v is not None}
+    if named - EXPIRY_FIELDS:
+        require_credit_card(account)
+    elif named:
+        require_card(account)
+    # None is applied rather than skipped: clearing an expiry recorded by
+    # mistake is a real edit, and callers only send the keys they mean.
+    for field, value in values.items():
         setattr(account, field, value)
 
 
@@ -294,7 +332,7 @@ def expiring_cards(
     today = today or datetime.now().date()
     cards = db.scalars(
         select(Account).where(
-            Account.account_type == AccountType.CREDIT_CARD,
+            Account.account_type.in_(CARD_ACCOUNT_TYPES),
             Account.status == AccountStatus.ACTIVE,
             Account.expiry_month.is_not(None),
             Account.expiry_year.is_not(None),
@@ -359,7 +397,7 @@ def notify_expiring_cards(
             title = f"{card.name} expires in {days} day{'s' if days != 1 else ''}"
             body = (
                 f"It stops working after {expires_on.day} {expires_on:%B %Y}. "
-                "Order a replacement and move any recurring charges across."
+                + _expiry_advice(card, expired=False)
             )
 
         notify(
