@@ -11,6 +11,13 @@
  * A crosshair finds the date, because nobody aims at a 2px line. Every value
  * the tooltip shows is also in the table below it, so hovering is an
  * enhancement and never the only way to read a number.
+ *
+ * The plot is stretched to its container (preserveAspectRatio="none"), which
+ * means x and y are scaled by different amounts. Anything round drawn inside
+ * that space comes out an ellipse, so the marker and the tooltip are HTML
+ * positioned over the SVG instead. The mapping is exact: the viewBox is 100
+ * wide, so x units are percentages of the width, and it is HEIGHT tall against
+ * a HEIGHT-pixel box, so y units are pixels.
  */
 
 import { useId, useMemo, useRef, useState } from "react";
@@ -19,6 +26,13 @@ import { Forecast } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 
 const HEIGHT = 160;
+
+function shortDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+}
 const PAD = { top: 12, right: 4, bottom: 18, left: 4 };
 
 export function ForecastChart({ forecast }: { forecast: Forecast }) {
@@ -55,30 +69,64 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
     ? points.findIndex((p) => p.date === forecast.warnings[0].date)
     : -1;
 
-  function onMove(event: React.PointerEvent<SVGSVGElement>) {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const ratio = (event.clientX - rect.left) / rect.width;
+  function onMove(event: React.PointerEvent<HTMLDivElement>) {
+    const box = svgRef.current?.getBoundingClientRect();
+    if (!box) return;
+    const ratio = (event.clientX - box.left) / box.width;
     // Snap to the nearest date rather than the exact pixel.
     const index = Math.round(ratio * (points.length - 1));
     setActive(Math.max(0, Math.min(index, points.length - 1)));
   }
 
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    setActive((current) => {
+      const from = current === null ? points.length - 1 : current;
+      return Math.max(0, Math.min(from + step, points.length - 1));
+    });
+  }
+
   const shown = active === null ? points.length - 1 : active;
   const showing = points[shown];
+  const marker = active === null ? null : geometry.xy[active];
+
+  // Keep the tooltip inside the card at either end of the range.
+  const anchor =
+    marker === null
+      ? "translateX(-50%)"
+      : marker.x < 22
+        ? "translateX(0)"
+        : marker.x > 78
+          ? "translateX(-100%)"
+          : "translateX(-50%)";
+  // Above the point, unless the point is high enough that above is off-chart.
+  const below = marker !== null && marker.y < 56;
 
   return (
     <figure className="m-0">
+      <div
+        className="relative touch-none"
+        style={{ height: HEIGHT }}
+        onPointerMove={onMove}
+        onPointerDown={onMove}
+        onPointerLeave={() => setActive(null)}
+        onKeyDown={onKeyDown}
+        onBlur={() => setActive(null)}
+        tabIndex={0}
+        role="application"
+        aria-label={`Projected balance over ${
+          forecast.period === "7d" ? "7" : "30"
+        } days. Use the arrow keys to move through the dates.`}
+      >
       <svg
         ref={svgRef}
         viewBox={`0 0 100 ${HEIGHT}`}
         preserveAspectRatio="none"
         role="img"
         aria-label={`Projected balance over ${forecast.period === "7d" ? "7" : "30"} days`}
-        className="h-40 w-full touch-none"
-        onPointerMove={onMove}
-        onPointerLeave={() => setActive(null)}
+        className="h-full w-full"
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -130,44 +178,62 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
           />
         )}
 
-        {active !== null && geometry.xy[active] && (
-          <>
-            <line
-              x1={geometry.xy[active].x}
-              x2={geometry.xy[active].x}
-              y1={PAD.top}
-              y2={HEIGHT - PAD.bottom}
-              stroke="currentColor"
-              strokeWidth="1"
-              className="text-content-muted"
-              vectorEffect="non-scaling-stroke"
-            />
-            <circle
-              cx={geometry.xy[active].x}
-              cy={geometry.xy[active].y}
-              r="3.5"
-              fill="#2DD4BF"
-              stroke="#141E2B"
-              strokeWidth="1.5"
-            />
-          </>
+        {/* A vertical rule survives the stretch; a circle would not. */}
+        {marker && (
+          <line
+            x1={marker.x}
+            x2={marker.x}
+            y1={PAD.top}
+            y2={HEIGHT - PAD.bottom}
+            stroke="currentColor"
+            strokeWidth="1"
+            className="text-content-muted"
+            vectorEffect="non-scaling-stroke"
+          />
         )}
       </svg>
 
-      {/* Values lead, labels follow. */}
-      <figcaption
-        aria-live="polite"
-        className="mt-2 flex items-baseline justify-between gap-3 text-xs"
-      >
-        <span className="tabular font-semibold text-content-primary">
-          {showing ? formatMoney(showing.projected_balance, forecast.currency) : "—"}
-        </span>
-        <span className="text-content-secondary">
-          {showing
-            ? new Date(`${showing.date}T00:00:00`).toLocaleDateString(undefined, {
-                day: "numeric",
-                month: "short",
-              })
+      {marker && showing && (
+        <>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute h-2.5 w-2.5 rounded-full border-2 border-surface-primary bg-accent"
+            style={{
+              left: `${marker.x}%`,
+              top: marker.y,
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+          <div
+            role="tooltip"
+            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-control bg-surface-elevated px-2.5 py-1.5 text-xs shadow-lg ring-1 ring-white/10"
+            style={{
+              left: `${marker.x}%`,
+              top: below ? marker.y + 14 : marker.y - 14,
+              transform: `${anchor} ${below ? "translateY(0)" : "translateY(-100%)"}`,
+            }}
+          >
+            <span className="tabular block font-semibold text-content-primary">
+              {formatMoney(showing.projected_balance, forecast.currency)}
+            </span>
+            <span className="block text-content-secondary">{shortDate(showing.date)}</span>
+          </div>
+        </>
+      )}
+      </div>
+
+      {/* The ends of the range, so the horizontal axis is labelled without
+          hovering. The value under the pointer is the tooltip's job now. */}
+      <figcaption className="mt-2 flex items-baseline justify-between gap-3 text-xs text-content-muted">
+        <span>{points[0] ? shortDate(points[0].date) : ""}</span>
+        <span>{points.length > 1 ? shortDate(points[points.length - 1].date) : ""}</span>
+        {/* A pointer is not the only way through the series; this speaks the
+            same reading the tooltip shows. */}
+        <span aria-live="polite" className="sr-only">
+          {active !== null && showing
+            ? `${formatMoney(showing.projected_balance, forecast.currency)} on ${shortDate(
+                showing.date,
+              )}`
             : ""}
         </span>
       </figcaption>
@@ -194,12 +260,7 @@ export function ForecastTable({ forecast }: { forecast: Forecast }) {
       <tbody>
         {weekly.map((point) => (
           <tr key={point.date} className="border-t border-white/5">
-            <td className="py-2 text-content-secondary">
-              {new Date(`${point.date}T00:00:00`).toLocaleDateString(undefined, {
-                day: "numeric",
-                month: "short",
-              })}
-            </td>
+            <td className="py-2 text-content-secondary">{shortDate(point.date)}</td>
             <td
               className={`tabular py-2 text-right font-medium ${
                 Number(point.projected_balance) < 0
