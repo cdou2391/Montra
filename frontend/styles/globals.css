@@ -86,3 +86,22 @@
     opacity: 1;
   }
 }
+
+
+/* The splash's indeterminate bar. Reduced motion gets a static bar rather than
+   a moving one; the splash is short and the movement is decoration. */
+@keyframes splash-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+.animate-splash-sweep {
+  animation: splash-sweep 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-splash-sweep {
+    animation: none;
+    width: 100%;
+  }
+}

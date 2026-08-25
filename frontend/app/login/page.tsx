@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 
 import { MontraApiError, montra } from "@/lib/api";
 import { Logo } from "@/components/logo";
+import { SPLASH_FLAG } from "@/components/splash";
 import { Button, Card, ErrorNotice, Field, Input } from "@/components/ui";
 
 export default function LoginPage() {
@@ -21,6 +22,9 @@ export default function LoginPage() {
     setError(null);
     try {
       await montra.login(email, password);
+      // The app has to fetch a session and preferences before it can show a
+      // balance; the splash covers that rather than a half-built screen.
+      window.sessionStorage.setItem(SPLASH_FLAG, "1");
       router.push("/");
       router.refresh();
     } catch (err) {

@@ -2,6 +2,7 @@ import { AppShell } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
 import { BalancePrivacyProvider } from "@/components/balance-privacy";
+import { SignInSplash } from "@/components/splash";
 import { FinancialContextProvider } from "@/components/context";
 
 /**
@@ -29,6 +30,9 @@ export default function AuthenticatedLayout({
     <Providers>
       <FinancialContextProvider>
         <BalancePrivacyProvider>
+          {/* Above the shell, so it covers the whole app rather than the
+              page body alone. */}
+          <SignInSplash />
           <AppShell>
             <RequireSession>{children}</RequireSession>
           </AppShell>
