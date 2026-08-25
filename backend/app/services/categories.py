@@ -37,7 +37,7 @@ DEFAULT_EXPENSE_CATEGORIES = [
     "Family",
     "Subscriptions",
     "Insurance",
-    "Banking Fees",
+    "Transaction Fees",
     "Travel",
     "Gifts",
     "Other",
@@ -46,7 +46,9 @@ DEFAULT_EXPENSE_CATEGORIES = [
 
 # The category a fee is filed under, whatever the charge it was taken on was
 # for. Part of the default set, so it exists for every user without asking.
-FEE_CATEGORY_NAME = "Banking Fees"
+# Named for the transaction rather than the institution: a mobile-money charge
+# is a fee on a transaction, and nobody would file it under a bank.
+FEE_CATEGORY_NAME = "Transaction Fees"
 
 
 def fee_category_id(db: DbSession, *, user_id: uuid.UUID) -> uuid.UUID | None:

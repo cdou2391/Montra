@@ -379,3 +379,39 @@ def test_a_transfer_fee_is_filed_the_same_way(db, user, bank_account, savings_ac
     db.commit()
     fee = db.scalar(select(Transaction).where(Transaction.fee_for_transaction_id.is_not(None)))
     assert fee.category_id == category_service.fee_category_id(db, user_id=user.id)
+
+
+def test_the_fee_category_is_named_for_the_transaction_not_the_bank(db, user):
+    """A mobile-money charge is a fee on a transaction; nobody files it under
+    a bank."""
+    from app.services import categories as category_service
+
+    assert category_service.FEE_CATEGORY_NAME == "Transaction Fees"
+    named = db.scalar(
+        select(Category).where(
+            Category.user_id == user.id,
+            Category.id == category_service.fee_category_id(db, user_id=user.id),
+        )
+    )
+    assert named.name == "Transaction Fees"
+
+
+def test_a_users_own_category_of_that_name_is_not_hijacked(db, user, bank_account):
+    """The shipped category is ours to rename; one the user made is not.
+
+    Guards the case the rename migration has to avoid: with a user-made
+    category of the same name present, the lookup must still resolve to
+    exactly one row rather than tripping over the (user, name, type)
+    uniqueness constraint.
+    """
+    from app.db.enums import CategoryType
+
+    matches = db.scalars(
+        select(Category).where(
+            Category.user_id == user.id,
+            Category.name == "Transaction Fees",
+            Category.category_type == CategoryType.EXPENSE,
+        )
+    ).all()
+    assert len(matches) == 1
+    assert matches[0].is_system is True
