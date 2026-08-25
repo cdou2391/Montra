@@ -37,18 +37,6 @@ def net_worth(
     return single(payload)
 
 
-@router.get("/reports/spending-trend")
-def spending_trend(
-    context: str = Context,
-    days: int = Query(default=30, ge=7, le=90),
-    db: DbSession = Depends(db_session),
-    user: User = Depends(current_user),
-) -> dict:
-    payload = reporting.spending_trend(db, user=user, context=context, days=days)
-    db.commit()
-    return single(payload)
-
-
 @router.get("/forecasts/cash-flow")
 def cash_flow(
     context: str = Context,

@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Account, Forecast, Insight, Loan, SpendingTrend, Transaction, montra } from "@/lib/api";
+import { Account, Forecast, Insight, Loan, Transaction, montra } from "@/lib/api";
 import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { AccountTile, MetricCard, TransactionRow } from "@/components/financial";
 import { InsightList } from "@/components/insights";
 import { ForecastChart } from "@/components/forecast-chart";
-import { SpendingChart } from "@/components/spending-chart";
 import { formatMoney } from "@/lib/format";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { ProfileAvatarLink } from "@/components/avatar";
@@ -28,7 +27,6 @@ export default function Home() {
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
-  const [trend, setTrend] = useState<SpendingTrend | null>(null);
   const [hidden, setHidden] = useState(false);
   const { context, family } = useFinancialContext();
 
@@ -42,10 +40,6 @@ export default function Home() {
       .forecast(context, "30d")
       .then(setForecast)
       .catch(() => setForecast(null));
-    montra
-      .spendingTrend(context, 30)
-      .then(setTrend)
-      .catch(() => setTrend(null));
     montra
       .insights(context)
       .then(setInsights)
@@ -214,40 +208,6 @@ export default function Home() {
                 </div>
                 <div className="mt-3">
                   <ForecastChart forecast={forecast} />
-                </div>
-              </Card>
-            </section>
-          )}
-
-          {trend && trend.points.length > 0 && (
-            <section className="mb-6">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-section">Spending</h2>
-                <Link href="/transactions" className="pressable text-xs text-accent">
-                  Transactions
-                </Link>
-              </div>
-              <Card>
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <p className="tabular text-lg font-semibold text-content-primary">
-                    {hidden ? "••••••" : formatMoney(trend.total, trend.currency)}
-                  </p>
-                  {/* Direction is in the words, not only in the colour. */}
-                  {trend.change_percentage !== null && (
-                    <p
-                      className={`text-xs ${
-                        Number(trend.change_percentage) > 0
-                          ? "text-semantic-expense"
-                          : "text-semantic-income"
-                      }`}
-                    >
-                      {Number(trend.change_percentage) > 0 ? "Up " : "Down "}
-                      {Math.abs(Number(trend.change_percentage))}% on the previous 30 days
-                    </p>
-                  )}
-                </div>
-                <div className="mt-3">
-                  <SpendingChart trend={trend} />
                 </div>
               </Card>
             </section>

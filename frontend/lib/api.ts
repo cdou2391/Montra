@@ -272,20 +272,6 @@ export type Forecast = {
   warnings: ForecastWarning[];
 };
 
-export type SpendingTrend = {
-  context: string;
-  currency: string;
-  days: number;
-  starts_on: string;
-  ends_on: string;
-  total: string;
-  previous_total: string;
-  change_percentage: string | null;
-  daily_average: string;
-  busiest_day: { date: string; amount: string } | null;
-  points: { date: string; amount: string }[];
-};
-
 export type Insight = {
   code: string;
   title: string;
@@ -609,10 +595,6 @@ export const montra = {
       .then((r) => r.data),
   insights: (context: Context = "personal") =>
     api.get<Collection<Insight>>(`/insights?context=${context}`).then((r) => r.data),
-  spendingTrend: (context: Context = "personal", days = 30) =>
-    api
-      .get<Envelope<SpendingTrend>>(`/reports/spending-trend?context=${context}&days=${days}`)
-      .then((r) => r.data),
 
   // ------------------------------------------------------------- reporting
   dashboard: (context: Context = "personal") =>
