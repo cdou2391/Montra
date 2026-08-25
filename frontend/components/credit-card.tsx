@@ -7,10 +7,11 @@
  * are the two numbers a card holder acts on.
  */
 
-import { CardSummary } from "@/lib/api";
+import { CardExpiry, CardSummary } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { MoneyValue } from "@/components/financial";
 import { Card } from "@/components/ui";
+import { Icon } from "@/components/icons";
 
 /** Restrained bar; colour only appears once utilization genuinely matters. */
 export function UtilizationBar({ summary }: { summary: CardSummary }) {
@@ -55,6 +56,54 @@ export function UtilizationBar({ summary }: { summary: CardSummary }) {
         {caption}
         {pct > 100 ? " — over your limit" : ""}
       </p>
+    </div>
+  );
+}
+
+/**
+ * Expiry, stated as a date rather than as MM/YY.
+ *
+ * A card printed 08/28 works to the end of August, which is not obvious from
+ * the two numbers embossed on it; the API resolves the month end and this only
+ * renders it. The icon and the wording carry the urgency, not the colour alone.
+ */
+export function ExpiryNotice({ expiry }: { expiry: CardExpiry | null }) {
+  if (!expiry) return null;
+
+  const on = formatDate(`${expiry.expires_on}T00:00:00`);
+  if (expiry.status === "VALID") {
+    return <Stat label="Expires" value={on} tone="muted" />;
+  }
+
+  const expired = expiry.status === "EXPIRED";
+  const days = expiry.days_remaining;
+  return (
+    <div
+      className={`flex items-start gap-2.5 rounded-control p-3 ${
+        expired ? "bg-semantic-expense/10" : "bg-semantic-warning/10"
+      }`}
+    >
+      <span
+        className={`mt-0.5 shrink-0 ${
+          expired ? "text-semantic-expense" : "text-semantic-warning"
+        }`}
+      >
+        <Icon name="alertTriangle" size={16} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-content-primary">
+          {expired
+            ? `Expired ${on}`
+            : days === 0
+              ? `Expires today, ${on}`
+              : `Expires in ${days} day${days === 1 ? "" : "s"}`}
+        </p>
+        <p className="mt-0.5 text-xs text-content-secondary">
+          {expired
+            ? "Recurring charges on this card will be failing."
+            : `Good until ${on}. Move recurring charges before then.`}
+        </p>
+      </div>
     </div>
   );
 }
@@ -108,9 +157,16 @@ export function CreditCardSummaryCard({
         />
       </p>
 
+      {summary.expiry && summary.expiry.status !== "VALID" && (
+        <div className="mt-5">
+          <ExpiryNotice expiry={summary.expiry} />
+        </div>
+      )}
+
       <div className="mt-5 grid grid-cols-2 gap-4">
         <Stat label="Available credit" value={money(summary.available_credit)} />
         <Stat label="Limit" value={money(summary.credit_limit)} tone="muted" />
+        {summary.expiry?.status === "VALID" && <ExpiryNotice expiry={summary.expiry} />}
       </div>
 
       <UtilizationBar summary={summary} />

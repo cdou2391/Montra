@@ -96,7 +96,7 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
     """Everything worth saying about this scope, most useful first."""
     from app.core.timezone import to_local
     from app.db.base import utcnow
-    from app.services import reporting
+    from app.services import credit_cards, reporting
     from app.services.forecast import cash_flow
 
     access = authz.resolve(db, user)
@@ -214,6 +214,34 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
                 tone="warning" if used < 80 else "negative",
                 account_id=str(account.id),
                 value=str(used.quantize(Decimal("0.1"))),
+                currency=currency,
+            )
+        )
+
+    # --- cards approaching their expiry ----------------------------------
+    for account in accounts:
+        if account.account_type is not AccountType.CREDIT_CARD:
+            continue
+        state = credit_cards.expiry_state(account, today=today)
+        if state is None or state["status"] == "VALID":
+            continue
+        days = state["days_remaining"]
+        if days < 0:
+            title = f"{account.name} has expired"
+            detail = "Replace it, or archive the account if it is gone."
+        elif days == 0:
+            title = f"{account.name} expires today"
+            detail = "Today is the last day it will work."
+        else:
+            title = f"{account.name} expires in {days} day{'s' if days != 1 else ''}"
+            detail = "Order a replacement before recurring charges start failing."
+        insights.append(
+            _insight(
+                "card_expiring",
+                title,
+                detail,
+                tone="negative" if days < 0 else "warning",
+                account_id=str(account.id),
                 currency=currency,
             )
         )

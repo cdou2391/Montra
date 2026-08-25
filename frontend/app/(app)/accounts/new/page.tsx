@@ -38,6 +38,7 @@ function NewAccountForm() {
     statement_closing_day: "",
     minimum_payment: "",
     interest_rate: "",
+    expiry: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -54,7 +55,8 @@ function NewAccountForm() {
     setError(null);
     try {
       // Card metadata only travels for cards; the backend rejects it elsewhere.
-      const { credit_limit, payment_due_day, statement_closing_day, minimum_payment, interest_rate, ...base } = form;
+      const { credit_limit, payment_due_day, statement_closing_day, minimum_payment, interest_rate, expiry, ...base } = form;
+      const [expiryYear, expiryMonth] = expiry ? expiry.split("-") : [];
       await montra.createAccount({
         ...base,
         account_identifier: base.account_identifier || null,
@@ -67,6 +69,8 @@ function NewAccountForm() {
                 : null,
               minimum_payment: minimum_payment || null,
               interest_rate: interest_rate || null,
+              expiry_month: expiryMonth ? Number(expiryMonth) : null,
+              expiry_year: expiryYear ? Number(expiryYear) : null,
             }
           : {}),
       });
@@ -179,6 +183,22 @@ function NewAccountForm() {
                   />
                 </Field>
               </div>
+
+              <Field
+                label="Expires"
+                hint="The month printed on the card. You will be warned two months ahead."
+              >
+                {/* month gives a native month picker where one exists and a
+                    plain YYYY-MM field where it does not; either way the value
+                    is unambiguous, unlike a hand-typed MM/YY. */}
+                <Input
+                  type="month"
+                  min="2000-01"
+                  max="2100-12"
+                  value={form.expiry}
+                  onChange={(e) => update("expiry", e.target.value)}
+                />
+              </Field>
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Minimum payment">

@@ -12,7 +12,7 @@ The three properties the plan asks to guard:
 """
 
 import calendar
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Session as DbSession
@@ -26,6 +26,44 @@ from app.services.posting import PostingService
 # Utilization bands from UI/UX section 36. Returned by the API so the client
 # does not re-derive thresholds and drift from them.
 UTILIZATION_BANDS = ((30, "NORMAL"), (60, "NEUTRAL"), (80, "WARNING"))
+
+
+# How much warning is useful before a card stops working: long enough to order
+# a replacement and move recurring charges across, short enough that the notice
+# still feels current.
+EXPIRY_NOTICE_DAYS = 60
+
+
+def expiry_date(account: Account) -> date | None:
+    """The last day the card works.
+
+    A card printed 08/28 is good for the whole of August 2028, so expiry falls
+    at the end of that month rather than on its first day.
+    """
+    if account.expiry_month is None or account.expiry_year is None:
+        return None
+    last_day = calendar.monthrange(account.expiry_year, account.expiry_month)[1]
+    return date(account.expiry_year, account.expiry_month, last_day)
+
+
+def expiry_state(account: Account, *, today: date | None = None) -> dict | None:
+    """Expiry as the UI needs it, so the client never derives month-ends."""
+    expires_on = expiry_date(account)
+    if expires_on is None:
+        return None
+    today = today or datetime.now().date()
+    days_remaining = (expires_on - today).days
+    if days_remaining < 0:
+        status = "EXPIRED"
+    elif days_remaining <= EXPIRY_NOTICE_DAYS:
+        status = "EXPIRING"
+    else:
+        status = "VALID"
+    return {
+        "expires_on": expires_on.isoformat(),
+        "days_remaining": days_remaining,
+        "status": status,
+    }
 
 
 def require_credit_card(account: Account) -> Account:
@@ -118,6 +156,7 @@ def summary(db: DbSession, account: Account, *, today: date | None = None) -> di
         ),
         "expiry_month": account.expiry_month,
         "expiry_year": account.expiry_year,
+        "expiry": expiry_state(account, today=today),
     }
 
 
@@ -228,6 +267,7 @@ def card_fields_payload(account: Account) -> dict | None:
         ),
         "expiry_month": account.expiry_month,
         "expiry_year": account.expiry_year,
+        "expiry": expiry_state(account),
     }
 
 
@@ -239,3 +279,98 @@ def apply_card_fields(account: Account, values: dict) -> None:
     require_credit_card(account)
     for field, value in supplied.items():
         setattr(account, field, value)
+
+
+def expiring_cards(
+    db: DbSession, *, today: date | None = None, within_days: int = EXPIRY_NOTICE_DAYS
+) -> list[tuple[Account, dict]]:
+    """Every active card at or past its notice window, oldest expiry first.
+
+    Archived cards are skipped: an account you have already put away does not
+    need chasing about a card you have presumably already replaced.
+    """
+    from sqlalchemy import select
+
+    today = today or datetime.now().date()
+    cards = db.scalars(
+        select(Account).where(
+            Account.account_type == AccountType.CREDIT_CARD,
+            Account.status == AccountStatus.ACTIVE,
+            Account.expiry_month.is_not(None),
+            Account.expiry_year.is_not(None),
+        )
+    ).all()
+
+    found = []
+    for card in cards:
+        state = expiry_state(card, today=today)
+        if state is None:
+            continue
+        if state["days_remaining"] <= within_days:
+            found.append((card, state))
+    found.sort(key=lambda pair: pair[1]["expires_on"])
+    return found
+
+
+def notify_expiring_cards(
+    db: DbSession, *, today: date | None = None, within_days: int = EXPIRY_NOTICE_DAYS
+) -> int:
+    """Raise one notification per card, per expiry.
+
+    The task runs daily, so it must not send daily. The guard is the notice
+    window itself: a card is announced once after its window opens, and only
+    announced again if the expiry date moves — which is exactly what happens
+    when the card is replaced and the new date recorded.
+    """
+    from sqlalchemy import select
+
+    from app.db.enums import NotificationType, ReminderEntity
+    from app.models.planning import Notification
+    from app.services.planning import notify
+
+    today = today or datetime.now().date()
+    sent = 0
+
+    for card, state in expiring_cards(db, today=today, within_days=within_days):
+        recipient = card.owner_user_id or card.created_by
+        expires_on = date.fromisoformat(state["expires_on"])
+        window_opened = datetime.combine(
+            expires_on - timedelta(days=within_days), time.min, tzinfo=UTC
+        )
+        already = db.scalar(
+            select(Notification.id).where(
+                Notification.user_id == recipient,
+                Notification.notification_type == NotificationType.CARD_EXPIRING,
+                Notification.related_entity_id == card.id,
+                Notification.created_at >= window_opened,
+            )
+        )
+        if already is not None:
+            continue
+
+        days = state["days_remaining"]
+        if days < 0:
+            title = f"{card.name} has expired"
+            body = f"It expired on {expires_on.day} {expires_on:%B %Y}."
+        elif days == 0:
+            title = f"{card.name} expires today"
+            body = "Today is the last day it will work."
+        else:
+            title = f"{card.name} expires in {days} day{'s' if days != 1 else ''}"
+            body = (
+                f"It stops working after {expires_on.day} {expires_on:%B %Y}. "
+                "Order a replacement and move any recurring charges across."
+            )
+
+        notify(
+            db,
+            user_id=recipient,
+            notification_type=NotificationType.CARD_EXPIRING,
+            title=title,
+            body=body,
+            entity_type=ReminderEntity.CREDIT_CARD,
+            entity_id=card.id,
+        )
+        sent += 1
+
+    return sent

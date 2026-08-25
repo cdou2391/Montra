@@ -112,6 +112,11 @@ export default function AccountDetail() {
             Reconcile
           </Button>
         )}
+        {isCard && account.can_edit && (
+          <Button variant="secondary" onClick={() => router.push(`/accounts/${id}/edit`)}>
+            Card details
+          </Button>
+        )}
         {account.can_edit && (
           <Button variant="destructive" onClick={archive}>
             Archive

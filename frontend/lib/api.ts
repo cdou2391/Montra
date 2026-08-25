@@ -74,6 +74,12 @@ export const api = {
 
 export type Money = { amount: string; currency: string };
 
+export type CardExpiry = {
+  expires_on: string;
+  days_remaining: number;
+  status: "VALID" | "EXPIRING" | "EXPIRED";
+};
+
 export type CreditCardFields = {
   credit_limit: string | null;
   statement_balance: string | null;
@@ -83,6 +89,7 @@ export type CreditCardFields = {
   interest_rate: string | null;
   expiry_month: number | null;
   expiry_year: number | null;
+  expiry: CardExpiry | null;
 };
 
 export type Account = {
@@ -116,6 +123,9 @@ export type CardSummary = {
   payment_due_date: string | null;
   statement_closing_day: number | null;
   interest_rate: string | null;
+  expiry_month: number | null;
+  expiry_year: number | null;
+  expiry: CardExpiry | null;
 };
 
 export type ReconciliationPreview = {
@@ -428,6 +438,8 @@ export const montra = {
 
   cardSummary: (id: string) =>
     api.get<Envelope<CardSummary>>(`/credit-cards/${id}/summary`).then((r) => r.data),
+  updateAccount: (id: string, payload: Record<string, unknown>) =>
+    api.patch<Envelope<Account>>(`/accounts/${id}`, payload).then((r) => r.data),
   payCard: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
     api.post<Envelope<unknown>>(`/credit-cards/${id}/payments`, payload, {
       "Idempotency-Key": idempotencyKey,

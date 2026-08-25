@@ -56,6 +56,12 @@ celery_app.conf.beat_schedule = {
         "task": "montra.refresh_planned_status",
         "schedule": crontab(minute=0),
     },
+    # A card expiry moves once a day at most, so once a day is enough. Early
+    # morning, so the notice is waiting rather than arriving mid-evening.
+    "notify-expiring-cards": {
+        "task": "montra.notify_expiring_cards",
+        "schedule": crontab(hour=6, minute=30),
+    },
 }
 
 
@@ -132,3 +138,16 @@ def refresh_planned_status() -> int:
         count = result.rowcount or 0
     logger.info("promoted %s planned items to DUE", count)
     return count
+
+
+@celery_app.task(name="montra.notify_expiring_cards")
+def notify_expiring_cards() -> int:
+    """Warn about cards approaching their expiry date."""
+    from app.db.session import SessionLocal
+    from app.services.credit_cards import notify_expiring_cards as run
+
+    with SessionLocal() as db:
+        sent = run(db)
+        db.commit()
+    logger.info("sent %s card expiry notifications", sent)
+    return sent
