@@ -92,6 +92,7 @@ def create_transaction(
         merchant=payload.merchant,
         notes=payload.notes,
         reference=payload.reference,
+        fee_amount=payload.fee_amount,
     )
     db.commit()
     db.refresh(txn)

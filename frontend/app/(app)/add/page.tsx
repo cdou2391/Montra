@@ -30,6 +30,7 @@ function AddTransactionForm() {
     category_id: "",
     description: "",
     merchant: "",
+    fee_amount: "",
   });
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,9 @@ function AddTransactionForm() {
         category_id: form.category_id || null,
         description: form.description || null,
         merchant: form.merchant || null,
+        // Sent alongside rather than added in: the backend posts it as its own
+        // line, so the amount above stays the cost of the thing itself.
+        fee_amount: type === "EXPENSE" && form.fee_amount ? form.fee_amount : null,
       });
 
       // The transaction is saved by now. If a receipt fails to upload, that is
@@ -181,6 +185,18 @@ function AddTransactionForm() {
               onChange={(e) => update("occurred_at", e.target.value)}
             />
           </Field>
+          {type === "EXPENSE" && (
+            <Field
+              label="Fee"
+              hint="Optional. Recorded as its own line, so the amount above stays what the purchase cost."
+            >
+              <AmountInput
+                placeholder="0"
+                value={form.fee_amount}
+                onChange={(e) => update("fee_amount", e.target.value)}
+              />
+            </Field>
+          )}
           <Field label="Description">
             <Input
               value={form.description}

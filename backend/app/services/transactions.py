@@ -56,11 +56,23 @@ def create_transaction(
     merchant: str | None = None,
     notes: str | None = None,
     reference: str | None = None,
+    fee_amount: Decimal | None = None,
 ) -> Transaction:
     if transaction_type is TransactionType.TRANSFER:
         raise ValidationFailed(
             "Use the transfers endpoint to move money between accounts.",
             code="USE_TRANSFER_ENDPOINT",
+        )
+
+    if fee_amount is not None and transaction_type is not TransactionType.EXPENSE:
+        raise ValidationFailed(
+            "A fee can only be charged on an expense.",
+            code="FEE_NOT_APPLICABLE",
+            details=[{"field": "fee_amount", "message": "Only expenses carry a fee."}],
+        )
+    if fee_amount is not None and fee_amount <= 0:
+        raise ValidationFailed(
+            details=[{"field": "fee_amount", "message": "A fee must be more than zero."}]
         )
 
     account = get_transactable_account(db, account_id, user)
@@ -103,6 +115,23 @@ def create_transaction(
             code="USE_ADJUSTMENT_ENDPOINT",
         )
 
+    if fee_amount is not None:
+        # Its own line, not an adjustment to the amount above. The bank charged
+        # two separate sums and the statement will show two; folding them
+        # together would make every reconciliation off by the fee, and would
+        # quietly overstate what the purchase itself cost.
+        posting.record_expense(
+            account=account,
+            amount=fee_amount,
+            currency=account.currency,
+            occurred_at=occurred_at,
+            actor_id=user.id,
+            category_id=category_id,
+            description=_fee_description(description, merchant),
+            merchant=merchant,
+            fee_for_transaction_id=txn.id,
+        )
+
     # Spending on a shared account is the household's business in a way that
     # spending on a private one is not, so the two are distinguishable events.
     audit.record(
@@ -119,6 +148,12 @@ def create_transaction(
         metadata={"account_id": str(account.id), "transaction_type": transaction_type.value},
     )
     return txn
+
+
+def _fee_description(description: str | None, merchant: str | None) -> str:
+    """Name the fee after what it was charged on, so a list still reads."""
+    subject = (description or merchant or "").strip()
+    return f"{subject} — fee" if subject else "Fee"
 
 
 def _require_own_category(db: DbSession, category_id: uuid.UUID, user: User) -> Category:
@@ -190,7 +225,17 @@ def delete_transaction(db: DbSession, *, user: User, transaction_id: uuid.UUID) 
             code="TRANSFER_SIDE_NOT_DELETABLE",
         )
     account = get_transactable_account(db, txn.account_id, user)
-    txn.deleted_at = utcnow()
+    now = utcnow()
+    txn.deleted_at = now
+    # The fee only existed because of this charge. Leaving it behind would
+    # strand a line nobody can explain, and leave the balance wrong by its
+    # value relative to what the user thinks they just removed.
+    for fee in db.scalars(
+        select(Transaction).where(
+            Transaction.fee_for_transaction_id == txn.id, Transaction.deleted_at.is_(None)
+        )
+    ):
+        fee.deleted_at = now
     db.flush()
     # The row is tombstoned, so the trail is the only thing that will still say
     # this happened at all.
@@ -308,6 +353,9 @@ def serialize_transaction(txn: Transaction, account: Account | None = None) -> d
         "merchant": txn.merchant,
         "notes": txn.notes,
         "reference": txn.reference,
+        "fee_for_transaction_id": (
+            str(txn.fee_for_transaction_id) if txn.fee_for_transaction_id else None
+        ),
         "category": (
             {"id": str(txn.category.id), "name": txn.category.name} if txn.category else None
         ),

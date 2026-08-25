@@ -17,8 +17,12 @@ class TransactionCreate(MontraModel):
     merchant: str | None = Field(default=None, max_length=160)
     notes: str | None = None
     reference: str | None = Field(default=None, max_length=120)
+    # A charge levied alongside the expense — posted as its own line, not
+    # added to the amount above.
+    fee_amount: Decimal | None = None
 
     _v_amount = amount_validator("amount")
+    _v_fee = amount_validator("fee_amount")
 
 
 class TransactionUpdate(MontraModel):

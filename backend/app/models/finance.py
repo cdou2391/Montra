@@ -219,6 +219,13 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
     loan_payment_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("loan_payments.id", ondelete="CASCADE"), index=True
     )
+    # A charge levied on another transaction — a withdrawal fee, a card
+    # surcharge. It is a transaction in its own right, because it is money that
+    # actually left the account and it belongs in the total; the link only says
+    # what it was charged on.
+    fee_for_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), index=True
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

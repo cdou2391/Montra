@@ -133,6 +133,7 @@ class PostingService:
         reference: str | None = None,
         transfer_id: uuid.UUID | None = None,
         loan_payment_id: uuid.UUID | None = None,
+        fee_for_transaction_id: uuid.UUID | None = None,
         status: TransactionStatus = TransactionStatus.COMPLETED,
     ) -> Transaction:
         self._require_positive(posting.amount)
@@ -151,6 +152,7 @@ class PostingService:
             reference=reference,
             transfer_id=transfer_id,
             loan_payment_id=loan_payment_id,
+            fee_for_transaction_id=fee_for_transaction_id,
             created_by=actor_id,
         )
         self.db.add(txn)

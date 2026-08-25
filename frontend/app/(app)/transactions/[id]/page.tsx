@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -126,6 +127,19 @@ export default function TransactionDetail() {
         </div>
 
         <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-5 text-sm">
+          {txn.fee_for_transaction_id && (
+            <div className="col-span-2">
+              <dt className="text-xs uppercase tracking-wide text-content-muted">Fee on</dt>
+              <dd className="mt-1">
+                <Link
+                  href={`/transactions/${txn.fee_for_transaction_id}`}
+                  className="pressable text-accent"
+                >
+                  The charge this fee was taken for
+                </Link>
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs uppercase tracking-wide text-content-muted">Account</dt>
             <dd className="mt-1 text-content-primary">{txn.account?.name ?? "—"}</dd>

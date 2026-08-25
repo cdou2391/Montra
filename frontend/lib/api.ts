@@ -150,6 +150,7 @@ export type Transaction = {
   merchant: string | null;
   category: { id: string; name: string } | null;
   transfer_id: string | null;
+  fee_for_transaction_id?: string | null;
   notes?: string | null;
   reference?: string | null;
   created_at?: string;
