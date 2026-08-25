@@ -115,11 +115,10 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
  *
  * Narrower than the full-width card so several are visible at once, which is
  * the point: the row is for comparing accounts at a glance, not for reading
- * one in detail. Type and masked number are dropped — the icon carries the
- * type, and the detail screen carries the rest.
+ * one in detail. Type, masked number and the owed/available label are dropped
+ * — the icon carries the type, and the detail screen carries the rest.
  */
 export function AccountTile({ account, hidden }: { account: Account; hidden?: boolean }) {
-  const isLiability = account.account_nature === "LIABILITY";
   return (
     <Link
       href={`/accounts/${account.id}`}
@@ -140,10 +139,6 @@ export function AccountTile({ account, hidden }: { account: Account; hidden?: bo
           </p>
           <p className="mt-1.5">
             <MoneyValue amount={account.balance} currency={account.currency} hidden={hidden} />
-          </p>
-          {/* A liability balance is debt owed, not money held. */}
-          <p className="mt-0.5 text-xs text-content-muted">
-            {isLiability ? "Owed" : "Available"}
           </p>
         </div>
       </Card>

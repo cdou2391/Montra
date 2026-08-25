@@ -159,8 +159,11 @@ export default function Home() {
               />
             ) : (
               /* Bleeds into the page padding so the row reads as scrollable
-                 rather than as a list that happens to be cut off. */
-              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+                 rather than as a list that happens to be cut off. scroll-pl
+                 matches the padding: without it snapping aligns the first tile
+                 to the container edge, eating the padding and leaving the row
+                 visibly wider than every other section. */
+              <div className="-mx-4 flex snap-x scroll-pl-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:scroll-pl-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
                 {accounts.map((a) => (
                   <AccountTile key={a.id} account={a} hidden={hidden} />
                 ))}
