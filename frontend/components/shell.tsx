@@ -44,7 +44,7 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
     icon: "handshake",
     hint: "What you owe and are owed",
   },
-  { href: "/transactions", label: "Activity", icon: "list", hint: "Every transaction" },
+  { href: "/transactions", label: "Transactions", icon: "list", hint: "Everything you have recorded" },
   {
     href: "/planning/forecast",
     label: "Forecast",

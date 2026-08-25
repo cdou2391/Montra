@@ -14,7 +14,7 @@ import { Icon } from "@/components/icons";
 import { Button, Card, EmptyState, Input, Skeleton } from "@/components/ui";
 
 /**
- * Activity (Implementation Plan Phase 26).
+ * Transactions (Implementation Plan Phase 26).
  *
  * The same filter state drives both layouts: a bottom sheet on a phone, an
  * inline row and a table on a wide screen. Filtering happens on the server, so
@@ -100,7 +100,7 @@ function Transactions() {
       {family && <ContextSwitch className="mb-5" />}
 
       <PageHeader
-        title="Activity"
+        title="Transactions"
         icon="list"
         action={
           <Link href="/add">
