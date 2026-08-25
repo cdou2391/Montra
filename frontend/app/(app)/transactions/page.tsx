@@ -103,8 +103,20 @@ function Transactions() {
         title="Transactions"
         icon="list"
         action={
-          <Link href="/add">
-            <Button>Add</Button>
+          // "Transactions" is a longer title than the row used to carry, and
+          // the title must not be the thing that gives way. The action gives
+          // way instead, down to its glyph on a narrow phone.
+          <Link href="/add" aria-label="Add transaction">
+            {/* px-5 is the standard button gutter; at 320px those few pixels
+                are the difference between a whole title and a truncated one.
+                Marked important because Tailwind orders px-5 after px-3.5 in
+                the sheet, so a plain override loses. */}
+            <Button className="!px-3.5 sm:!px-5">
+              <span aria-hidden className="sm:hidden">
+                +
+              </span>
+              <span className="hidden sm:inline">Add</span>
+            </Button>
           </Link>
         }
       />

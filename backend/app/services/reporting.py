@@ -15,8 +15,8 @@ each member (section 49). It reports what you own, and shows the household's
 shared position beside it.
 """
 
-from datetime import date
-from decimal import Decimal
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -252,3 +252,98 @@ def dashboard(db: DbSession, *, user: User, context: str = "personal") -> dict:
 
     payload["insights"] = generate_insights(db, user=user, context=context)
     return payload
+
+
+def spending_trend(
+    db: DbSession,
+    *,
+    user: User,
+    context: str = "personal",
+    days: int = 30,
+    today: date | None = None,
+) -> dict:
+    """Daily spending over a window, and how it compares with the one before.
+
+    Expenses only. A transfer moves your own money and a loan principal
+    repayment settles a debt you already carried — counting either as spending
+    is the fastest way to make a chart lie, and the same rule the rest of the
+    reporting follows.
+
+    Every day in the window gets a row, including the ones with nothing on
+    them. A chart drawn from only the days that had spending would space them
+    evenly and quietly misrepresent when the money went.
+    """
+    from app.core.timezone import day_start, to_local
+    from app.db.base import utcnow
+
+    access = authz.resolve(db, user)
+    today = today or to_local(utcnow(), user.timezone).date()
+
+    account_ids = select(
+        authz.visible_accounts(db, access, include_archived=True, context=context).subquery().c.id
+    )
+
+    # Inclusive of today, so a 30-day window is today plus the 29 before it.
+    start = today - timedelta(days=days - 1)
+    previous_start = start - timedelta(days=days)
+
+    def _expenses(window_start: date, window_end: date) -> list[tuple[datetime, Decimal]]:
+        return list(
+            db.execute(
+                select(Transaction.occurred_at, Transaction.amount).where(
+                    Transaction.account_id.in_(account_ids),
+                    Transaction.transaction_type == TransactionType.EXPENSE,
+                    Transaction.status == TransactionStatus.COMPLETED,
+                    Transaction.deleted_at.is_(None),
+                    Transaction.occurred_at >= day_start(window_start, user.timezone),
+                    Transaction.occurred_at < day_start(window_end, user.timezone),
+                )
+            ).all()
+        )
+
+    by_day: dict[date, Decimal] = {}
+    for occurred_at, amount in _expenses(start, today + timedelta(days=1)):
+        # Bucketed by the user's local day, so a late-night purchase lands on
+        # the day they made it rather than the following UTC one.
+        local_day = to_local(occurred_at, user.timezone).date()
+        by_day[local_day] = by_day.get(local_day, ZERO) + Decimal(amount)
+
+    points = []
+    day = start
+    while day <= today:
+        points.append({"date": day.isoformat(), "amount": serialize(by_day.get(day, ZERO))})
+        day += timedelta(days=1)
+
+    total = sum(by_day.values(), ZERO)
+    previous_total = sum(
+        (Decimal(amount) for _, amount in _expenses(previous_start, start)), ZERO
+    )
+
+    # Averaged over the whole window rather than over the days that had
+    # spending: "what does a day cost me" is the question, and the quiet days
+    # are part of the answer.
+    average = (total / days).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    change = None
+    if previous_total > 0:
+        change = ((total - previous_total) / previous_total * 100).quantize(Decimal("1"))
+
+    busiest = max(by_day.items(), key=lambda pair: pair[1], default=None)
+
+    return {
+        "context": context,
+        "currency": user.base_currency,
+        "days": days,
+        "starts_on": start.isoformat(),
+        "ends_on": today.isoformat(),
+        "total": serialize(total),
+        "previous_total": serialize(previous_total),
+        "change_percentage": str(change) if change is not None else None,
+        "daily_average": serialize(average),
+        "busiest_day": (
+            {"date": busiest[0].isoformat(), "amount": serialize(busiest[1])}
+            if busiest and busiest[1] > 0
+            else None
+        ),
+        "points": points,
+    }
