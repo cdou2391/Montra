@@ -7,7 +7,7 @@ import { Account, Forecast, Insight, Loan, Transaction, montra } from "@/lib/api
 import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
-import { AccountCard, MetricCard, TransactionRow } from "@/components/financial";
+import { AccountTile, MetricCard, TransactionRow } from "@/components/financial";
 import { InsightList } from "@/components/insights";
 import { ForecastChart } from "@/components/forecast-chart";
 import { formatMoney } from "@/lib/format";
@@ -140,6 +140,34 @@ export default function Home() {
             />
           </div>
 
+          <section className="mb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-section">Accounts</h2>
+              <Link href="/accounts" className="text-xs text-accent">
+                View all
+              </Link>
+            </div>
+            {accounts.length === 0 ? (
+              <EmptyState
+                title="No accounts yet"
+                message="Add your first account to start tracking your position."
+                action={
+                  <Link href="/accounts/new">
+                    <Button>Add account</Button>
+                  </Link>
+                }
+              />
+            ) : (
+              /* Bleeds into the page padding so the row reads as scrollable
+                 rather than as a list that happens to be cut off. */
+              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+                {accounts.map((a) => (
+                  <AccountTile key={a.id} account={a} hidden={hidden} />
+                ))}
+              </div>
+            )}
+          </section>
+
           {forecast && forecast.points.length > 1 && (
             <section className="mb-6">
               <div className="mb-3 flex items-center justify-between">
@@ -188,32 +216,6 @@ export default function Home() {
               <InsightList insights={insights} />
             </section>
           )}
-
-          <section className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-section">Accounts</h2>
-              <Link href="/accounts" className="text-xs text-accent">
-                View all
-              </Link>
-            </div>
-            {accounts.length === 0 ? (
-              <EmptyState
-                title="No accounts yet"
-                message="Add your first account to start tracking your position."
-                action={
-                  <Link href="/accounts/new">
-                    <Button>Add account</Button>
-                  </Link>
-                }
-              />
-            ) : (
-              <div className="space-y-3">
-                {accounts.slice(0, 3).map((a) => (
-                  <AccountCard key={a.id} account={a} hidden={hidden} />
-                ))}
-              </div>
-            )}
-          </section>
 
           <section>
             <div className="mb-3 flex items-center justify-between">

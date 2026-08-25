@@ -110,6 +110,43 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
   );
 }
 
+/**
+ * Compact account tile for a scrolling row.
+ *
+ * Narrower than the full-width card so several are visible at once, which is
+ * the point: the row is for comparing accounts at a glance, not for reading
+ * one in detail. Type and masked number are dropped — the icon carries the
+ * type, and the detail screen carries the rest.
+ */
+export function AccountTile({ account, hidden }: { account: Account; hidden?: boolean }) {
+  const isLiability = account.account_nature === "LIABILITY";
+  return (
+    <Link
+      href={`/accounts/${account.id}`}
+      className="pressable pressable-surface w-[10.5rem] shrink-0 snap-start"
+    >
+      <Card className="h-full transition-colors hover:bg-surface-elevated">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+          <Icon name={accountTypeIcon(account.account_type)} size={18} />
+        </span>
+        <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-content-primary">
+          {account.is_favorite && (
+            <Icon name="star" size={13} filled className="shrink-0 text-accent" />
+          )}
+          <span className="truncate">{account.name}</span>
+        </p>
+        <p className="mt-1.5">
+          <MoneyValue amount={account.balance} currency={account.currency} hidden={hidden} />
+        </p>
+        {/* A liability balance is debt owed, not money held. */}
+        <p className="mt-0.5 text-xs text-content-muted">
+          {isLiability ? "Owed" : "Available"}
+        </p>
+      </Card>
+    </Link>
+  );
+}
+
 export function TransactionRow({
   transaction,
   hidden,
