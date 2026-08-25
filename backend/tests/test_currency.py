@@ -230,124 +230,129 @@ def test_currencies_in_use_reports_what_is_actually_held(db, user, bank_account,
     assert currency.currencies_in_use(db, user=user) == ["RWF", "USD"]
 
 
-# --------------------------------------------------------------- daily feed
+# --------------------------------------------------------- the shared table
 
 
 class FakeFeed:
-    """Stands in for the published feed.
+    """Stands in for the published feeds.
 
-    The network is not under test here; what is under test is which rates get
-    written, which get left alone, and what happens when a feed says nothing.
+    The network is not under test; what is under test is what gets written,
+    what gets left alone, and what happens when a feed says nothing.
     """
 
-    def __init__(self, rates=None):
-        self.rates = rates or {}
+    def __init__(self, tables=None):
+        self.tables = tables or {}
         self.calls = []
 
-    def __call__(self, base, symbols):
-        self.calls.append((base, tuple(symbols)))
-        out = {}
-        for symbol in symbols:
-            pair = self.rates.get((base.upper(), symbol.upper()))
-            if pair is not None:
-                out[symbol.upper()] = pair
-        return out
+    def __call__(self, base):
+        self.calls.append(base)
+        return self.tables.get(base.upper(), {})
 
 
-def test_the_feed_fills_a_missing_rate(db, user, usd_account):
-    feed = FakeFeed({("USD", "RWF"): (Decimal("1475.19"), "OPEN_ER_API")})
+def _feed(**bases):
+    return FakeFeed(
+        {
+            base: {code: (Decimal(value), "OPEN_ER_API") for code, value in rates.items()}
+            for base, rates in bases.items()
+        }
+    )
+
+
+def test_the_table_is_filled_once_for_everyone(db, user, other_user):
+    """The price of a dollar does not depend on who is asking, so one run
+    serves every user."""
+    feed = _feed(RWF={"USD": "0.000678"}, USD={"RWF": "1475.19"})
+    currency.refresh_market_rates(db, fetcher=feed)
     db.commit()
-    written = currency.sync_rates(db, user=user, fetcher=feed)
-    db.commit()
 
-    assert len(written) == 1
+    assert feed.calls == ["RWF", "USD"]
+    for who in (user, other_user):
+        assert currency.converter_for(db, user=who).can_convert("USD") is True
+
+
+def test_a_balance_converts_from_the_shared_table(db, user, usd_account):
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
+    db.commit()
     assert reporting.net_worth(db, user=user)["assets"] == "1475190.00"
 
 
-def test_the_feed_is_asked_in_the_direction_the_rate_is_used(db, user, usd_account):
-    """Fetching the inverse and flipping it throws away precision before the
-    number is ever stored."""
-    feed = FakeFeed({("USD", "RWF"): (Decimal("1475.19"), "OPEN_ER_API")})
+def test_a_second_run_updates_rather_than_duplicating(db, user):
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1400"}))
     db.commit()
-    currency.sync_rates(db, user=user, fetcher=feed)
-    assert feed.calls == [("USD", ("RWF",))]
-
-
-def test_a_second_run_updates_rather_than_duplicates(db, user, usd_account):
-    db.commit()
-    currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1400"), "OPEN_ER_API")})
-    )
-    db.commit()
-    currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1500"), "OPEN_ER_API")})
-    )
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1500"}))
     db.commit()
 
-    rows = currency.list_rates(db, user=user)
+    rows = [r for r in currency.market_rates(db) if r.quote_currency == "RWF"]
     assert len(rows) == 1
     assert Decimal(rows[0].rate) == Decimal("1500")
 
 
-def test_a_hand_entered_rate_is_not_overwritten(db, user, usd_account):
-    """Someone who typed a rate deliberately should not find it replaced
-    overnight."""
+def test_a_silent_feed_leaves_yesterdays_rates_alone(db, user, usd_account):
+    """A feed being down must not replace a usable rate with a gap."""
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
+    db.commit()
+    assert currency.refresh_market_rates(db, fetcher=FakeFeed({})) == 0
+    db.commit()
+    assert reporting.net_worth(db, user=user)["assets"] == "1475190.00"
+
+
+def test_two_bases_reach_a_pair_neither_was_fetched_for(db, user):
+    """With RWF->USD and RWF->EUR on hand, USD->EUR follows without a request
+    for it — which is what keeps the base list short."""
+    currency.refresh_market_rates(
+        db, fetcher=_feed(RWF={"USD": "0.000678", "EUR": "0.00058"})
+    )
+    db.commit()
+    converter = currency.converter_for(db, user=user)
+    crossed = converter.rate("USD", "EUR")
+    assert crossed is not None
+    # 0.00058 / 0.000678, reached the long way round.
+    assert crossed == Decimal("0.85545723")
+
+
+def test_an_untracked_currency_still_converts_to_nothing(db, user):
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
+    db.commit()
+    assert currency.converter_for(db, user=user).convert(Decimal("10"), "XYZ") is None
+
+
+# ------------------------------------------------------- overrides beat it
+
+
+def test_a_rate_you_set_wins_over_the_published_one(db, user, usd_account):
+    """A bank's actual rate is rarely the reference rate, and it is your money
+    that moved at it."""
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
     _rate(db, user, value="1300")
     db.commit()
-    written = currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1475"), "OPEN_ER_API")})
-    )
+    assert reporting.net_worth(db, user=user)["assets"] == "1300000.00"
+
+
+def test_removing_your_override_hands_the_pair_back(db, user, usd_account):
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
+    override = _rate(db, user, value="1300")
+    db.commit()
+    assert reporting.net_worth(db, user=user)["assets"] == "1300000.00"
+
+    currency.delete_rate(db, user=user, rate_id=override.id)
+    db.commit()
+    assert reporting.net_worth(db, user=user)["assets"] == "1475190.00"
+
+
+def test_your_override_is_yours_alone(db, user, other_user):
+    currency.refresh_market_rates(db, fetcher=_feed(USD={"RWF": "1475.19"}))
+    _rate(db, user, value="1300")
     db.commit()
 
-    assert written == []
-    assert Decimal(currency.list_rates(db, user=user)[0].rate) == Decimal("1300")
+    assert currency.converter_for(db, user=user).rate("USD", "RWF") == Decimal("1300")
+    # Everyone else still sees the published number.
+    assert currency.converter_for(db, user=other_user).rate("USD", "RWF") == Decimal("1475.19")
 
 
-def test_editing_an_automatic_rate_makes_it_yours(db, user, usd_account):
+def test_the_summary_reports_what_the_table_holds(db, user):
+    feed = _feed(RWF={"USD": "0.000678"}, USD={"RWF": "1475.19"})
+    currency.refresh_market_rates(db, fetcher=feed)
     db.commit()
-    currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1475"), "OPEN_ER_API")})
-    )
-    db.commit()
-    _rate(db, user, value="1500")
-    db.commit()
-
-    row = currency.list_rates(db, user=user)[0]
-    assert row.source == currency.MANUAL
-    # And the feed now leaves it alone.
-    currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1600"), "OPEN_ER_API")})
-    )
-    db.commit()
-    assert Decimal(currency.list_rates(db, user=user)[0].rate) == Decimal("1500")
-
-
-def test_a_silent_feed_writes_nothing(db, user, usd_account):
-    """A feed being down must not leave a wrong rate behind."""
-    db.commit()
-    assert currency.sync_rates(db, user=user, fetcher=FakeFeed({})) == []
-    assert currency.list_rates(db, user=user) == []
-
-
-def test_a_user_holding_one_currency_is_not_asked_about_rates(db, user, bank_account):
-    feed = FakeFeed()
-    db.commit()
-    assert currency.sync_rates(db, user=user, fetcher=feed) == []
-    assert feed.calls == []
-
-
-def test_the_recorded_source_says_where_the_number_came_from(db, user, usd_account):
-    db.commit()
-    currency.sync_rates(
-        db, user=user, fetcher=FakeFeed({("USD", "RWF"): (Decimal("1475"), "OPEN_ER_API")})
-    )
-    db.commit()
-    payload = currency.serialize(currency.list_rates(db, user=user)[0])
-    assert payload["source"] == "OPEN_ER_API"
-    assert payload["automatic"] is True
-
-
-def test_syncing_everyone_skips_a_user_with_nothing_to_convert(db, user, other_user, usd_account):
-    feed = FakeFeed({("USD", "RWF"): (Decimal("1475"), "OPEN_ER_API")})
-    db.commit()
-    assert currency.sync_all(db, fetcher=feed) == 1
+    summary = currency.market_summary(db)
+    assert summary["bases"] == ["RWF", "USD"]
+    assert summary["pair_count"] == 2

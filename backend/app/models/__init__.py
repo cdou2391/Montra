@@ -8,6 +8,7 @@ from app.models.finance import (  # noqa: F401
     Category,
     ExchangeRate,
     Institution,
+    MarketRate,
     Transaction,
     Transfer,
 )

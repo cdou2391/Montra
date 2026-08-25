@@ -275,3 +275,31 @@ class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
         CheckConstraint("rate > 0", name="exchange_rate_positive"),
         CheckConstraint("base_currency <> quote_currency", name="exchange_rate_distinct"),
     )
+
+
+class MarketRate(UUIDPrimaryKey, Timestamped, Base):
+    """A published rate, shared by everyone.
+
+    One table for the whole app rather than a copy per user: the price of a
+    dollar does not depend on who is asking. The daily job fills it from a
+    couple of requests, and every conversion reads from here — so adding users
+    or currencies costs no additional calls to anyone's API.
+
+    User-specific overrides still live in `exchange_rates`; this is only the
+    published number.
+    """
+
+    __tablename__ = "market_rates"
+
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    quote_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("base_currency", "quote_currency", name="market_currency_pair"),
+        CheckConstraint("rate > 0", name="market_rate_positive"),
+        CheckConstraint("base_currency <> quote_currency", name="market_rate_distinct"),
+        Index("ix_market_rates_base", "base_currency"),
+    )

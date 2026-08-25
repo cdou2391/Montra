@@ -161,12 +161,16 @@ def notify_expiring_cards() -> int:
 
 @celery_app.task(name="montra.refresh_exchange_rates")
 def refresh_exchange_rates() -> int:
-    """Pull the day's published rates for every user who holds two currencies."""
+    """Pull the day's published rates into the shared table.
+
+    One run for the whole app: the price of a dollar does not depend on who is
+    asking, so this costs a couple of requests however many users there are.
+    """
     from app.db.session import SessionLocal
-    from app.services.currency import sync_all
+    from app.services.currency import refresh_market_rates
 
     with SessionLocal() as db:
-        updated = sync_all(db)
+        updated = refresh_market_rates(db)
         db.commit()
-    logger.info("refreshed %s exchange rates", updated)
+    logger.info("refreshed %s market rates", updated)
     return updated

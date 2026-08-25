@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * Exchange rates, fetched daily.
+ * Exchange rates.
  *
- * Rates arrive on their own each morning, so nobody has to type one. The form
- * below is an override for when the published number is not the one you got —
- * a bank's tourist rate rarely matches the reference rate — and a rate you
- * enter stops being refreshed, because deliberate input outranks a feed.
+ * Published rates live in one shared table the whole app reads, refreshed each
+ * morning — so this screen shows what is stored, not a list the user has to
+ * maintain. The form is an override for when the published number is not the
+ * one you got; a bank's tourist rate rarely matches the reference rate.
  *
  * Nothing here changes what an account holds. A USD account holds dollars
  * whatever rate is recorded; this only makes the totals mean something.
@@ -14,7 +14,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
-import { CurrenciesInUse, ExchangeRate, MontraApiError, montra } from "@/lib/api";
+import { CurrenciesInUse, ExchangeRate, MarketRatesSummary, MontraApiError, montra } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import { Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 
@@ -28,6 +28,8 @@ const SOURCE_NAMES: Record<string, string> = {
 export function ExchangeRates() {
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [inUse, setInUse] = useState<CurrenciesInUse | null>(null);
+  const [market, setMarket] = useState<MarketRatesSummary | null>(null);
+  const [shown, setShown] = useState<{ code: string; rate: string } | null>(null);
   const [form, setForm] = useState({ quote: "", rate: "" });
   const [showOverride, setShowOverride] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,10 @@ export function ExchangeRates() {
   const load = useCallback(() => {
     montra.exchangeRates().then(setRates).catch(() => setRates([]));
     montra.currenciesInUse().then(setInUse).catch(() => setInUse(null));
+    montra
+      .refreshExchangeRates()
+      .then(setMarket)
+      .catch(() => montra.marketRates().then(() => undefined).catch(() => undefined));
   }, []);
   useEffect(load, [load]);
 
@@ -53,7 +59,7 @@ export function ExchangeRates() {
     setRefreshing(true);
     setError(null);
     try {
-      await montra.refreshExchangeRates();
+      setMarket(await montra.refreshExchangeRates());
       load();
     } catch {
       // A feed being down is not the user's problem to solve, but they should
@@ -101,8 +107,9 @@ export function ExchangeRates() {
     <Card>
       <p className="mb-1 text-xs uppercase tracking-wide text-content-muted">Exchange rates</p>
       <p className="mb-4 text-xs text-content-secondary">
-        Fetched every morning and used only to total your accounts in {base}.
-        Balances keep their own currency everywhere else.
+        Fetched every morning into one shared table and used only to total your
+        accounts in {base}. Balances keep their own currency everywhere else.
+        {market?.as_of ? ` Last updated ${market.as_of}.` : ""}
       </p>
 
       {error && (
@@ -139,7 +146,9 @@ export function ExchangeRates() {
         </ul>
       ) : (
         <p className="mb-4 text-sm text-content-secondary">
-          No rate yet for {others.join(" or ")}.
+          {inUse.missing.length === 0
+            ? `Using the published rates for ${others.join(" and ")}.`
+            : `No published rate yet for ${inUse.missing.join(" or ")}.`}
         </p>
       )}
 

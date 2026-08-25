@@ -87,6 +87,35 @@ def _from_currency_freaks(base: str, wanted: list[str]) -> dict[str, tuple[Decim
     return found
 
 
+def fetch_all(base: str) -> dict[str, tuple[Decimal, str]]:
+    """Every rate a feed publishes for one base, in a single request.
+
+    This is what makes a shared rate table cheap: one call returns the whole
+    row, so tracking a new currency costs nothing extra.
+    """
+    base = base.upper()
+    found: dict[str, tuple[Decimal, str]] = {}
+
+    payload = _get(f"{FRANKFURTER_URL}?base={base}")
+    for code, value in (payload or {}).get("rates", {}).items():
+        rate = _as_decimal(value)
+        if rate is not None:
+            found[code.upper()] = (rate, FRANKFURTER)
+
+    # Broader coverage, and the only one of the two that publishes RWF.
+    payload = _get(f"{OPEN_ER_API_URL}/{base}")
+    if payload and payload.get("result") == "success":
+        for code, value in payload.get("rates", {}).items():
+            code = code.upper()
+            if code in found or code == base:
+                continue
+            rate = _as_decimal(value)
+            if rate is not None:
+                found[code] = (rate, OPEN_ER_API)
+
+    return found
+
+
 def fetch(base: str, symbols: list[str]) -> dict[str, tuple[Decimal, str]]:
     """One unit of `base` in each requested currency, with its source.
 

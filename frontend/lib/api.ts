@@ -86,6 +86,13 @@ export type ExchangeRate = {
   automatic: boolean;
 };
 
+export type MarketRatesSummary = {
+  bases: string[];
+  pair_count: number;
+  as_of: string | null;
+  sources: string[];
+};
+
 export type CurrenciesInUse = {
   base_currency: string;
   currencies: string[];
@@ -624,7 +631,13 @@ export const montra = {
     api.put<Envelope<ExchangeRate>>("/exchange-rates", payload).then((r) => r.data),
   deleteExchangeRate: (id: string) => api.delete<void>(`/exchange-rates/${id}`),
   refreshExchangeRates: () =>
-    api.post<Collection<ExchangeRate>>("/exchange-rates/refresh").then((r) => r.data),
+    api.post<Envelope<MarketRatesSummary>>("/exchange-rates/refresh").then((r) => r.data),
+  marketRates: () =>
+    api
+      .get<Collection<{ base_currency: string; quote_currency: string; rate: string; as_of: string; source: string }>>(
+        "/exchange-rates/market",
+      )
+      .then((r) => r.data),
   insights: (context: Context = "personal") =>
     api.get<Collection<Insight>>(`/insights?context=${context}`).then((r) => r.data),
 

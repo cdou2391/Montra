@@ -67,9 +67,19 @@ def refresh_rates(
     Adding a foreign account at noon should not mean an uncounted balance
     until tomorrow.
     """
-    updated = currency_service.sync_rates(db, user=user)
+    currency_service.refresh_market_rates(db)
     db.commit()
-    payload = [currency_service.serialize(r) for r in updated]
+    return single(currency_service.market_summary(db))
+
+
+@router.get("/exchange-rates/market")
+def market_rates(
+    db: DbSession = Depends(db_session),
+    user: User = Depends(current_user),
+) -> dict:
+    """The shared table, as the app reads it."""
+    rows = currency_service.market_rates(db)
+    payload = [currency_service.serialize_market(r) for r in rows]
     return collection(payload, limit=len(payload))
 
 

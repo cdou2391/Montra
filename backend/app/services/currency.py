@@ -23,12 +23,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.core.errors import NotFound, ValidationFailed
-from app.models.finance import ExchangeRate
+from app.models.finance import ExchangeRate, MarketRate
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 MANUAL = "MANUAL"
+
+# The bases the shared table is kept in. Two is enough: everything else is
+# reached by crossing through one of them, and each base costs one request a
+# day however many currencies it covers.
+MARKET_BASES = ("RWF", "USD")
 
 QUANTUM = Decimal("0.0001")
 RATE_QUANTUM = Decimal("0.00000001")
@@ -46,31 +51,63 @@ def normalize(code: str) -> str:
 
 
 class Converter:
-    """Converts many balances against one snapshot of a user's rates.
+    """Converts many balances against one snapshot of the rates.
 
     Built once per request rather than queried per account: a page listing
     accounts would otherwise issue one lookup per row, and every row would be
     free to disagree with the others about the rate.
+
+    Two layers, in order. A rate the user set themselves wins, because it is a
+    deliberate statement about their own money. Otherwise the shared published
+    table answers.
     """
 
-    def __init__(self, rates: dict[tuple[str, str], Decimal], base: str):
+    def __init__(
+        self,
+        rates: dict[tuple[str, str], Decimal],
+        base: str,
+        market: dict[tuple[str, str], Decimal] | None = None,
+    ):
         self._rates = rates
+        self._market = market or {}
         self.base = base
 
-    def rate(self, source: str, target: str) -> Decimal | None:
-        source, target = source.upper(), target.upper()
-        if source == target:
-            return Decimal(1)
-        direct = self._rates.get((source, target))
+    def _lookup(self, table, source: str, target: str) -> Decimal | None:
+        direct = table.get((source, target))
         if direct is not None:
             return direct
         # One rate defines the pair both ways. Storing USD→RWF and then
         # refusing RWF→USD would make the user enter the same fact twice and
         # give them a way to contradict themselves.
-        inverse = self._rates.get((target, source))
+        inverse = table.get((target, source))
         if inverse is not None and inverse > 0:
             return (Decimal(1) / inverse).quantize(RATE_QUANTUM, rounding=ROUND_HALF_UP)
         return None
+
+    def _cross(self, source: str, target: str) -> Decimal | None:
+        """Go via a currency the table has rates for both sides of.
+
+        Tracking two bases covers far more than two currencies: with RWF→USD
+        and RWF→EUR on hand, USD→EUR follows without ever fetching it.
+        """
+        for pivot in MARKET_BASES:
+            if pivot in (source, target):
+                continue
+            left = self._lookup(self._market, source, pivot)
+            right = self._lookup(self._market, pivot, target)
+            if left is not None and right is not None:
+                return (left * right).quantize(RATE_QUANTUM, rounding=ROUND_HALF_UP)
+        return None
+
+    def rate(self, source: str, target: str) -> Decimal | None:
+        source, target = source.upper(), target.upper()
+        if source == target:
+            return Decimal(1)
+        return (
+            self._lookup(self._rates, source, target)
+            or self._lookup(self._market, source, target)
+            or self._cross(source, target)
+        )
 
     def convert(self, amount: Decimal, source: str, target: str | None = None) -> Decimal | None:
         """The amount in the target currency, or None if no rate is known."""
@@ -86,8 +123,12 @@ class Converter:
 
 def converter_for(db: DbSession, *, user: User, base: str | None = None) -> Converter:
     rows = db.scalars(select(ExchangeRate).where(ExchangeRate.user_id == user.id)).all()
-    rates = {(r.base_currency, r.quote_currency): Decimal(r.rate) for r in rows}
-    return Converter(rates, (base or user.base_currency).upper())
+    overrides = {(r.base_currency, r.quote_currency): Decimal(r.rate) for r in rows}
+    market = {
+        (r.base_currency, r.quote_currency): Decimal(r.rate)
+        for r in db.scalars(select(MarketRate))
+    }
+    return Converter(overrides, (base or user.base_currency).upper(), market)
 
 
 # ------------------------------------------------------------------ management
@@ -198,67 +239,79 @@ def currencies_in_use(db: DbSession, *, user: User) -> list[str]:
 # ------------------------------------------------------------- automatic rates
 
 
-def sync_rates(db: DbSession, *, user: User, fetcher=None) -> list[ExchangeRate]:
-    """Refresh this user's rates from the published feed.
+def refresh_market_rates(db: DbSession, *, fetcher=None) -> int:
+    """Pull the published rates into the shared table.
 
-    Rates are fetched in the direction they are used — one unit of the foreign
-    currency in the base currency — rather than fetched the other way and
-    inverted. Inverting a rate published to six places throws away precision
-    before the number is ever stored.
+    One request per base, however many currencies come back and however many
+    users the app has — which is the point of the table. Previously each user
+    triggered a call for each currency they held.
 
-    A rate the user typed is left alone. The feed owns what the feed created.
+    Nothing is written unless a real number came back, so a feed being down
+    leaves yesterday's rates in place rather than replacing them with a gap.
     """
     from app.services import fx_feed
 
-    fetcher = fetcher or fx_feed.fetch
-    base = user.base_currency.upper()
-    foreign = [c for c in currencies_in_use(db, user=user) if c != base]
-    if not foreign:
-        return []
+    fetcher = fetcher or fx_feed.fetch_all
+    today = date.today()
 
-    existing = {
-        (r.base_currency, r.quote_currency): r
-        for r in db.scalars(select(ExchangeRate).where(ExchangeRate.user_id == user.id))
+    existing = {(r.base_currency, r.quote_currency): r for r in db.scalars(select(MarketRate))}
+    written = 0
+
+    for base in MARKET_BASES:
+        published = fetcher(base)
+        for quote, (rate, source) in published.items():
+            if quote == base or rate <= 0:
+                continue
+            row = existing.get((base, quote))
+            if row is None:
+                row = MarketRate(
+                    base_currency=base,
+                    quote_currency=quote,
+                    rate=rate,
+                    as_of=today,
+                    source=source,
+                )
+                db.add(row)
+                existing[(base, quote)] = row
+            else:
+                row.rate = rate
+                row.as_of = today
+                row.source = source
+            written += 1
+
+    db.flush()
+    return written
+
+
+def market_rates(db: DbSession) -> list[MarketRate]:
+    return list(
+        db.scalars(
+            select(MarketRate).order_by(MarketRate.base_currency, MarketRate.quote_currency)
+        )
+    )
+
+
+def market_summary(db: DbSession) -> dict:
+    """What the shared table currently holds, for the screen that shows it."""
+    rows = market_rates(db)
+    return {
+        "bases": list(MARKET_BASES),
+        "pair_count": len(rows),
+        "as_of": max((r.as_of for r in rows), default=None),
+        "sources": sorted({r.source for r in rows}),
     }
 
-    updated = []
-    for code in foreign:
-        held = existing.get((code, base)) or existing.get((base, code))
-        if held is not None and held.source == MANUAL:
-            # Deliberate input outranks the feed.
-            continue
 
-        result = fetcher(code, [base])
-        pair = result.get(base)
-        if pair is None:
-            continue
-        rate, source = pair
+def serialize_market(rate: MarketRate) -> dict:
+    from app.core.money import serialize_rate
 
-        row = set_rate(
-            db,
-            user=user,
-            base_currency=code,
-            quote_currency=base,
-            rate=rate,
-            as_of=date.today(),
-        )
-        row.source = source
-        db.flush()
-        updated.append(row)
-
-    return updated
-
-
-def sync_all(db: DbSession, *, fetcher=None) -> int:
-    """Refresh every user who holds more than one currency."""
-    total = 0
-    for user in db.scalars(select(User)):
-        try:
-            total += len(sync_rates(db, user=user, fetcher=fetcher))
-        except Exception:  # pragma: no cover - one user must not stop the run
-            logger.exception("rate sync failed for user %s", user.id)
-            db.rollback()
-    return total
+    return {
+        "base_currency": rate.base_currency,
+        "quote_currency": rate.quote_currency,
+        "rate": serialize_rate(Decimal(rate.rate)),
+        "as_of": rate.as_of.isoformat(),
+        "source": rate.source,
+    }
 
 
 def serialize(rate: ExchangeRate) -> dict:
