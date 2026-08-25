@@ -17,6 +17,7 @@ import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
 import { ExchangeRates } from "@/components/exchange-rates";
+import { useBalancePrivacy } from "@/components/balance-privacy";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -171,6 +172,8 @@ export default function Profile() {
     }
   }
 
+  const { refresh: refreshPrivacy } = useBalancePrivacy();
+
   async function save(patch: Partial<Preferences>) {
     if (!prefs) return;
     // Optimistic: the control should not lag behind the tap.
@@ -180,6 +183,9 @@ export default function Profile() {
     setError(null);
     try {
       setPrefs(await montra.updatePreferences(patch));
+      // The masking lives in a provider above this page; without this it
+      // would keep the old preference until the next full load.
+      refreshPrivacy();
     } catch (err) {
       setPrefs(previous);
       setError(err instanceof MontraApiError ? err.message : "Could not save that.");

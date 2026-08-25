@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/shell";
 import { Providers } from "@/app/providers";
 import { RequireSession } from "@/components/session";
+import { BalancePrivacyProvider } from "@/components/balance-privacy";
 import { FinancialContextProvider } from "@/components/context";
 
 /**
@@ -27,9 +28,11 @@ export default function AuthenticatedLayout({
   return (
     <Providers>
       <FinancialContextProvider>
-        <AppShell>
-          <RequireSession>{children}</RequireSession>
-        </AppShell>
+        <BalancePrivacyProvider>
+          <AppShell>
+            <RequireSession>{children}</RequireSession>
+          </AppShell>
+        </BalancePrivacyProvider>
       </FinancialContextProvider>
     </Providers>
   );
