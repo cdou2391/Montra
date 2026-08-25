@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 
 import { Account, Category, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
+import { TransferForm } from "@/components/transfer-form";
 import { AttachmentPicker } from "@/components/attachment-picker";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 import { toLocalInputValue } from "@/lib/format";
@@ -19,7 +20,7 @@ function AddTransactionForm() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const [type, setType] = useState<"EXPENSE" | "INCOME">("EXPENSE");
+  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState({
@@ -42,6 +43,7 @@ function AddTransactionForm() {
   }, []);
 
   useEffect(() => {
+    if (type === "TRANSFER") return;
     montra.categories(type).then(setCategories);
     setForm((f) => ({ ...f, category_id: "" }));
   }, [type]);
@@ -97,24 +99,36 @@ function AddTransactionForm() {
       <PageHeader title="Add transaction"
         icon="plus" />
 
-      <div className="mb-5 grid grid-cols-2 gap-2 rounded-control bg-background-secondary p-1">
-        {(["EXPENSE", "INCOME"] as const).map((t) => (
+      {/* Money leaving, money arriving, money moving between your own
+          accounts — all three are "recording something", so all three start
+          here. A transfer is not a transaction the ledger can post directly,
+          which is why it swaps in a different form rather than another field. */}
+      <div className="mb-5 grid grid-cols-3 gap-2 rounded-control bg-background-secondary p-1">
+        {(
+          [
+            ["EXPENSE", "Expense", "bg-semantic-expense/15 text-semantic-expense"],
+            ["INCOME", "Income", "bg-semantic-income/15 text-semantic-income"],
+            ["TRANSFER", "Transfer", "bg-semantic-transfer/15 text-semantic-transfer"],
+          ] as const
+        ).map(([value, label, active]) => (
           <button
-            key={t}
-            onClick={() => setType(t)}
-            className={`min-h-[44px] rounded-[10px] text-sm font-semibold transition ${
-              type === t
-                ? t === "EXPENSE"
-                  ? "bg-semantic-expense/15 text-semantic-expense"
-                  : "bg-semantic-income/15 text-semantic-income"
-                : "text-content-secondary"
+            key={value}
+            onClick={() => setType(value)}
+            aria-pressed={type === value}
+            className={`pressable min-h-[44px] rounded-[10px] text-sm font-semibold transition ${
+              type === value ? active : "text-content-secondary"
             }`}
           >
-            {t === "EXPENSE" ? "Expense" : "Income"}
+            {label}
           </button>
         ))}
       </div>
 
+      {type === "TRANSFER" && (
+        <TransferForm defaultSourceId={params.get("account") ?? ""} />
+      )}
+
+      {type !== "TRANSFER" && (
       <Card>
         <form onSubmit={submit} className="space-y-4">
           {error && <ErrorNotice message={error} />}
@@ -192,6 +206,7 @@ function AddTransactionForm() {
           </div>
         </form>
       </Card>
+      )}
     </>
   );
 }
