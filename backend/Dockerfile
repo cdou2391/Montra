@@ -11,7 +11,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-dev.txt ./
-RUN pip install -r requirements-dev.txt
+# pip itself carries advisories, and the image should not ship a stale one —
+# a scanner reports on what is installed, not on what was current at build.
+RUN pip install --no-cache-dir --upgrade pip setuptools \
+    && pip install --no-cache-dir -r requirements-dev.txt
 
 COPY . .
 

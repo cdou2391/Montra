@@ -33,7 +33,7 @@ class MontraError(Exception):
 
 
 class ValidationFailed(MontraError):
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "VALIDATION_ERROR"
     message = "One or more fields are invalid."
 
@@ -103,7 +103,7 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
         for err in exc.errors()
     ]
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=error_body("VALIDATION_ERROR", "One or more fields are invalid.", details),
     )
 

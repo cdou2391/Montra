@@ -50,6 +50,17 @@ for image in montra-api montra-web; do
 done
 
 echo
-echo "Note: montra-web is a development image and ships a package manager, so"
-echo "findings inside pnpm/npm are expected there. The production image built"
-echo "in Phase 31 should be multi-stage and carry neither."
+echo "Note: both images ship a package manager, and what remains is inside it."
+echo
+echo "  montra-api  2 HIGH, both from pip's own vendored tree. pip bundles a"
+echo "              private copy of msgpack, and declares setuptools in the SBOM"
+echo "              at pip/_vendor/bom.cdx.json that trivy reads. Neither is on"
+echo "              the application's import path, and pip 26.2.1 -- the newest"
+echo "              there is -- still vendors them, so there is nothing to bump."
+echo "              The installed (non-vendored) copies are current and clean."
+echo
+echo "  montra-web  findings inside pnpm itself, same shape."
+echo
+echo "The Phase 31 multi-stage build removes both: install into a virtualenv in a"
+echo "builder stage, copy only the venv into the runtime image, and no package"
+echo "manager is left to be scanned."

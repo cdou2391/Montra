@@ -1,6 +1,7 @@
 """Montra API application factory."""
 
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -19,12 +20,40 @@ from app.core.logging import configure_logging, request_id_ctx
 
 configure_logging()
 
+def refuse_unsafe_production() -> None:
+    """Fail loudly rather than run wide open.
+
+    Every one of these is a setting that is right on a laptop and wrong in
+    public, and each is the kind of thing that is noticed after it matters.
+    """
+    if not settings.is_production:
+        return
+    problems = settings.production_problems()
+    if problems:
+        raise RuntimeError(
+            "Refusing to start in production with unsafe settings:\n  - "
+            + "\n  - ".join(problems)
+        )
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup and shutdown.
+
+    A lifespan rather than @app.on_event: the decorator is deprecated and
+    removed in current Starlette, and this is the form that keeps working.
+    """
+    refuse_unsafe_production()
+    yield
+
+
 app = FastAPI(
     title="Montra API",
     version="0.1.0",
     description="Personal and household finance tracking.",
     openapi_url=f"{settings.api_v1_prefix}/openapi.json",
     docs_url=f"{settings.api_v1_prefix}/docs",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -163,21 +192,6 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-@app.on_event("startup")
-def refuse_unsafe_production() -> None:
-    """Fail loudly rather than run wide open.
-
-    Every one of these is a setting that is right on a laptop and wrong in
-    public, and each is the kind of thing that is noticed after it matters.
-    """
-    if not settings.is_production:
-        return
-    problems = settings.production_problems()
-    if problems:
-        raise RuntimeError(
-            "Refusing to start in production with unsafe settings:\n  - "
-            + "\n  - ".join(problems)
-        )
 
 
 app.add_exception_handler(MontraError, montra_error_handler)
