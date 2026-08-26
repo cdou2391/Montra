@@ -25,18 +25,24 @@ def verify_password(password_hash: str, password: str) -> bool:
     return True
 
 
-def validate_password_policy(password: str) -> None:
-    problems = []
-    if len(password) < MIN_PASSWORD_LENGTH:
-        problems.append(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
-    if password.isdigit() or password.isalpha():
-        problems.append("Password must mix letters with numbers or symbols.")
-    if problems:
+def validate_password_policy(password: str, *, email: str | None = None) -> None:
+    """Whether this password may be set.
+
+    The rules live in app.core.passwords; this stays as the entry point every
+    caller already uses, and keeps the PASSWORD_POLICY_FAILED code they and the
+    clients expect.
+    """
+    from app.core.passwords import validate
+
+    try:
+        validate(password, email=email)
+    except ValidationFailed as weak:
         raise ValidationFailed(
             "Password does not meet the required policy.",
             code="PASSWORD_POLICY_FAILED",
-            details=[{"field": "password", "message": m} for m in problems],
-        )
+            details=weak.details,
+        ) from weak
+
 
 
 def generate_session_token() -> str:

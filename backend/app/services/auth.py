@@ -36,7 +36,7 @@ def register_user(
     base_currency: str,
     timezone: str,
 ) -> User:
-    validate_password_policy(password)
+    validate_password_policy(password, email=email)
     validate_timezone(timezone)
     user = User(
         email=normalize_email(email),

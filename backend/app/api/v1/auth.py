@@ -1,10 +1,19 @@
 """Authentication and preference endpoints (API spec sections 13-14)."""
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import current_session, current_user, db_session
 from app.core.config import settings
+from app.core.rate_limit import (
+    LOGIN,
+    LOGIN_ACCOUNT,
+    REGISTER,
+    SENSITIVE,
+    caller,
+    clear,
+    hit,
+)
 from app.core.responses import single
 from app.models.user import Session, User, UserPreference
 from app.schemas.auth import (
@@ -26,7 +35,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
         key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=settings.cookie_secure,
+        secure=settings.session_cookie_secure,
         samesite=settings.cookie_samesite,
         max_age=settings.session_ttl_hours * 3600,
         path="/",
@@ -59,9 +68,11 @@ def _preferences_payload(prefs: UserPreference) -> dict:
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 def register(
     payload: RegisterRequest,
+    request: Request,
     response: Response,
     db: DbSession = Depends(db_session),
 ) -> dict:
+    hit("register", caller(request), REGISTER)
     user = auth_service.register_user(
         db,
         email=payload.email,
@@ -79,10 +90,26 @@ def register(
 @router.post("/auth/login")
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     db: DbSession = Depends(db_session),
 ) -> dict:
+    # Two counters doing different jobs. The address catches someone hammering
+    # one login; the account catches the same guessing spread across many
+    # addresses. The account limit is far looser on purpose — see the note on
+    # LOGIN_ACCOUNT, since a tight one is itself a way to lock someone out.
+    address = caller(request)
+    account = payload.email.strip().casefold()
+    hit("login-ip", address, LOGIN)
+    hit("login-account", account, LOGIN_ACCOUNT)
+
     user = auth_service.authenticate(db, email=payload.email, password=payload.password)
+
+    # Getting it right clears the count, so fumbling a password four times and
+    # then remembering it does not leave you locked out.
+    clear("login-ip", address, LOGIN)
+    clear("login-account", account, LOGIN_ACCOUNT)
+
     _, token = auth_service.create_session(db, user)
     db.commit()
     _set_session_cookie(response, token)
@@ -163,6 +190,7 @@ def reset_preview(
 @router.post("/profile/reset")
 def reset_profile(
     payload: ProfileResetRequest,
+    request: Request,
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
@@ -170,6 +198,9 @@ def reset_profile(
 
     The login survives, so this is "start over", not "delete my account".
     """
+    # Password-guarded and irreversible: worth capping so a stolen session
+    # cannot be used to brute-force the password behind it.
+    hit("profile-reset", str(user.id), SENSITIVE)
     deleted = profile_service.reset_profile(db, user=user, password=payload.password)
     db.commit()
     return single({"deleted": deleted})

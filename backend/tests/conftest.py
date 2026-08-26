@@ -14,6 +14,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ.setdefault("MONTRA_ENV", "test")
+# The suite registers and signs in as dozens of users from one address. Left
+# on, the limiter would be throttling the tests rather than the tests
+# exercising anything — so it is off by default here and switched back on
+# explicitly by the tests that are about it.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 from app.api.deps import db_session  # noqa: E402
 from app.core.config import settings  # noqa: E402
