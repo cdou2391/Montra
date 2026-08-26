@@ -467,3 +467,102 @@ def test_a_field_is_only_claimed_when_it_was_actually_filled():
     assert "fee" not in result.matched
     # The balance did produce a value, so it is claimed.
     assert "balance" in result.matched
+
+
+# ----------------------------------------------------------- a bill payment
+
+
+BILL = (
+    "Bill payment - Cash Power Electricity Credited account: 01026311843 "
+    "Debited account: 100020806359 Amount: RWF 100,000 Transaction Charge: RWF 0 "
+    "Event #: FTCM26238OT9NI371 Status: COMPLETED Date: 8/26/26, 11:10 AM  "
+    "Channel:MOBILE  Voucher#: TK1:-1291-7440-1034-1082-4985 "
+    "Available Balance: RWF 887,956 For enquiry call BK: 250788143000 / 4455"
+)
+
+
+def test_a_bill_payment_is_spending():
+    """Both ends are named, but the credited one is a meter. Before this the
+    message produced no type at all."""
+    result = parse(BILL)
+    assert result.understood is True
+    assert result.transaction_type == "EXPENSE"
+    assert result.amount == Decimal("100000")
+
+
+def test_the_bill_names_what_was_bought():
+    assert parse(BILL).counterparty == "Cash Power Electricity"
+
+
+def test_the_electricity_token_is_kept():
+    """It is what gets typed into the meter, and it exists nowhere else once
+    the message is gone."""
+    assert parse(BILL).voucher == "TK1:-1291-7440-1034-1082-4985"
+
+
+def test_a_slash_date_with_a_meridiem_is_read():
+    """8/26/26, 11:10 AM — the other shape this bank writes."""
+    assert parse(BILL).occurred_at == datetime(2026, 8, 26, 11, 10)
+
+
+@pytest.mark.parametrize(
+    "written,expected",
+    [
+        ("1/2/26, 12:05 AM", datetime(2026, 1, 2, 0, 5)),
+        ("1/2/26, 12:05 PM", datetime(2026, 1, 2, 12, 5)),
+        ("12/31/26, 11:59 PM", datetime(2026, 12, 31, 23, 59)),
+        ("3/4/2026, 09:07", datetime(2026, 3, 4, 9, 7)),
+    ],
+)
+def test_midnight_and_noon_do_not_collide(written, expected):
+    """12 AM is the start of the day and 12 PM the middle; the naive
+    conversion gets both wrong."""
+    assert parse(f"Bill payment - Water Debited account: 100020806359 "
+                 f"Amount: RWF 500 Date: {written}").occurred_at == expected
+
+
+def test_an_impossible_date_is_left_empty_rather_than_guessed():
+    result = parse(
+        "Bill payment - Water Debited account: 100020806359 Amount: RWF 500 "
+        "Date: 13/45/26, 11:10 AM"
+    )
+    assert result.occurred_at is None
+
+
+def test_a_zero_charge_on_a_bill_is_no_fee():
+    assert parse(BILL).fee_amount is None
+
+
+def test_the_bill_keeps_both_account_numbers():
+    result = parse(BILL)
+    assert result.debited_identifier == "100020806359"
+    assert result.credited_identifier == "01026311843"
+
+
+def test_paying_a_meter_is_not_a_transfer(): 
+    """The credited account belongs to the utility, so only one end resolves
+    and it stays spending."""
+    accounts = [FakeAccount("BK Salary", "100020806359"), FakeAccount("MoMo", "0788863783")]
+    resolved = resolve_accounts(parse(BILL), accounts)
+    assert resolved["transaction_type"] == "EXPENSE"
+    assert resolved["source_account_id"] == "BK Salary"
+    assert resolved["destination_account_id"] is None
+
+
+def test_the_declared_transfer_still_outranks_the_default():
+    """The type default changed for labelled messages; the transfer case must
+    not have been swept up in it."""
+    accounts = [FakeAccount("BK Salary", "100020806359"), FakeAccount("MoMo", "0788863783")]
+    assert resolve_accounts(parse(BK_TRANSFER), accounts)["transaction_type"] == "TRANSFER"
+
+
+def test_a_message_without_a_voucher_claims_none():
+    assert parse(BK_TRANSFER).voucher is None
+    assert parse(SENT).voucher is None
+
+
+def test_a_labelled_message_reports_the_amount_it_filled():
+    """The prose patterns are skipped once the labelled reader has an amount,
+    and they were the only thing reporting one."""
+    assert "amount" in parse(BILL).matched
+    assert "amount" in parse(BK_TRANSFER).matched

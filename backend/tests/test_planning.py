@@ -381,7 +381,11 @@ def test_generation_stops_at_the_end_date(db, bank_account, user):
 
 
 def test_pausing_a_rule_clears_its_future_items(db, bank_account, user):
-    rule = _rule(db, user, bank_account)
+    # A start date comfortably ahead of any day this suite might run on. The
+    # fixture's default is a fixed calendar date, so once the clock reached it
+    # the first occurrence was no longer in the future and this test failed
+    # for a reason that had nothing to do with pausing.
+    rule = _rule(db, user, bank_account, start_date=date.today() + timedelta(days=30))
     db.commit()
     planning.generate_occurrences(db, rule, owner=user)
     db.commit()
@@ -396,6 +400,41 @@ def test_pausing_a_rule_clears_its_future_items(db, bank_account, user):
         )
     ).all()
     assert remaining == []
+
+
+def test_pausing_leaves_an_item_that_is_already_due(db, bank_account, user):
+    """Deliberate, and worth stating: pausing a series stops what has not
+    happened yet. An item whose moment has already passed may still be owed,
+    and quietly cancelling it would remove a real obligation from the list.
+
+    The already-due item is placed by hand rather than by waiting for the
+    clock to overtake one — a test that depends on the time of day it runs is
+    how the sibling above came to fail a month after it was written.
+    """
+    rule = _rule(db, user, bank_account, start_date=date.today() + timedelta(days=30))
+    db.commit()
+    created = planning.generate_occurrences(db, rule, owner=user)
+    db.commit()
+    assert created, "expected the rule to generate something"
+
+    overdue = created[0]
+    overdue.expected_at = datetime.now(UTC) - timedelta(hours=2)
+    db.commit()
+
+    planning.set_rule_status(db, user=user, rule_id=rule.id, status=RecurringStatus.PAUSED)
+    db.commit()
+    db.refresh(overdue)
+
+    assert overdue.status is not PlannedStatus.CANCELLED
+    # Everything still ahead of us is cancelled, which is the point of pausing.
+    still_open = db.scalars(
+        select(PlannedTransaction).where(
+            PlannedTransaction.recurring_rule_id == rule.id,
+            PlannedTransaction.expected_at > datetime.now(UTC),
+            PlannedTransaction.status.in_((PlannedStatus.UPCOMING, PlannedStatus.DUE)),
+        )
+    ).all()
+    assert still_open == []
 
 
 def test_paused_rule_generates_nothing(db, bank_account, user):

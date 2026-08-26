@@ -24,6 +24,17 @@ CURRENCY_NC = r"(?:RWF|USD|EUR|GBP|KES|UGX|TZS)"
 # Milliseconds are matched so they are consumed rather than left dangling,
 # but they are dropped: the ledger records to the second.
 TIMESTAMP = re.compile(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?")
+
+# The other shape a bank writes: 8/26/26, 11:10 AM.
+#
+# Read as month/day/year, which is what this bank sends — 8/26/26 could be
+# nothing else. A date where both halves are twelve or under is genuinely
+# ambiguous and this will read it the same way; the form shows the date it
+# chose, which is the only honest place to settle it.
+TIMESTAMP_SLASH = re.compile(
+    r"\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?",
+    re.IGNORECASE,
+)
 # Banks and networks label the same thing differently, and some put the
 # currency in front of the number rather than after it.
 FEE = re.compile(
@@ -50,6 +61,17 @@ LABELLED_AMOUNT = re.compile(
 )
 BENEFICIARY = re.compile(r"beneficiary[:\s]*([^\n:]{2,60}?)\s*(?:credited|debited|amount|$)", re.I)
 DECLARED_TRANSFER = re.compile(r"^\s*transfer\b", re.IGNORECASE)
+
+# "Bill payment - Cash Power Electricity". The header names what was bought,
+# which is the only description the message offers.
+BILL_SUBJECT = re.compile(
+    r"bill\s+payment\s*[-–:]\s*([^\n]{2,60}?)\s*(?:credited|debited|amount|$)", re.I
+)
+
+# The token an electricity payment returns. Worth keeping above almost
+# everything else in the message: it is what gets typed into the meter, and it
+# exists nowhere else once the SMS is gone.
+VOUCHER = re.compile(r"voucher\s*#?\s*:?\s*(\S{6,64})", re.IGNORECASE)
 
 # A counterparty runs to the phone number, the timestamp, a full stop, or a
 # run of digits — whichever comes first. Names carry spaces and mixed case, so
@@ -170,6 +192,7 @@ def _channel(text: str) -> str | None:
 class ParsedSms:
     transaction_type: str | None = None
     channel: str | None = None
+    voucher: str | None = None
     # The till code a merchant payment quotes. Kept separate from the name so
     # it can be recognised later without re-reading the description.
     merchant_code: str | None = None
@@ -211,6 +234,30 @@ def _clean_party(raw: str | None) -> str | None:
     return name or None
 
 
+def _read_slash_timestamp(text: str, result: ParsedSms) -> None:
+    found = TIMESTAMP_SLASH.search(text)
+    if not found:
+        return
+    month, day, year, hour, minute, second, meridiem = found.groups()
+    year = int(year)
+    if year < 100:
+        year += 2000
+    hour = int(hour)
+    if meridiem:
+        meridiem = meridiem.upper()
+        if meridiem == "PM" and hour != 12:
+            hour += 12
+        elif meridiem == "AM" and hour == 12:
+            hour = 0
+    try:
+        result.occurred_at = datetime(
+            year, int(month), int(day), hour, int(minute), int(second or 0)
+        )
+    except ValueError:
+        return
+    result.matched.append("timestamp")
+
+
 def _read_labelled(text: str, result: ParsedSms) -> None:
     """Read a statement-style message: Label: value, Label: value.
 
@@ -233,20 +280,37 @@ def _read_labelled(text: str, result: ParsedSms) -> None:
         # The currency may sit on either side of the number.
         result.currency = (amount.group(1) or amount.group(3) or "").upper() or None
         result.amount = _decimal(amount.group(2))
+        if result.amount is not None:
+            # The prose patterns are skipped once this has an amount, and they
+            # were the only thing reporting one — so a labelled message filled
+            # the field and then told the user it had not.
+            result.matched.append("amount")
 
     party = BENEFICIARY.search(text)
     if party:
         result.counterparty = _clean_party(party.group(1))
+
+    subject = BILL_SUBJECT.search(text)
+    if subject and not result.counterparty:
+        result.counterparty = _clean_party(subject.group(1))
+
+    voucher = VOUCHER.search(text)
+    if voucher:
+        result.voucher = voucher.group(1)
+        result.matched.append("voucher")
 
     if DECLARED_TRANSFER.search(text):
         # Provisional: refined once the identifiers are matched against real
         # accounts. A bank calls it a transfer whoever the beneficiary is.
         result.transaction_type = "TRANSFER"
         result.matched.append("transfer")
-    elif debited and not credited:
-        result.transaction_type = "EXPENSE"
     elif credited and not debited:
         result.transaction_type = "INCOME"
+    else:
+        # Money left the debited account. A bill payment names both ends, but
+        # the credited one is a meter or a till rather than anything of the
+        # user's — resolve_accounts settles that against their real accounts.
+        result.transaction_type = "EXPENSE"
 
 
 def parse(message: str) -> ParsedSms:
@@ -305,6 +369,8 @@ def parse(message: str) -> ParsedSms:
             result.matched.append("balance")
 
     stamp = TIMESTAMP.search(text)
+    if stamp is None:
+        _read_slash_timestamp(text, result)
     if stamp:
         raw = f"{stamp.group(1)} {stamp.group(2)}"
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
@@ -342,6 +408,7 @@ def serialize(parsed: ParsedSms) -> dict:
         # which accounts exist.
         "channel": parsed.channel,
         "merchant_code": parsed.merchant_code,
+        "voucher": parsed.voucher,
         "debited_identifier": parsed.debited_identifier,
         "credited_identifier": parsed.credited_identifier,
         "amount": serialize_amount(parsed.amount) if parsed.amount is not None else None,

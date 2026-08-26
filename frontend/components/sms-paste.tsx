@@ -26,6 +26,7 @@ const FIELD_NAMES: Record<string, string> = {
   accounts: "accounts",
   account: "accounts",
   merchant: "merchant",
+  voucher: "voucher",
   fee: "fee",
   balance: "balance",
   timestamp: "date and time",

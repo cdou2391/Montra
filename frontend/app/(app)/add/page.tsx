@@ -32,6 +32,7 @@ function AddTransactionForm() {
     description: "",
     merchant: "",
     fee_amount: "",
+    notes: "",
   });
   const [files, setFiles] = useState<File[]>([]);
   const [transferPrefill, setTransferPrefill] = useState<{
@@ -79,6 +80,7 @@ function AddTransactionForm() {
         category_id: form.category_id || null,
         description: form.description || null,
         merchant: form.merchant || null,
+        notes: form.notes || null,
         // Sent alongside rather than added in: the backend posts it as its own
         // line, so the amount above stays the cost of the thing itself.
         fee_amount: type === "EXPENSE" && form.fee_amount ? form.fee_amount : null,
@@ -154,6 +156,9 @@ function AddTransactionForm() {
             // value submitted is the moment the message stated.
             occurred_at: parsed.occurred_at ?? f.occurred_at,
             description: parsed.counterparty ?? f.description,
+            // An electricity token exists nowhere else once the message is
+            // gone, and it is too long to live in a description.
+            notes: parsed.voucher ? `Voucher: ${parsed.voucher}` : f.notes,
             // A MoMo message is about the wallet; picking it saves the step
             // the user would otherwise take every single time.
             account_id: resolved ?? onAccount?.id ?? f.account_id,
@@ -270,6 +275,12 @@ function AddTransactionForm() {
               onChange={setFiles}
               onError={setError}
               disabled={busy}
+            />
+          </Field>
+          <Field label="Notes" hint="Optional. Anything worth keeping — a token, a reference.">
+            <Input
+              value={form.notes}
+              onChange={(e) => update("notes", e.target.value)}
             />
           </Field>
           <div className="flex gap-3">

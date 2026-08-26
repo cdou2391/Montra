@@ -212,6 +212,7 @@ export type ParsedSms = {
   source_account_id: string | null;
   destination_account_id: string | null;
   merchant_code: string | null;
+  voucher: string | null;
   debited_identifier: string | null;
   credited_identifier: string | null;
   amount: string | null;
