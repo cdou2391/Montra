@@ -57,6 +57,22 @@ API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-act
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
+
+def _own_origin(request: Request) -> str | None:
+    """The origin this request was served from, as the browser saw it.
+
+    Behind the proxy the scheme is whatever the client used, not what reached
+    the API, so the forwarded header decides it. Neither Host nor Origin can
+    be set by a page forging a request: the browser fills in Origin with the
+    attacker's site and Host with the target, which is exactly why comparing
+    them detects the forgery.
+    """
+    host = request.headers.get("host")
+    if not host:
+        return None
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
+    return f"{scheme}://{host}"
+
 # Bodies larger than this are refused before they are read. Attachments do not
 # come through here — they go straight to object storage on a signed URL — so
 # nothing legitimate posted to the API is anywhere near a megabyte.
@@ -105,6 +121,14 @@ async def verify_same_origin(request: Request, call_next):
 
     origin = request.headers.get("origin")
     if origin is None:
+        return await call_next(request)
+
+    if origin == _own_origin(request):
+        # The request came from the very host that served it, which is what
+        # same-origin means. Checking against a fixed list instead breaks the
+        # moment the app is reached by any hostname nobody thought to add —
+        # a tunnel, a staging domain, an IP on the local network — and breaks
+        # it as a 403 on every write, including signing in.
         return await call_next(request)
 
     if origin not in settings.cors_origin_list and origin not in settings.same_origin_list:

@@ -353,3 +353,69 @@ def test_a_long_address_does_not_reject_an_unrelated_password():
     the email address, however unrelated the two were."""
     validate_password_policy("a-good-passphrase-1", email="someone-else@example.com")
     validate_password_policy("correct horse battery", email="a-very-long-address@example.com")
+
+
+# --------------------------------------------------- the same-origin check
+
+# These use the app directly, because the bug they guard against was in how a
+# request's own origin is worked out — not in any service.
+
+
+def _post(client, origin: str | None):
+    headers = {"Origin": origin} if origin else {}
+    return client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@example.com", "password": "wrong-but-well-formed"},
+        headers=headers,
+    )
+
+
+def test_a_request_from_the_host_that_served_it_is_allowed(client):
+    """Whatever hostname the app is reached by. Checking against a fixed list
+    instead meant every write 403'd the moment it was opened through a tunnel
+    — including signing in."""
+    assert _post(client, "http://testserver").status_code != 403
+
+
+def test_a_request_from_somewhere_else_is_refused(client):
+    response = _post(client, "https://evil.example")
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "CROSS_ORIGIN_REFUSED"
+
+
+def test_a_request_with_no_origin_is_allowed(client):
+    """A script or a native client sends none, and neither carries the ambient
+    cookie this protects against."""
+    assert _post(client, None).status_code != 403
+
+
+def test_reading_is_never_blocked_by_origin(client):
+    """Only unsafe methods are checked; a GET changes nothing."""
+    response = client.get("/api/v1/health/live", headers={"Origin": "https://evil.example"})
+    assert response.status_code == 200
+
+
+def test_the_forwarded_scheme_decides_the_origin():
+    """A tunnel terminates TLS and forwards plain HTTP, so the scheme that
+    reached the API is not the one the browser used. Trusting the wrong one
+    turned every HTTPS request into a mismatch."""
+    from unittest.mock import Mock
+
+    from app.main import _own_origin
+
+    request = Mock()
+    request.headers = {"host": "app.example.com", "x-forwarded-proto": "https"}
+    request.url.scheme = "http"
+    assert _own_origin(request) == "https://app.example.com"
+
+
+def test_a_host_with_a_port_keeps_it():
+    """An origin without its port does not match the one the browser sends."""
+    from unittest.mock import Mock
+
+    from app.main import _own_origin
+
+    request = Mock()
+    request.headers = {"host": "localhost:8080"}
+    request.url.scheme = "http"
+    assert _own_origin(request) == "http://localhost:8080"
