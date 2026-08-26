@@ -81,7 +81,7 @@ VOUCHER = re.compile(r"voucher\s*#?\s*:?\s*(\S{6,64})", re.IGNORECASE)
 # till code inside the sentence ("to AFRICA BUSINESS SERVICES Limit 999577 was
 # completed"), and without it the name has nowhere legal to end, so the whole
 # pattern failed and the message parsed as nothing at all.
-PARTY_TAIL = r"([^()\d.]{2,60}?)\s*(?:\(|\bat\b|\d|\.|$)"
+PARTY_TAIL = r"([^()\d.]{2,60}?)\s*(?:\(|\bat\b|\bwas\b|\d|\.|$)"
 
 # The till or merchant code a payment quotes after the name.
 MERCHANT_CODE = re.compile(
@@ -137,6 +137,13 @@ OUTGOING = [
     ),
     re.compile(rf"(?:you have\s+)?paid\s+{AMOUNT}\s*{CURRENCY}\s+to\s+{PARTY_TAIL}", re.I),
     re.compile(rf"payment\s+of\s+{AMOUNT}\s*{CURRENCY}\s+to\s+{PARTY_TAIL}", re.I),
+    # A direct debit, worded from the merchant's side: "a transaction of X by
+    # NAME". "by" rather than "to", but the money still leaves — the balance
+    # the message quotes is lower for it.
+    re.compile(
+        rf"transaction\s+of\s+{AMOUNT}\s*{CURRENCY}\s+(?:by|to|from)\s+{PARTY_TAIL}",
+        re.I,
+    ),
     re.compile(rf"{AMOUNT}\s*{CURRENCY}\s+withdrawn", re.I),
 ]
 

@@ -566,3 +566,67 @@ def test_a_labelled_message_reports_the_amount_it_filled():
     and they were the only thing reporting one."""
     assert "amount" in parse(BILL).matched
     assert "amount" in parse(BK_TRANSFER).matched
+
+
+# ------------------------------------------------------------ a direct debit
+
+
+DIRECT_DEBIT = (
+    "*164*S*Y'ello, A transaction of 14000 RWF by DIRECT PAYMENT LTD  was completed "
+    "at 2026-08-26 20:00:10. Balance:109507 RWF. Fee  0 RWF. FT Id: 30138330592. "
+    "ET  Id: 64752860.*EN#"
+)
+
+
+def test_a_direct_debit_is_spending():
+    """Worded from the merchant's side — "by" rather than "to" — but the money
+    still leaves, and the balance it quotes is lower for it."""
+    result = parse(DIRECT_DEBIT)
+    assert result.understood is True
+    assert result.transaction_type == "EXPENSE"
+    assert result.amount == Decimal("14000")
+
+
+def test_the_merchant_is_read_from_a_by_clause():
+    assert parse(DIRECT_DEBIT).counterparty == "DIRECT PAYMENT LTD"
+
+
+def test_a_name_ends_before_was_completed():
+    """Nothing separates this name from the verb — no bracket, no digits, no
+    full stop — so "was" has to end it or the name swallows the sentence."""
+    assert "completed" not in (parse(DIRECT_DEBIT).counterparty or "")
+
+
+def test_the_greeting_and_the_bookends_are_not_read_as_data():
+    """The message opens with "Y'ello," and closes with *EN#."""
+    result = parse(DIRECT_DEBIT)
+    assert result.amount == Decimal("14000")
+    assert result.channel == "MOBILE_MONEY"
+
+
+def test_a_doubled_space_before_a_zero_fee_still_reads_as_no_fee():
+    assert parse(DIRECT_DEBIT).fee_amount is None
+    assert "fee" not in parse(DIRECT_DEBIT).matched
+
+
+def test_the_direct_debit_keeps_its_reference_and_balance():
+    result = parse(DIRECT_DEBIT)
+    assert result.reference == "30138330592"
+    assert result.balance_after == Decimal("109507")
+    assert result.occurred_at == datetime(2026, 8, 26, 20, 0, 10)
+
+
+# "was" now ends a name, so the formats that came before are re-asserted.
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        (SENT, "Denise NYIRAMUNINI"),
+        (RECEIVED, "CEDRIC RUGAMBA"),
+        (MERCHANT, "AFRICA BUSINESS SERVICES Limit"),
+        (BILL, "Cash Power Electricity"),
+    ],
+)
+def test_the_earlier_formats_still_name_the_same_party(message, expected):
+    assert parse(message).counterparty == expected
