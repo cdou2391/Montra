@@ -383,3 +383,87 @@ def test_the_earlier_momo_formats_still_resolve_nothing():
     resolved = resolve_accounts(parse(SENT), _accounts(("BK Current", "100020806359")))
     assert resolved["transaction_type"] == "EXPENSE"
     assert resolved["source_account_id"] is None
+
+
+# ------------------------------------------------------- a merchant payment
+
+
+MERCHANT = (
+    "TxId:30121045018*S*Your payment of 20,000 RWF to AFRICA BUSINESS SERVICES "
+    "Limit 999577 was completed at 2026-08-26 08:16:13.  Balance: 32,607 RWF. "
+    "Fee 0 RWF.*EN#"
+)
+
+
+def test_a_merchant_payment_is_an_expense():
+    result = parse(MERCHANT)
+    assert result.understood is True
+    assert result.transaction_type == "EXPENSE"
+    assert result.amount == Decimal("20000")
+
+
+def test_a_till_code_inside_the_sentence_does_not_defeat_the_name():
+    """The code sits between the merchant and the verb, so the name has to be
+    allowed to end at a digit. Without that the whole message parsed as
+    nothing — no type, no amount, not just a missing name."""
+    assert parse(MERCHANT).counterparty == "AFRICA BUSINESS SERVICES Limit"
+
+
+def test_the_till_code_is_kept_separately():
+    """Useful on its own: the same code identifies the same merchant next
+    time, whatever the name is spelled like."""
+    assert parse(MERCHANT).merchant_code == "999577"
+
+
+def test_a_zero_fee_is_no_fee():
+    """"Fee 0 RWF" must not post a zero line into the ledger."""
+    assert parse(MERCHANT).fee_amount is None
+
+
+def test_txid_without_a_space_is_a_reference():
+    assert parse(MERCHANT).reference == "30121045018"
+
+
+def test_the_networks_own_bookends_identify_it_as_momo():
+    """This format carries no USSD prefix; *S* and *EN# are what mark it."""
+    assert parse(MERCHANT).channel == "MOBILE_MONEY"
+
+
+def test_the_balance_survives_the_thousands_separator():
+    assert parse(MERCHANT).balance_after == Decimal("32607")
+
+
+def test_the_moment_is_read_to_the_second():
+    assert parse(MERCHANT).occurred_at == datetime(2026, 8, 26, 8, 16, 13)
+
+
+# The digit terminator changed how every name ends, so the older formats are
+# re-checked here rather than trusted.
+
+
+def test_a_bracketed_phone_number_still_ends_a_name():
+    assert parse(SENT).counterparty == "Denise NYIRAMUNINI"
+
+
+def test_a_masked_number_still_ends_a_name():
+    assert parse(RECEIVED).counterparty == "CEDRIC RUGAMBA"
+
+
+def test_a_name_followed_by_at_still_ends_there():
+    result = parse("You have sent 5000 RWF to JEAN BOSCO at 2026-08-01 09:00:00.")
+    assert result.counterparty == "JEAN BOSCO"
+
+
+def test_a_message_with_no_merchant_code_claims_none():
+    assert parse(SENT).merchant_code is None
+    assert parse(RECEIVED).merchant_code is None
+
+
+def test_a_field_is_only_claimed_when_it_was_actually_filled():
+    """"Fee 0 RWF" matches the pattern and yields nothing usable. Reporting it
+    as filled would have the screen tell the user something untrue."""
+    result = parse(MERCHANT)
+    assert result.fee_amount is None
+    assert "fee" not in result.matched
+    # The balance did produce a value, so it is claimed.
+    assert "balance" in result.matched

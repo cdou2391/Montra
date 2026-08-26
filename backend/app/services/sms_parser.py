@@ -35,7 +35,7 @@ BALANCE = re.compile(
     re.IGNORECASE,
 )
 REFERENCE = re.compile(
-    r"(?:financial\s+transaction\s+id|ft\s*id|transaction\s+id|txn\s*id|event\s*#|"
+    r"(?:financial\s+transaction\s+id|ft\s*id|transaction\s+id|txn?\s*id|event\s*#|"
     r"ref(?:erence)?)[:\s#]*([A-Za-z0-9]+)",
     re.IGNORECASE,
 )
@@ -51,10 +51,21 @@ LABELLED_AMOUNT = re.compile(
 BENEFICIARY = re.compile(r"beneficiary[:\s]*([^\n:]{2,60}?)\s*(?:credited|debited|amount|$)", re.I)
 DECLARED_TRANSFER = re.compile(r"^\s*transfer\b", re.IGNORECASE)
 
-# A counterparty runs to the phone number, the timestamp, or a full stop —
-# whichever comes first. Names carry spaces and mixed case, so the boundary
-# has to be something other than whitespace.
-PARTY_TAIL = r"([^()\d.]{2,60}?)\s*(?:\(|\bat\b|\.|$)"
+# A counterparty runs to the phone number, the timestamp, a full stop, or a
+# run of digits — whichever comes first. Names carry spaces and mixed case, so
+# the boundary has to be something other than whitespace.
+#
+# The digit terminator matters more than it looks: a merchant payment puts the
+# till code inside the sentence ("to AFRICA BUSINESS SERVICES Limit 999577 was
+# completed"), and without it the name has nowhere legal to end, so the whole
+# pattern failed and the message parsed as nothing at all.
+PARTY_TAIL = r"([^()\d.]{2,60}?)\s*(?:\(|\bat\b|\d|\.|$)"
+
+# The till or merchant code a payment quotes after the name.
+MERCHANT_CODE = re.compile(
+    r"\bto\s+[^()\d.]{2,60}?\s*(\d{4,12})\b(?=[^.]*?\bwas\s+completed\b|[^.]*?\bat\b)",
+    re.IGNORECASE,
+)
 
 # Both orders occur in the wild: "200000 RWF transferred to X" and "You have
 # sent 5,000 RWF to X". Amount-first is listed first so the more specific
@@ -121,6 +132,10 @@ INCOMING = [
 # quotes.
 MOMO_MARKERS = (
     re.compile(r"\*1(?:65|82|85)\*"),          # MTN and Airtel USSD codes
+    # The same networks top and tail their messages with these even when the
+    # USSD prefix is absent, which is how a merchant payment identifies itself.
+    re.compile(r"\*S\*"),
+    re.compile(r"\*EN#"),
     re.compile(r"mobile\s*money", re.I),
     re.compile(r"\bmomo\b", re.I),
     re.compile(r"airtel\s+money", re.I),
@@ -155,6 +170,9 @@ def _channel(text: str) -> str | None:
 class ParsedSms:
     transaction_type: str | None = None
     channel: str | None = None
+    # The till code a merchant payment quotes. Kept separate from the name so
+    # it can be recognised later without re-reading the description.
+    merchant_code: str | None = None
     # Raw account numbers as the message wrote them. Resolving these to the
     # user's accounts needs the stored identifiers, which only the API has.
     debited_identifier: str | None = None
@@ -274,12 +292,17 @@ def parse(message: str) -> ParsedSms:
     fee = FEE.search(text)
     if fee:
         result.fee_amount = _decimal(fee.group(1))
-        result.matched.append("fee")
+        # Only claimed when a usable value came out. "Fee 0 RWF" matches the
+        # pattern and yields nothing, and saying a field was filled when it
+        # was left empty is a small lie the screen then repeats.
+        if result.fee_amount is not None:
+            result.matched.append("fee")
 
     balance = BALANCE.search(text)
     if balance:
         result.balance_after = _decimal(balance.group(1))
-        result.matched.append("balance")
+        if result.balance_after is not None:
+            result.matched.append("balance")
 
     stamp = TIMESTAMP.search(text)
     if stamp:
@@ -294,6 +317,11 @@ def parse(message: str) -> ParsedSms:
                 break
             except ValueError:
                 continue
+
+    code = MERCHANT_CODE.search(text)
+    if code:
+        result.merchant_code = code.group(1)
+        result.matched.append("merchant")
 
     reference = REFERENCE.search(text)
     if reference:
@@ -313,6 +341,7 @@ def serialize(parsed: ParsedSms) -> dict:
         # names a kind rather than an account, because only the client knows
         # which accounts exist.
         "channel": parsed.channel,
+        "merchant_code": parsed.merchant_code,
         "debited_identifier": parsed.debited_identifier,
         "credited_identifier": parsed.credited_identifier,
         "amount": serialize_amount(parsed.amount) if parsed.amount is not None else None,
