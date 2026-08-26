@@ -60,7 +60,7 @@ export function AttachmentPicker({
           {files.map((file, index) => (
             <li
               key={`${file.name}-${index}`}
-              className="flex items-center gap-3 border-b border-white/5 py-2 first:pt-0 last:border-0"
+              className="flex items-center gap-3 border-b border-line/5 py-2 first:pt-0 last:border-0"
             >
               <span className="shrink-0 text-content-secondary">
                 <Icon name="paperclip" size={14} />

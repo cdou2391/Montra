@@ -11,31 +11,38 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // Every colour resolves through a CSS variable defined in globals.css,
+      // so the light theme is a different set of values rather than a
+      // different set of class names. <alpha-value> keeps the opacity
+      // modifiers working: bg-surface-primary/60 still means what it says.
       colors: {
         background: {
-          primary: "#08111C",
-          secondary: "#0C1522",
+          primary: "rgb(var(--background-primary) / <alpha-value>)",
+          secondary: "rgb(var(--background-secondary) / <alpha-value>)",
         },
         surface: {
-          primary: "#141E2B",
-          elevated: "#192431",
+          primary: "rgb(var(--surface-primary) / <alpha-value>)",
+          elevated: "rgb(var(--surface-elevated) / <alpha-value>)",
         },
         content: {
-          primary: "#F8FAFC",
-          secondary: "#94A3B8",
-          muted: "#64748B",
+          primary: "rgb(var(--content-primary) / <alpha-value>)",
+          secondary: "rgb(var(--content-secondary) / <alpha-value>)",
+          muted: "rgb(var(--content-muted) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "#2DD4BF",
-          muted: "rgba(45, 212, 191, 0.12)",
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          muted: "rgb(var(--accent) / 0.12)",
         },
         semantic: {
-          income: "#22C55E",
-          expense: "#F87171",
-          warning: "#F59E0B",
-          transfer: "#60A5FA",
-          neutral: "#94A3B8",
+          income: "rgb(var(--semantic-income) / <alpha-value>)",
+          expense: "rgb(var(--semantic-expense) / <alpha-value>)",
+          warning: "rgb(var(--semantic-warning) / <alpha-value>)",
+          transfer: "rgb(var(--semantic-transfer) / <alpha-value>)",
+          neutral: "rgb(var(--semantic-neutral) / <alpha-value>)",
         },
+        // Hairlines and subtle fills. Replaces the literal white/N utilities,
+        // which are invisible on a light ground.
+        line: "rgb(var(--line) / <alpha-value>)",
       },
       borderRadius: {
         card: "18px",

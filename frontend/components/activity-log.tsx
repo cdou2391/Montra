@@ -59,7 +59,7 @@ export function ActivityLog({ events }: { events: AuditEvent[] }) {
       {events.map((event) => (
         <div
           key={event.id}
-          className="flex items-start gap-3 border-b border-white/5 py-3 first:pt-0 last:border-0 last:pb-0"
+          className="flex items-start gap-3 border-b border-line/5 py-3 first:pt-0 last:border-0 last:pb-0"
         >
           <span className="mt-0.5 shrink-0 text-content-secondary">
             <Icon name={ICONS[event.entity_type] ?? "list"} size={16} />

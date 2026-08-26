@@ -18,7 +18,7 @@ function ProgressBar({ percent }: { percent: number }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Principal repaid"
-      className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/8"
+      className="mt-3 h-2 w-full overflow-hidden rounded-full bg-line/8"
     >
       <div
         className="h-full rounded-full bg-accent transition-all"
@@ -69,7 +69,7 @@ export function LoanCard({ loan }: { loan: Loan }) {
         </p>
 
         {loan.next_payment_date && loan.expected_payment_amount && loan.status === "ACTIVE" && (
-          <p className="mt-3 border-t border-white/5 pt-3 text-xs text-content-secondary">
+          <p className="mt-3 border-t border-line/5 pt-3 text-xs text-content-secondary">
             Next {formatMoney(loan.expected_payment_amount, loan.currency)} ·{" "}
             {loan.next_payment_date}
           </p>

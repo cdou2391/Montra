@@ -56,7 +56,7 @@ export default function Notifications() {
             const href =
               n.related_entity_type === "PLANNED_TRANSACTION" ? "/planning" : null;
             const inner = (
-              <div className="flex items-start gap-3 border-b border-white/5 py-4 last:border-0">
+              <div className="flex items-start gap-3 border-b border-line/5 py-4 last:border-0">
                 <span
                   aria-hidden
                   className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${

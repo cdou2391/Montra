@@ -421,6 +421,7 @@ export type Preferences = {
   default_context: "PERSONAL" | "FAMILY";
   default_reminder_days: number | null;
   notifications_enabled: boolean;
+  theme: "SYSTEM" | "LIGHT" | "DARK";
   favorite_account_id: string | null;
 };
 

@@ -16,7 +16,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-card border border-white/5 bg-surface-primary p-4 sm:p-5 ${className}`}
+      className={`rounded-card border border-line/5 bg-surface-primary p-4 sm:p-5 ${className}`}
     >
       {children}
     </div>
@@ -41,7 +41,7 @@ export function Button({
   const styles = {
     primary: "bg-accent text-background-primary hover:brightness-110",
     secondary:
-      "bg-transparent text-content-primary border border-white/15 hover:bg-white/5",
+      "bg-transparent text-content-primary border border-line/15 hover:bg-line/5",
     destructive: "bg-semantic-expense/15 text-semantic-expense hover:bg-semantic-expense/25",
   }[variant];
 
@@ -81,7 +81,7 @@ export function Field({
 }
 
 const inputClass =
-  "w-full min-h-[48px] rounded-control border border-white/10 bg-background-secondary px-4 text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none";
+  "w-full min-h-[48px] rounded-control border border-line/10 bg-background-secondary px-4 text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
@@ -111,7 +111,7 @@ export function StatusChip({
   tone?: "neutral" | "income" | "expense" | "warning" | "transfer";
 }) {
   const tones = {
-    neutral: "bg-white/5 text-content-secondary",
+    neutral: "bg-line/5 text-content-secondary",
     income: "bg-semantic-income/15 text-semantic-income",
     expense: "bg-semantic-expense/15 text-semantic-expense",
     warning: "bg-semantic-warning/15 text-semantic-warning",
@@ -141,7 +141,7 @@ export function EmptyState({
 }
 
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-control bg-white/5 ${className}`} />;
+  return <div className={`animate-pulse rounded-control bg-line/5 ${className}`} />;
 }
 
 export function ErrorNotice({ message }: { message: string }) {

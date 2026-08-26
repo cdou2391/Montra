@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * The palette, as variables so a theme can be swapped without a component
+ * knowing. Every token below is referenced by name in tailwind.config.ts, so
+ * nothing in the markup changes between light and dark.
+ *
+ * Written as space-separated RGB channels rather than hex so Tailwind's
+ * opacity modifiers keep working: bg-surface-primary/60 still means what it
+ * says.
+ */
+:root {
+  --background-primary: 8 17 28;
+  --background-secondary: 12 21 34;
+  --surface-primary: 20 30 43;
+  --surface-elevated: 25 36 49;
+  --content-primary: 248 250 252;
+  --content-secondary: 148 163 184;
+  --content-muted: 100 116 139;
+  --accent: 45 212 191;
+  --semantic-income: 34 197 94;
+  --semantic-expense: 248 113 113;
+  --semantic-warning: 245 158 11;
+  --semantic-transfer: 96 165 250;
+  --semantic-neutral: 148 163 184;
+
+  /* Hairlines and subtle fills. On a dark ground these are white at a low
+     alpha; on a light one they have to be ink, or they disappear. */
+  --line: 255 255 255;
+}
+
+[data-theme="light"] {
+  --background-primary: 246 248 250;
+  --background-secondary: 237 241 245;
+  --surface-primary: 255 255 255;
+  --surface-elevated: 244 247 250;
+  --content-primary: 15 27 42;
+  --content-secondary: 71 85 105;
+  --content-muted: 100 116 139;
+
+  /* The accent and the semantic colours are chosen for a dark ground and are
+     far too pale on a white one — teal #2DD4BF on white is under 2:1. These
+     are the same hues taken darker, so they still read as the same colours
+     while clearing the contrast bar for text. */
+  /* teal-700 rather than teal-600: the accent carries small text like "View
+     all", and 600 measured 3.74:1 on a white card — fine for a large label,
+     short of the 4.5 that body-sized text needs. */
+  --accent: 15 118 110;
+  --semantic-income: 21 128 61;
+  --semantic-expense: 185 28 28;
+  --semantic-warning: 180 83 9;
+  --semantic-transfer: 29 78 216;
+  --semantic-neutral: 100 116 139;
+
+  --line: 15 27 42;
+}
+
 @layer base {
   html {
     /* The platform highlight is replaced by the .pressable states below, which

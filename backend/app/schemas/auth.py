@@ -21,6 +21,7 @@ class LoginRequest(MontraModel):
 class PreferencesUpdate(MontraModel):
     hide_balances: bool | None = None
     persist_balance_privacy: bool | None = None
+    theme: str | None = Field(default=None, pattern="^(SYSTEM|LIGHT|DARK)$")
     default_context: str | None = None
     default_reminder_days: int | None = Field(default=None, ge=0, le=30)
     notifications_enabled: bool | None = None

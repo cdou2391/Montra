@@ -10,7 +10,7 @@ import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui"
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-white/5 py-3 last:border-0">
+    <div className="flex items-baseline justify-between gap-4 border-b border-line/5 py-3 last:border-0">
       <span className="text-sm text-content-secondary">{label}</span>
       <span className="tabular text-sm font-medium text-content-primary">{value}</span>
     </div>
@@ -83,7 +83,7 @@ export default function LoanDetail() {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Principal repaid"
-          className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/8"
+          className="mt-4 h-2 w-full overflow-hidden rounded-full bg-line/8"
         >
           <div
             className="h-full rounded-full bg-accent"
@@ -134,7 +134,7 @@ export default function LoanDetail() {
       ) : (
         <Card>
           {payments.map((p) => (
-            <div key={p.id} className="border-b border-white/5 py-3 last:border-0">
+            <div key={p.id} className="border-b border-line/5 py-3 last:border-0">
               <div className="flex items-baseline justify-between gap-4">
                 <span className="text-sm text-content-primary">
                   {formatDate(`${p.payment_date}T00:00:00`)}

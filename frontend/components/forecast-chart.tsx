@@ -126,12 +126,12 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
         preserveAspectRatio="none"
         role="img"
         aria-label={`Projected balance over ${forecast.period === "7d" ? "7" : "30"} days`}
-        className="h-full w-full"
+        className="h-full w-full text-accent"
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#2DD4BF" stopOpacity="0" />
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -150,11 +150,12 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
           />
         )}
 
-        <path d={area} fill={`url(#${gradientId})`} />
+        <path d={area} fill={`url(#${gradientId})`} className="text-accent" />
         <path
           d={line}
           fill="none"
-          stroke="#2DD4BF"
+          stroke="currentColor"
+          className="text-accent"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -171,7 +172,8 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
             x2={geometry.xy[warningIndex].x}
             y1={PAD.top}
             y2={HEIGHT - PAD.bottom}
-            stroke="#F87171"
+            stroke="currentColor"
+            className="text-semantic-expense"
             strokeWidth="1.5"
             strokeDasharray="3 3"
             vectorEffect="non-scaling-stroke"
@@ -206,7 +208,7 @@ export function ForecastChart({ forecast }: { forecast: Forecast }) {
           />
           <div
             role="tooltip"
-            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-control bg-surface-elevated px-2.5 py-1.5 text-xs shadow-lg ring-1 ring-white/10"
+            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-control bg-surface-elevated px-2.5 py-1.5 text-xs shadow-lg ring-1 ring-line/10"
             style={{
               left: `${marker.x}%`,
               top: below ? marker.y + 14 : marker.y - 14,
@@ -259,7 +261,7 @@ export function ForecastTable({ forecast }: { forecast: Forecast }) {
       </thead>
       <tbody>
         {weekly.map((point) => (
-          <tr key={point.date} className="border-t border-white/5">
+          <tr key={point.date} className="border-t border-line/5">
             <td className="py-2 text-content-secondary">{shortDate(point.date)}</td>
             <td
               className={`tabular py-2 text-right font-medium ${

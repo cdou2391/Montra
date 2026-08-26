@@ -238,7 +238,7 @@ export default function NewRule() {
             />
           </Field>
 
-          <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+          <p className="rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
             Montra keeps the next 90 days of this series in your upcoming list. Each occurrence
             stays a plan until you mark it done — nothing posts automatically.
             {type === "TRANSFER" &&

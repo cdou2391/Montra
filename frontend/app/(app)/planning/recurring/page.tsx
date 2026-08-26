@@ -74,7 +74,7 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
           <button
             disabled={busy}
             onClick={() => act("pause")}
-            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-line/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Pause
           </button>
@@ -92,7 +92,7 @@ function RuleCard({ rule, onChanged }: { rule: RecurringRule; onChanged: () => v
           <button
             disabled={busy}
             onClick={() => act("end")}
-            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-semantic-expense disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-line/10 px-3 text-xs text-semantic-expense disabled:opacity-40"
           >
             End series
           </button>
@@ -118,7 +118,7 @@ function ScheduledLoanCard({ loan }: { loan: Loan }) {
       <Card className="transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
               <Icon name="handshake" size={18} />
             </span>
             <div className="min-w-0">

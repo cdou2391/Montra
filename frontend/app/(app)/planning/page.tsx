@@ -46,7 +46,7 @@ function PlannedRow({
   }
 
   return (
-    <div className="border-b border-white/5 py-4 last:border-0">
+    <div className="border-b border-line/5 py-4 last:border-0">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-content-primary">
@@ -84,7 +84,7 @@ function PlannedRow({
           </span>
         </Link>
         <Link href={`/planning/${planned.id}/reschedule`} className="pressable pressable-tint rounded-full">
-          <span className="inline-flex min-h-[36px] items-center rounded-full border border-white/10 px-3 text-xs text-content-secondary">
+          <span className="inline-flex min-h-[36px] items-center rounded-full border border-line/10 px-3 text-xs text-content-secondary">
             Reschedule
           </span>
         </Link>
@@ -92,7 +92,7 @@ function PlannedRow({
           <button
             disabled={busy}
             onClick={() => run(() => montra.skipPlanned(planned.id))}
-            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-line/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Skip this one
           </button>
@@ -100,7 +100,7 @@ function PlannedRow({
           <button
             disabled={busy}
             onClick={() => run(() => montra.cancelPlanned(planned.id))}
-            className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary disabled:opacity-40"
+            className="pressable pressable-tint min-h-[36px] rounded-full border border-line/10 px-3 text-xs text-content-secondary disabled:opacity-40"
           >
             Cancel
           </button>
@@ -114,10 +114,10 @@ function PlannedRow({
 function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
   const owed = due.direction === "PAYABLE";
   return (
-    <div className="border-b border-white/5 py-4 last:border-0">
+    <div className="border-b border-line/5 py-4 last:border-0">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
             <Icon name="handshake" size={18} />
           </span>
           <div className="min-w-0">
@@ -151,7 +151,7 @@ function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
           </span>
         </Link>
         <Link href={`/loans/${due.loan_id}`}>
-          <span className="pressable pressable-tint inline-flex min-h-[36px] items-center rounded-full border border-white/10 px-3 text-xs text-content-secondary">
+          <span className="pressable pressable-tint inline-flex min-h-[36px] items-center rounded-full border border-line/10 px-3 text-xs text-content-secondary">
             View loan
           </span>
         </Link>

@@ -123,7 +123,7 @@ export function ExchangeRates() {
           {rates.map((r) => (
             <li
               key={r.id}
-              className="flex items-center gap-3 border-b border-white/5 py-3 first:pt-0 last:border-0 last:pb-0"
+              className="flex items-center gap-3 border-b border-line/5 py-3 first:pt-0 last:border-0 last:pb-0"
             >
               <div className="min-w-0 flex-1">
                 <p className="tabular text-sm text-content-primary">
@@ -165,7 +165,7 @@ export function ExchangeRates() {
       </div>
 
       {showOverride && (
-        <form onSubmit={save} className="mt-4 space-y-4 border-t border-white/5 pt-4">
+        <form onSubmit={save} className="mt-4 space-y-4 border-t border-line/5 pt-4">
           <p className="text-xs text-content-secondary">
             <Icon name="alertTriangle" size={12} className="mr-1 inline" />
             A rate you set here stops being updated daily.

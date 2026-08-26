@@ -79,7 +79,7 @@ export function SmsPaste({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="pressable pressable-surface mb-5 flex w-full items-center gap-3 rounded-control border border-dashed border-white/15 px-4 py-3 text-left"
+        className="pressable pressable-surface mb-5 flex w-full items-center gap-3 rounded-control border border-dashed border-line/15 px-4 py-3 text-left"
       >
         <span className="text-content-secondary">
           <Icon name="paperclip" size={16} />
@@ -92,14 +92,14 @@ export function SmsPaste({
   }
 
   return (
-    <div className="mb-5 rounded-control border border-white/10 p-4">
+    <div className="mb-5 rounded-control border border-line/10 p-4">
       <Field label="Paste the message">
         <textarea
           rows={4}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="*165*S*200000 RWF transferred to …"
-          className="min-h-[96px] w-full rounded-control border border-white/10 bg-background-secondary px-3 py-2 text-sm text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
+          className="min-h-[96px] w-full rounded-control border border-line/10 bg-background-secondary px-3 py-2 text-sm text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
         />
       </Field>
 

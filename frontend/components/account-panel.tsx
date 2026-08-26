@@ -84,7 +84,7 @@ export function AccountPanel({
           <div className="flex min-w-0 items-start gap-3">
             {/* Restrained: the accent stays reserved for meaning, not decoration
                 (UI/UX section 9). */}
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
               <Icon name={accountTypeIcon(account.account_type)} size={20} />
             </span>
             <div className="min-w-0">

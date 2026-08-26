@@ -161,7 +161,7 @@ export default function RecordPayment() {
           {/* Live reconciliation of the split. */}
           <div
             aria-live="polite"
-            className="rounded-control border border-white/10 bg-background-secondary p-4"
+            className="rounded-control border border-line/10 bg-background-secondary p-4"
           >
             <p className="text-xs uppercase tracking-wide text-content-muted">
               Goes to principal

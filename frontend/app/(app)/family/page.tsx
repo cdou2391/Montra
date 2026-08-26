@@ -155,7 +155,7 @@ function SharingControls({ onChanged }: { onChanged: () => void }) {
       </p>
       <div className="mt-4 space-y-3">
         {mine.map((account) => (
-          <div key={account.id} className="border-t border-white/5 pt-3 first:border-0 first:pt-0">
+          <div key={account.id} className="border-t border-line/5 pt-3 first:border-0 first:pt-0">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-content-primary">
@@ -266,7 +266,7 @@ function Household({ family, onChanged }: { family: Family; onChanged: () => voi
           .map((m) => (
             <div
               key={m.user_id}
-              className="flex items-center justify-between gap-3 border-b border-white/5 py-3 last:border-0"
+              className="flex items-center justify-between gap-3 border-b border-line/5 py-3 last:border-0"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-content-primary">
@@ -326,7 +326,7 @@ function Household({ family, onChanged }: { family: Family; onChanged: () => voi
           )}
 
           {invitations.length > 0 && (
-            <div className="mt-4 border-t border-white/5 pt-3">
+            <div className="mt-4 border-t border-line/5 pt-3">
               <p className="text-xs uppercase tracking-wide text-content-muted">Pending</p>
               {invitations.map((i) => (
                 <div

@@ -244,12 +244,12 @@ export default function Accounts() {
               className={`pressable pressable-surface w-full rounded-card border px-4 py-3 text-left ${
                 i === index
                   ? "border-accent/40 bg-accent-muted"
-                  : "border-white/5 bg-surface-primary hover:bg-surface-elevated"
+                  : "border-line/5 bg-surface-primary hover:bg-surface-elevated"
               }`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
                     <Icon name={accountTypeIcon(account.account_type)} size={16} />
                   </span>
                   <div className="min-w-0">
@@ -335,14 +335,14 @@ function ActivitySection({
           </Link>
           <Link
             href={`/transfer?from=${account.id}`}
-            className="pressable pressable-tint inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-4 text-sm font-medium text-content-primary"
+            className="pressable pressable-tint inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-line/15 px-4 text-sm font-medium text-content-primary"
           >
             <Icon name="transfer" size={18} />
             Transfer
           </Link>
         </div>
       ) : (
-        <p className="mb-3 rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+        <p className="mb-3 rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
           Shared with you to view. Only the owner can record transactions here.
         </p>
       )}

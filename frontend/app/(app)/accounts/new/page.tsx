@@ -176,7 +176,7 @@ function NewAccountForm() {
           )}
 
           {isLiability && (
-            <fieldset className="space-y-4 rounded-control border border-white/10 p-4">
+            <fieldset className="space-y-4 rounded-control border border-line/10 p-4">
               <legend className="px-1 text-xs uppercase tracking-wide text-content-muted">
                 Card details — all optional
               </legend>

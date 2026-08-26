@@ -27,7 +27,7 @@ export function TransactionTable({ transactions }: { transactions: Transaction[]
       <table className="w-full min-w-[44rem] text-sm">
         <caption className="sr-only">Transactions matching the current filters</caption>
         <thead>
-          <tr className="border-b border-white/5 text-left text-xs uppercase tracking-wide text-content-muted">
+          <tr className="border-b border-line/5 text-left text-xs uppercase tracking-wide text-content-muted">
             <th scope="col" className="px-4 py-3 font-normal">
               When
             </th>
@@ -47,7 +47,7 @@ export function TransactionTable({ transactions }: { transactions: Transaction[]
         </thead>
         <tbody>
           {transactions.map((t) => (
-            <tr key={t.id} className="border-b border-white/5 last:border-0 hover:bg-surface-elevated">
+            <tr key={t.id} className="border-b border-line/5 last:border-0 hover:bg-surface-elevated">
               <td className="whitespace-nowrap px-4 py-3 text-content-secondary">
                 <span className="block">{formatDate(t.occurred_at)}</span>
                 <span className="block text-xs text-content-muted">

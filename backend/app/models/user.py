@@ -44,6 +44,9 @@ class UserPreference(UUIDPrimaryKey, Timestamped, Base):
     )
     default_reminder_days: Mapped[int | None] = mapped_column(Integer, default=3)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # SYSTEM follows the device. Stored rather than left to the browser so the
+    # choice travels with the account to a new phone.
+    theme: Mapped[str] = mapped_column(String(10), default="SYSTEM", nullable=False)
 
     # The favourite lives on the user, not the account. Accounts become
     # shareable in the Family phases, and a flag on the account row would make

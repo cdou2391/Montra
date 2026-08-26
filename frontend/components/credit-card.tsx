@@ -44,7 +44,7 @@ export function UtilizationBar({ summary }: { summary: CardSummary }) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label="Credit utilization"
-        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/8"
+        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-line/8"
       >
         <div
           className={`h-full rounded-full transition-all ${fill}`}
@@ -176,7 +176,7 @@ export function CreditCardSummaryCard({
       {(summary.statement_balance ||
         summary.minimum_payment ||
         summary.payment_due_date) && (
-        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-5">
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line/5 pt-5">
           {summary.statement_balance && (
             <Stat label="Statement balance" value={money(summary.statement_balance)} />
           )}

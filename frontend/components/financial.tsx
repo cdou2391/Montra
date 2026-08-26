@@ -98,7 +98,7 @@ export function AccountCard({ account, hidden }: { account: Account; hidden?: bo
       <Card className="transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
               <Icon name={accountTypeIcon(account.account_type)} size={18} />
             </span>
             <div className="min-w-0">
@@ -149,7 +149,7 @@ export function AccountTile({ account, hidden }: { account: Account; hidden?: bo
       className="pressable pressable-surface w-[13.5rem] shrink-0 snap-start"
     >
       <Card className="flex h-full items-start gap-3 transition-colors hover:bg-surface-elevated">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-content-secondary">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
           <Icon name={accountTypeIcon(account.account_type)} size={18} />
         </span>
         {/* min-w-0 so a long account name truncates instead of pushing the
@@ -198,7 +198,7 @@ export function TransactionRow({
   const sign = direction === "INCREASE" ? "+" : "−";
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/5 py-3 last:border-0">
+    <div className="flex items-center justify-between gap-4 border-b border-line/5 py-3 last:border-0">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-content-primary">
           {transaction.description ?? transaction.merchant ?? type}

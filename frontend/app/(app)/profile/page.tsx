@@ -18,10 +18,11 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
 import { ExchangeRates } from "@/components/exchange-rates";
 import { useBalancePrivacy } from "@/components/balance-privacy";
+import { useTheme } from "@/components/theme";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-white/5 py-3 last:border-0">
+    <div className="flex items-baseline justify-between gap-4 border-b border-line/5 py-3 last:border-0">
       <span className="text-sm text-content-secondary">{label}</span>
       <span className="min-w-0 truncate text-sm font-medium text-content-primary">{value}</span>
     </div>
@@ -47,7 +48,7 @@ function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="pressable pressable-surface flex w-full items-center justify-between gap-4 border-b border-white/5 py-4 text-left last:border-0 disabled:opacity-50"
+      className="pressable pressable-surface flex w-full items-center justify-between gap-4 border-b border-line/5 py-4 text-left last:border-0 disabled:opacity-50"
     >
       <span className="min-w-0">
         <span className="block text-sm font-medium text-content-primary">{label}</span>
@@ -56,7 +57,7 @@ function Toggle({
       <span
         aria-hidden
         className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-          checked ? "bg-accent" : "bg-white/15"
+          checked ? "bg-accent" : "bg-line/15"
         }`}
       >
         <span
@@ -173,6 +174,7 @@ export default function Profile() {
   }
 
   const { refresh: refreshPrivacy } = useBalancePrivacy();
+  const { theme, setTheme } = useTheme();
 
   async function save(patch: Partial<Preferences>) {
     if (!prefs) return;
@@ -248,6 +250,38 @@ export default function Profile() {
           <Skeleton className="h-32 w-full" />
         ) : (
           <>
+            {/* Three states, so a segmented control rather than a switch: a
+                toggle cannot say "follow the device", and following the
+                device is what most people want. */}
+            <div className="border-b border-line/5 py-3">
+              <p className="text-sm font-medium text-content-primary">Appearance</p>
+              <p className="mt-0.5 text-xs text-content-secondary">
+                Light, dark, or whatever your device is set to.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 rounded-control bg-background-secondary p-1">
+                {(
+                  [
+                    ["SYSTEM", "System"],
+                    ["LIGHT", "Light"],
+                    ["DARK", "Dark"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    aria-pressed={theme === value}
+                    className={`pressable min-h-[38px] rounded-[10px] text-sm font-semibold transition ${
+                      theme === value
+                        ? "bg-accent-muted text-accent"
+                        : "text-content-secondary"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Toggle
               label="Hide balances by default"
               hint="Amounts start masked when you open the app."
@@ -311,7 +345,7 @@ export default function Profile() {
           <a
             href={montra.backupUrl()}
             download
-            className="pressable inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-control border border-white/15 px-5 text-sm font-semibold text-content-primary"
+            className="pressable inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-control border border-line/15 px-5 text-sm font-semibold text-content-primary"
           >
             <Icon name="download" size={18} />
             Download backup
@@ -375,7 +409,7 @@ export default function Profile() {
               Your existing data is deleted, not merged, and it cannot be undone.
             </p>
 
-            <div className="mt-4 rounded-control border border-white/10 bg-background-primary p-4">
+            <div className="mt-4 rounded-control border border-line/10 bg-background-primary p-4">
               <p className="text-xs uppercase tracking-wide text-content-muted">
                 Taken {new Date(pending.exported_at).toLocaleString()}
                 {pending.user?.email ? ` · ${pending.user.email}` : ""}

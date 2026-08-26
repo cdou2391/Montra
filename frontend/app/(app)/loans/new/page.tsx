@@ -213,7 +213,7 @@ export default function NewLoan() {
             />
           </Field>
 
-          <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+          <p className="rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
             Adding a loan records no transaction. It changes your net worth,
             because {owed ? "what you owe counts against it" : "what you are owed counts toward it"},
             but no money moves until you record a payment.

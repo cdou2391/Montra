@@ -133,7 +133,7 @@ function Transactions() {
             controls laid out below instead. */}
         <button
           onClick={() => setSheetOpen(true)}
-          className="pressable pressable-surface flex min-h-[44px] shrink-0 items-center gap-2 rounded-control border border-white/10 px-3 text-sm text-content-secondary lg:hidden"
+          className="pressable pressable-surface flex min-h-[44px] shrink-0 items-center gap-2 rounded-control border border-line/10 px-3 text-sm text-content-secondary lg:hidden"
         >
           <Icon name="filter" size={16} />
           Filters

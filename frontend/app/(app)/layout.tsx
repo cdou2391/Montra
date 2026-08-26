@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/shell";
 import { Providers } from "@/app/providers";
+import { ThemeProvider } from "@/components/theme";
 import { RequireSession } from "@/components/session";
 import { BalancePrivacyProvider } from "@/components/balance-privacy";
 import { SignInSplash } from "@/components/splash";
@@ -28,6 +29,7 @@ export default function AuthenticatedLayout({
 }) {
   return (
     <Providers>
+      <ThemeProvider>
       <FinancialContextProvider>
         <BalancePrivacyProvider>
           {/* Above the shell, so it covers the whole app rather than the
@@ -38,6 +40,7 @@ export default function AuthenticatedLayout({
           </AppShell>
         </BalancePrivacyProvider>
       </FinancialContextProvider>
+      </ThemeProvider>
     </Providers>
   );
 }

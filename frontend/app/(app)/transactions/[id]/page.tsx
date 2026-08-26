@@ -126,7 +126,7 @@ export default function TransactionDetail() {
           <StatusChip tone="neutral">{txn.status}</StatusChip>
         </div>
 
-        <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-white/5 pt-5 text-sm">
+        <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-line/5 pt-5 text-sm">
           {txn.fee_for_transaction_id && (
             <div className="col-span-2">
               <dt className="text-xs uppercase tracking-wide text-content-muted">Fee on</dt>

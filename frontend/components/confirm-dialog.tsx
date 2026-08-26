@@ -84,13 +84,13 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         className="
-          relative w-full max-w-lg rounded-t-[20px] border-t border-white/10
+          relative w-full max-w-lg rounded-t-[20px] border-t border-line/10
           bg-background-secondary pb-safe motion-safe:animate-[sheet_200ms_ease-out]
           lg:rounded-card lg:border lg:pb-0 lg:motion-safe:animate-[fade_150ms_ease-out]
         "
       >
         <div className="flex justify-center pb-1 pt-3 lg:hidden">
-          <span aria-hidden className="h-1 w-9 rounded-full bg-white/20" />
+          <span aria-hidden className="h-1 w-9 rounded-full bg-line/20" />
         </div>
         <div className="p-5">{children}</div>
       </div>

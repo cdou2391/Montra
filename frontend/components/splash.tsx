@@ -80,7 +80,7 @@ export function SignInSplash() {
     >
       <Logo size={72} />
       <p className="mt-5 text-title text-content-primary">Montra</p>
-      <div className="mt-8 h-1 w-24 overflow-hidden rounded-full bg-white/10">
+      <div className="mt-8 h-1 w-24 overflow-hidden rounded-full bg-line/10">
         {/* A moving bar rather than a percentage: we do not know how far along
             this is, and inventing a number would be a lie. */}
         <div className="h-full w-1/3 animate-splash-sweep rounded-full bg-accent" />

@@ -202,7 +202,7 @@ export default function NewPlanned() {
             />
           </Field>
 
-          <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+          <p className="rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
             Nothing is recorded against your balance yet. This stays a plan until you mark it
             {type === "EXPENSE" ? " paid" : type === "INCOME" ? " received" : " done"}.
             {type === "TRANSFER" &&

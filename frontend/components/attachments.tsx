@@ -92,7 +92,7 @@ export function Attachments({ transactionId }: { transactionId: string }) {
           {items.map((a) => (
             <li
               key={a.id}
-              className="flex items-center gap-3 border-b border-white/5 py-3 first:pt-0 last:border-0 last:pb-0"
+              className="flex items-center gap-3 border-b border-line/5 py-3 first:pt-0 last:border-0 last:pb-0"
             >
               <span className="shrink-0 text-content-secondary">
                 <Icon name="paperclip" size={16} />

@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh lg:flex">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 border-r border-white/5 bg-background-secondary p-5 lg:block">
+      <aside className="hidden w-60 shrink-0 border-r border-line/5 bg-background-secondary p-5 lg:block">
         <div className="flex items-center gap-2.5 px-2">
           <Logo size={28} />
           <p className="text-title text-content-primary">Montra</p>
@@ -124,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav
           className="
             pointer-events-auto mx-auto flex max-w-lg items-stretch justify-around
-            rounded-[22px] border border-white/10 bg-surface-elevated
+            rounded-[22px] border border-line/10 bg-surface-elevated
             shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)]
           "
         >
@@ -186,7 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                   pathname === item.href
                     ? "bg-accent text-background-primary"
-                    : "bg-white/5 text-content-secondary"
+                    : "bg-line/5 text-content-secondary"
                 }`}
               >
                 <Icon name={item.icon} size={20} />

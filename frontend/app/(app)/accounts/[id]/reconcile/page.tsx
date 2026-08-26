@@ -116,7 +116,7 @@ export default function Reconcile() {
           {preview && (
             <div
               aria-live="polite"
-              className="rounded-control border border-white/10 bg-background-secondary p-4"
+              className="rounded-control border border-line/10 bg-background-secondary p-4"
             >
               {matches ? (
                 <p className="text-sm text-content-secondary">

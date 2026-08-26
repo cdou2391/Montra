@@ -29,7 +29,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
         return (
           <div
             key={`${insight.code}-${insight.title}`}
-            className="flex items-start gap-3 border-b border-white/5 py-3 first:pt-0 last:border-0 last:pb-0"
+            className="flex items-start gap-3 border-b border-line/5 py-3 first:pt-0 last:border-0 last:pb-0"
           >
             <span className={`mt-0.5 shrink-0 ${tone.className}`}>
               <Icon name={tone.icon} size={18} />

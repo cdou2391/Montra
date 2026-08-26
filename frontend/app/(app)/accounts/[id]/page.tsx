@@ -130,7 +130,7 @@ export default function AccountDetail() {
       </div>
 
       {!account.can_transact && (
-        <p className="mb-6 rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+        <p className="mb-6 rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
           Shared with you to view. Only the owner can record transactions here.
         </p>
       )}

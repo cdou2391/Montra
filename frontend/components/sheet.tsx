@@ -86,11 +86,11 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-x-0 bottom-0 rounded-t-[20px] border-t border-white/10 bg-background-secondary pb-safe motion-safe:animate-[sheet_200ms_ease-out]"
+        className="absolute inset-x-0 bottom-0 rounded-t-[20px] border-t border-line/10 bg-background-secondary pb-safe motion-safe:animate-[sheet_200ms_ease-out]"
       >
         {/* Grab handle: signals the sheet is dismissible. */}
         <div className="flex justify-center pb-1 pt-3">
-          <span aria-hidden className="h-1 w-9 rounded-full bg-white/20" />
+          <span aria-hidden className="h-1 w-9 rounded-full bg-line/20" />
         </div>
         <div className="px-4 pb-4 pt-2">{children}</div>
       </div>

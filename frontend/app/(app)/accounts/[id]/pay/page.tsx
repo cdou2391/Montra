@@ -144,7 +144,7 @@ export default function PayCard() {
                       key={s.label}
                       type="button"
                       onClick={() => update("amount", s.value)}
-                      className="pressable pressable-tint min-h-[36px] rounded-full border border-white/10 px-3 text-xs text-content-secondary"
+                      className="pressable pressable-tint min-h-[36px] rounded-full border border-line/10 px-3 text-xs text-content-secondary"
                     >
                       {s.label}
                     </button>
@@ -161,7 +161,7 @@ export default function PayCard() {
                 />
               </Field>
 
-              <p className="rounded-control border border-white/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
+              <p className="rounded-control border border-line/10 bg-background-secondary px-4 py-3 text-xs text-content-secondary">
                 {isCredit
                   ? "This moves money you already owed. Your cash goes down, the balance owed goes down by the same amount, and your net worth does not change. It is not counted as spending."
                   : "A top-up moves money between your own accounts. Your net worth does not change and it is not counted as spending."}
