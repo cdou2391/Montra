@@ -55,13 +55,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
-      <div className="mb-5 flex items-center gap-3">
+    // Centred only when there is room for it. On a phone the keyboard takes
+    // roughly half the screen, and a centred form puts the password field and
+    // the submit button underneath it — so below that height the form sits at
+    // the top and stays reachable.
+    <main
+      className="
+        mx-auto flex min-h-dvh max-w-md flex-col justify-start px-4 py-4
+        [@media(min-height:720px)]:py-10 [@media(min-height:720px)]:justify-center
+      "
+    >
+      {/* On a small phone with the keyboard up there is no room for a
+          wordmark and a sign-in form. The heading below still says which
+          page this is, and the mark was on screen before the keyboard
+          opened. */}
+      <div className="mb-3 hidden items-center gap-3 [@media(min-height:380px)]:flex [@media(min-height:720px)]:mb-5">
         <Logo size={40} />
         <span className="text-title text-content-primary">Montra</span>
       </div>
-      <h1 className="mb-2 text-title">Create your account</h1>
-      <p className="mb-6 text-sm text-content-secondary">
+      <h1 className="mb-1 text-title [@media(min-height:720px)]:mb-2">Create your account</h1>
+      <p className="mb-4 hidden text-sm text-content-secondary [@media(min-height:640px)]:block [@media(min-height:720px)]:mb-6">
         One place for what you have, what you owe, and what is coming next.
       </p>
       <Card>
@@ -84,7 +97,7 @@ export default function RegisterPage() {
           </Field>
           <Field
             label="Password"
-            hint="At least 10 characters, mixing letters with numbers or symbols."
+            hint="At least 12 characters. A few words you will remember beats a short one with symbols in it."
             error={fieldErrors.password}
           >
             <Input
