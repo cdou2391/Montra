@@ -150,7 +150,12 @@ function AddTransactionForm() {
           const onAccount = accountForChannel(accounts, parsed.channel);
           setForm((f) => ({
             ...f,
-            amount: parsed.amount ?? f.amount,
+            // A ledger entry is always in its account's currency, so a foreign
+            // purchase is filled with the converted figure rather than the one
+            // the message quoted. SmsPaste says so, and says to replace it
+            // with the amount the statement actually charged.
+            amount:
+              parsed.currency_conversion?.amount ?? parsed.amount ?? f.amount,
             fee_amount: parsed.fee_amount ?? f.fee_amount,
             // Held in full, seconds included: the input shows minutes but the
             // value submitted is the moment the message stated.

@@ -128,10 +128,47 @@ export function SmsPaste({
           {result.balance_after
             ? ` The message says the balance is now ${formatMoney(
                 result.balance_after,
-                result.currency ?? "RWF",
+                // The balance's own currency. A card quotes a foreign purchase
+                // in one currency and its balance in another, and labelling
+                // this with the purchase's would state something the message
+                // never said.
+                result.balance_currency ?? result.currency ?? "RWF",
               )}.`
             : ""}{" "}
           Check it, then add.
+        </p>
+      )}
+
+      {/* A foreign purchase on a local card. The amount on the form is a
+          conversion at today's market rate, not what the bank charged — it has
+          its own rate and takes a margin. Warned rather than filled silently:
+          a converted figure looks exactly like a real one. */}
+      {result?.currency_conversion && (
+        <p className="mt-3 text-xs text-semantic-warning">
+          The message is in {result.currency_conversion.from_currency} and this
+          account is in {result.currency_conversion.to_currency}.{" "}
+          {result.currency_conversion.amount ? (
+            <>
+              Filled in{" "}
+              {formatMoney(
+                result.currency_conversion.amount,
+                result.currency_conversion.to_currency,
+              )}
+              , converted from{" "}
+              {formatMoney(
+                result.currency_conversion.from_amount,
+                result.currency_conversion.from_currency,
+              )}{" "}
+              at today&apos;s rate. Your bank used its own rate — replace this
+              with the amount it charged.
+            </>
+          ) : (
+            <>
+              No rate is known for that pair, so the amount is still in{" "}
+              {result.currency_conversion.from_currency}. Replace it with the
+              amount your bank charged.
+            </>
+          )}
         </p>
       )}
 

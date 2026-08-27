@@ -48,9 +48,12 @@ FEE = re.compile(
 # out of "254107" and stop there — the alternation takes the first branch that
 # succeeds, not the longest.
 AMOUNT_GROUPED = r"(\d{1,3}(?:[ ,]\d{3})+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?)"
+# The leading currency is captured rather than skipped: a card alert quotes the
+# purchase in one currency and the balance in another, and labelling the
+# balance with the purchase's currency states something the message never said.
 BALANCE = re.compile(
     rf"(?:new|available|avail\.?|current)?\s*\bbal(?:ance)?\b[:\s]*"
-    rf"(?:{CURRENCY_NC}\s*)?{AMOUNT_GROUPED}\s*{CURRENCY}?",
+    rf"{CURRENCY}?\s*{AMOUNT_GROUPED}\s*{CURRENCY}?",
     re.IGNORECASE,
 )
 REFERENCE = re.compile(
@@ -253,6 +256,8 @@ class ParsedSms:
     occurred_at: datetime | None = None
     counterparty: str | None = None
     balance_after: Decimal | None = None
+    # The balance's own currency, which need not be the purchase's.
+    balance_currency: str | None = None
     reference: str | None = None
     matched: list[str] = field(default_factory=list)
 
@@ -462,8 +467,10 @@ def parse(message: str) -> ParsedSms:
 
     balance = BALANCE.search(text)
     if balance:
-        result.balance_after = _decimal(balance.group(1))
+        leading, amount, trailing = balance.groups()
+        result.balance_after = _decimal(amount)
         if result.balance_after is not None:
+            result.balance_currency = (leading or trailing or "").upper() or None
             result.matched.append("balance")
 
     stamp = TIMESTAMP.search(text)
@@ -526,6 +533,7 @@ def serialize(parsed: ParsedSms) -> dict:
         "balance_after": (
             serialize_amount(parsed.balance_after) if parsed.balance_after is not None else None
         ),
+        "balance_currency": parsed.balance_currency,
         "reference": parsed.reference,
         "matched": parsed.matched,
     }
@@ -560,7 +568,42 @@ def match_account(identifier: str | None, accounts) -> object | None:
     return hits[0] if len(hits) == 1 else None
 
 
-def resolve_accounts(parsed: ParsedSms, accounts) -> dict:
+def _currency_conversion(parsed: ParsedSms, account, converter) -> dict | None:
+    """The message's amount restated in the account's own currency.
+
+    A card denominated in francs still gets a dollar figure texted to it when
+    the purchase was abroad, and a ledger entry is always in its account's
+    currency — so filling the dollar figure straight into the form would record
+    ten francs for a ten dollar purchase.
+
+    This is a starting point and says so. The rate here is the daily market
+    one; the bank's rate, plus whatever margin it takes, is on the statement
+    and is the number that actually gets charged. Returning the pair rather
+    than silently swapping the amount is what lets the form say as much.
+    """
+    if account is None or parsed.amount is None or not parsed.currency:
+        return None
+    target = (account.currency or "").upper()
+    if not target or target == parsed.currency.upper():
+        return None
+
+    from app.core.money import serialize as serialize_amount
+
+    converted = converter.convert(parsed.amount, parsed.currency, target) if converter else None
+    rate = converter.rate(parsed.currency, target) if converter else None
+    return {
+        "from_currency": parsed.currency.upper(),
+        "from_amount": serialize_amount(parsed.amount),
+        "to_currency": target,
+        # None when no rate is known. The mismatch is still worth reporting:
+        # the amount on the form is in the wrong currency either way, and the
+        # user is the one who can fix it.
+        "amount": serialize_amount(converted) if converted is not None else None,
+        "rate": str(rate) if rate is not None else None,
+    }
+
+
+def resolve_accounts(parsed: ParsedSms, accounts, converter=None) -> dict:
     """Turn the message's account numbers into the user's accounts.
 
     This is what settles the type. A bank calls it a transfer whoever the
@@ -582,4 +625,9 @@ def resolve_accounts(parsed: ParsedSms, accounts) -> dict:
         "transaction_type": kind,
         "source_account_id": str(source.id) if source is not None else None,
         "destination_account_id": str(destination.id) if destination is not None else None,
+        # Against the account the entry lands on, which is the one whose
+        # currency the amount has to be in.
+        "currency_conversion": _currency_conversion(
+            parsed, source if source is not None else destination, converter
+        ),
     }

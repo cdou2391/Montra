@@ -223,8 +223,24 @@ export type ParsedSms = {
   occurred_at: string | null;
   counterparty: string | null;
   balance_after: string | null;
+  /** The balance's own currency, which need not be the purchase's. */
+  balance_currency: string | null;
   reference: string | null;
   matched: string[];
+  /**
+   * Present only when the message's currency differs from the currency of the
+   * account it resolved to — a foreign purchase on a local card. `amount` is
+   * the figure restated in the account's currency at the daily market rate,
+   * and is null when no rate is known. It is a starting point: the bank's own
+   * rate and margin are on the statement.
+   */
+  currency_conversion: {
+    from_currency: string;
+    from_amount: string;
+    to_currency: string;
+    amount: string | null;
+    rate: string | null;
+  } | null;
 };
 
 export type Category = {

@@ -312,14 +312,17 @@ def test_both_account_numbers_are_kept():
 
 
 class FakeAccount:
-    def __init__(self, name, identifier):
+    def __init__(self, name, identifier, currency="RWF"):
         self.id = name
         self.name = name
         self.account_identifier = identifier
+        # Not optional on the real model, and the amount a message quotes is
+        # only meaningful next to it.
+        self.currency = currency
 
 
 def _accounts(*pairs):
-    return [FakeAccount(name, ident) for name, ident in pairs]
+    return [FakeAccount(*pair) for pair in pairs]
 
 
 def test_both_ends_ours_makes_it_a_transfer():
@@ -700,3 +703,70 @@ def test_a_large_card_purchase_keeps_its_spaces():
     )
     assert result.amount == Decimal("1250000")
     assert result.currency == "RWF"
+
+
+# ------------------------------------------- a foreign purchase on a local card
+
+
+class FakeConverter:
+    """Only the two calls the parser makes, so a missing rate is easy to pose."""
+
+    def __init__(self, rate=None):
+        self._rate = rate
+
+    def rate(self, source, target):
+        return self._rate
+
+    def convert(self, amount, source, target=None):
+        return None if self._rate is None else (amount * self._rate)
+
+
+def test_a_foreign_purchase_is_restated_in_the_card_currency():
+    """The card is in francs; ten dollars is not ten francs."""
+    accounts = _accounts(("BK Credit Card", "4124", "RWF"))
+    resolved = resolve_accounts(
+        parse(CARD_PURCHASE), accounts, FakeConverter(Decimal("1475"))
+    )
+    conversion = resolved["currency_conversion"]
+    assert conversion["from_currency"] == "USD"
+    assert conversion["from_amount"] == "10.00"
+    assert conversion["to_currency"] == "RWF"
+    assert conversion["amount"] == "14750.00"
+
+
+def test_a_matching_currency_needs_no_conversion():
+    accounts = _accounts(("BK Card USD", "4124", "USD"))
+    resolved = resolve_accounts(
+        parse(CARD_PURCHASE), accounts, FakeConverter(Decimal("1475"))
+    )
+    assert resolved["currency_conversion"] is None
+
+
+def test_an_unknown_rate_still_reports_the_mismatch():
+    """The amount is in the wrong currency whether or not a rate exists, and
+    the user is the one who can fix it."""
+    accounts = _accounts(("BK Credit Card", "4124", "RWF"))
+    conversion = resolve_accounts(parse(CARD_PURCHASE), accounts, FakeConverter(None))[
+        "currency_conversion"
+    ]
+    assert conversion is not None
+    assert conversion["amount"] is None
+    assert conversion["from_currency"] == "USD"
+
+
+def test_no_account_means_no_conversion():
+    """Nothing to convert into until the account is known."""
+    accounts = _accounts(("Someone else", "9999", "RWF"))
+    resolved = resolve_accounts(
+        parse(CARD_PURCHASE), accounts, FakeConverter(Decimal("1475"))
+    )
+    assert resolved["currency_conversion"] is None
+
+
+def test_the_balance_keeps_its_own_currency():
+    """The purchase is in dollars and the balance is in francs. Labelling the
+    balance with the purchase's currency states something never said."""
+    result = parse(CARD_PURCHASE)
+    assert result.currency == "USD"
+    assert result.balance_currency == "RWF"
+    assert result.balance_after == Decimal("268026")

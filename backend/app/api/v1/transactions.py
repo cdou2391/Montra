@@ -97,7 +97,14 @@ def parse_sms(
     draft = sms_parser.serialize(parsed)
 
     accounts = list(db.scalars(authz.visible_accounts(db, user)))
-    draft.update(sms_parser.resolve_accounts(parsed, accounts))
+    # A foreign purchase on a local card is quoted in the currency it was made
+    # in, and a ledger entry is in its account's currency — so the draft has to
+    # carry both, and say which is which.
+    from app.services.currency import converter_for
+
+    draft.update(
+        sms_parser.resolve_accounts(parsed, accounts, converter_for(db, user=user))
+    )
     db.commit()
     return single(draft)
 
