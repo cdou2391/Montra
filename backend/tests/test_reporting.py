@@ -69,7 +69,7 @@ def test_personal_net_worth_includes_loans_both_ways(db, user):
 
 
 def test_personal_shows_shared_separately_rather_than_splitting_it(db, user, other_user, family):
-    """Data Model section 49: never attribute half a household balance to each
+    """never attribute half a household balance to each
     member — that is a guess presented as a number."""
     make_account(db, user, "Mine", Visibility.PRIVATE, opening="1000000")
     make_account(db, user, "Household", Visibility.SHARED, opening="600000")
@@ -109,7 +109,6 @@ def test_family_net_worth_excludes_private_accounts(db, user, other_user, family
 
 
 def test_a_shared_account_counts_once_not_once_per_member(db, user, other_user, family):
-    """Data Model section 51."""
     make_account(db, user, "Household", Visibility.SHARED, opening="600000")
 
     for viewer in (user, other_user):
@@ -128,7 +127,7 @@ def test_family_view_without_a_household_is_empty_not_an_error(db, user):
 
 
 def test_month_flows_exclude_transfers_and_adjustments(db, user):
-    """Data Model section 52: moving your own money is neither earning nor
+    """moving your own money is neither earning nor
     spending."""
     a = make_account(db, user, "Bank", Visibility.PRIVATE, opening="1000000")
     b = make_account(db, user, "Savings", Visibility.PRIVATE, opening="0")

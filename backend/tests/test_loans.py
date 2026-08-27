@@ -332,7 +332,7 @@ def test_payment_must_come_from_an_asset_account(db, credit_card, user):
 
 
 def test_outstanding_is_derived_never_overwritten(db, bank_account, user):
-    """Data Model section 33: the original loan amount is never rewritten."""
+    """the original loan amount is never rewritten."""
     loan = _loan(db, user, original_principal=Decimal("100000"), opening=Decimal("100000"))
     db.commit()
     for _ in range(4):

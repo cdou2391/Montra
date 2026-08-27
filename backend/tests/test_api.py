@@ -1004,7 +1004,7 @@ def test_sharing_an_account_makes_it_visible_to_the_household(client):
 
 
 def test_joining_leaves_your_own_accounts_private(client):
-    """Implementation Plan Phase 18: nothing is shared until you say so."""
+    """Nothing is shared until you say so."""
     _register(client, email="owner@example.com")
     family_id = client.post("/api/v1/families", json={"name": "H", "base_currency": "RWF"}).json()[
         "data"

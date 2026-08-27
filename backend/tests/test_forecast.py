@@ -68,7 +68,7 @@ def test_items_beyond_the_period_are_not_counted(db, user):
 
 
 def test_cancelled_items_are_excluded(db, user):
-    """FSD section 111: a cancelled item never happens."""
+    """a cancelled item never happens."""
     account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="500000")
     planned = _plan(db, user, account, PlannedType.EXPENSE, "100000", 3)
     db.commit()
@@ -95,7 +95,7 @@ def test_completed_items_are_not_counted_twice(db, user):
 
 
 def test_an_internal_transfer_does_not_change_the_total(db, user):
-    """FSD section 112: moving money between two accounts you already count is
+    """moving money between two accounts you already count is
     movement, not cash flow."""
     a = make_account(db, user, "Bank", Visibility.PRIVATE, opening="500000")
     b = make_account(db, user, "Savings", Visibility.PRIVATE, opening="100000")
@@ -196,7 +196,7 @@ def test_the_last_point_matches_the_ending_balance(db, user):
 
 
 def test_family_forecast_excludes_private_items(db, user, other_user, family):
-    """FSD section 111: private financial events are not household cash flow."""
+    """private financial events are not household cash flow."""
     visible = make_account(db, user, "Salary", Visibility.FAMILY_VISIBLE, opening="300000")
     secret = make_account(db, other_user, "Secret", Visibility.PRIVATE, opening="900000")
     _plan(db, user, visible, PlannedType.EXPENSE, "50000", 3)
@@ -211,7 +211,7 @@ def test_family_forecast_excludes_private_items(db, user, other_user, family):
 def test_a_family_visible_to_shared_transfer_is_not_household_cash_flow(
     db, user, other_user, family
 ):
-    """FSD section 112, in household scope."""
+    """In household scope."""
     a = make_account(db, user, "Salary", Visibility.FAMILY_VISIBLE, opening="400000")
     b = make_account(db, user, "Household", Visibility.SHARED, opening="200000")
     planning.create_planned(

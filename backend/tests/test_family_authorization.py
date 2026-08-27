@@ -1,8 +1,4 @@
-"""Family authorization.
-
-Implementation Plan Phase 17 calls this a security milestone and says the
-scenarios must be tested exhaustively before any family dashboard is built.
-This is that matrix.
+"""Family authorization — the visibility matrix, tested exhaustively.
 
 The rules under test:
 
@@ -161,7 +157,7 @@ def test_removing_a_member_unshares_their_accounts(db, user, other_user, family)
 
 
 def test_transactions_resolve_through_their_account_not_their_author(db, user, other_user, family):
-    """Data Model section 47: never authorize a transaction on created_by."""
+    """never authorize a transaction on created_by."""
     from app.services.posting import PostingService
     from app.services.transactions import get_transaction
 
@@ -200,7 +196,7 @@ def test_family_visible_transactions_are_readable_by_a_member(db, user, other_us
 
 
 def test_personal_scope_includes_own_accounts_and_shared_ones(db, user, other_user, family):
-    """Data Model section 49: personal includes what you own whatever its
+    """personal includes what you own whatever its
     visibility, plus the household's shared accounts, which are genuinely
     yours to use."""
     make_account(db, user, "Mine Private", Visibility.PRIVATE)
@@ -214,7 +210,6 @@ def test_personal_scope_includes_own_accounts_and_shared_ones(db, user, other_us
 
 
 def test_family_scope_excludes_private_whoever_owns_it(db, user, other_user, family):
-    """Data Model section 50."""
     make_account(db, user, "Mine Private", Visibility.PRIVATE)
     make_account(db, user, "Mine Visible", Visibility.FAMILY_VISIBLE)
     make_account(db, other_user, "Theirs Private", Visibility.PRIVATE)
@@ -230,7 +225,7 @@ def test_family_scope_is_empty_without_a_household(db, user):
 
 
 def test_a_shared_account_appears_once_not_once_per_member(db, user, other_user, family):
-    """Data Model section 51: aggregation must not double count."""
+    """aggregation must not double count."""
     make_account(db, user, "Household", Visibility.SHARED)
     rows = db.scalars(authz.visible_accounts(db, user, context="family")).all()
     assert len(rows) == 1

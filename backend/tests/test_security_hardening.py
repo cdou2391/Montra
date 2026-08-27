@@ -1,8 +1,7 @@
-"""Phase 29 — the attacks the plan names, written down as tests.
+"""The attacks worth trying, written down as tests.
 
-The plan lists five scenarios to try by hand. Trying them by hand proves they
-were safe on the day someone remembered to try; a test proves it stays that
-way. Each one below is one of those scenarios.
+Trying them by hand proves they were safe on the day someone remembered to
+try; a test proves it stays that way.
 """
 
 import uuid

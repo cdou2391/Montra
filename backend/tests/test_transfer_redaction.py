@@ -1,7 +1,7 @@
 """Private transfer redaction.
 
-Implementation Plan Phase 20, tested at the serialization layer as the spec
-requires — the point is what leaves the API, not what the database holds.
+Tested at the serialization layer: the point is what leaves the API, not what
+the database holds.
 
 The scenario: money moves from a shared household account into one member's
 private account. The other member may see that it happened and for how much.
@@ -85,7 +85,7 @@ def test_the_owner_of_the_private_account_sees_it_in_full(db, user, other_user, 
 
 
 def test_the_linkage_is_not_broken_to_achieve_this(db, user, other_user, family):
-    """Data Model section 48: do not solve redaction by severing the transfer
+    """do not solve redaction by severing the transfer
     in the database. It stays one logical movement with two entries."""
     from sqlalchemy import select
 

@@ -1,9 +1,8 @@
 """Recurring and planned transfers.
 
-Data Model section 76 always anticipated TRANSFER as a planned type; this is
-that extension. The property under test is the same one that governs all
-planning: a planned transfer moves nothing until it is completed, and when it
-is, it completes as a real transfer — two linked entries, no expense.
+The same property that governs all planning: a planned transfer moves nothing
+until completed, and then completes as a real transfer — two linked entries,
+no expense.
 """
 
 from datetime import UTC, date, datetime

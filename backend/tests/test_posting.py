@@ -1,7 +1,6 @@
 """Financial invariant tests for the posting engine.
 
-Implementation Plan Phase 5: "This is one of the most important phases in the
-project." These assert the ledger rules directly, not through the API.
+These assert the ledger rules directly, not through the API.
 """
 
 from datetime import UTC, datetime
@@ -75,7 +74,7 @@ def test_expense_from_asset_decreases_balance(db, bank_account):
 
 
 def test_credit_card_expense_increases_debt(db, credit_card):
-    """Data Model section 83: a card purchase raises the liability balance."""
+    """a card purchase raises the liability balance."""
     posting = PostingService(db)
     txn = posting.record_expense(
         account=credit_card,
@@ -104,7 +103,7 @@ def test_credit_card_expense_is_still_an_expense(db, credit_card):
 
 
 def test_credit_card_payment_decreases_debt(db, bank_account, credit_card):
-    """Data Model section 84: both sides of a repayment are DECREASE."""
+    """both sides of a repayment are DECREASE."""
     posting = PostingService(db)
     posting.transfer_funds(
         source=bank_account,
