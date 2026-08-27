@@ -100,25 +100,6 @@ export default function Accounts() {
     );
   }
 
-  // The base-currency figure, not the raw balance — see the note on Home.
-  // Excluded accounts stay in the list below but out of these two totals.
-  const counted = accounts.filter((a) => !a.excluded_from_totals);
-  const excludedCount = accounts.length - counted.length;
-  const unconverted = new Set(
-    counted.filter((a) => a.balance_in_base === null).map((a) => a.currency),
-  );
-  const totals = counted.reduce(
-    (acc, a) => {
-      if (a.balance_in_base === null) return acc;
-      const value = Number(a.balance_in_base);
-      if (a.account_nature === "LIABILITY") acc.owed += value;
-      else acc.available += value;
-      return acc;
-    },
-    { available: 0, owed: 0 },
-  );
-
-  const baseCurrency = accounts[0]?.base_currency ?? accounts[0]?.currency ?? "RWF";
   const rows = active ? activity[active.id] : undefined;
 
   return (
@@ -129,63 +110,19 @@ export default function Accounts() {
         title="Accounts"
         icon="wallet"
         action={
-          <Link href="/accounts/new">
-            <Button>
-              <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">New account</span>
-            </Button>
-          </Link>
+          <>
+            <Link href="/accounts/new">
+              <Button>
+                <span className="sm:hidden">Add</span>
+                <span className="hidden sm:inline">New account</span>
+              </Button>
+            </Link>
+            {/* Last in the action slot, so it sits immediately left of the
+                bell — the same place Home puts it. */}
+            <BalancePrivacyToggle />
+          </>
         }
       />
-
-      {/* Totals across every account, so swiping never loses the whole picture. */}
-      <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <BalancePrivacyToggle className="order-last ml-auto" />
-        <div>
-          <span className="text-xs uppercase tracking-wide text-content-muted">
-            Total available
-          </span>
-          <p className="mt-0.5">
-            {/* The base currency, not the first account's — the total is in
-                base currency, and labelling it with whichever account happened
-                to sort first would misname it outright. */}
-            <MoneyValue
-              amount={String(totals.available)}
-              currency={baseCurrency}
-              hidden={hidden}
-            />
-          </p>
-        </div>
-        {totals.owed > 0 && (
-          <div>
-            <span className="text-xs uppercase tracking-wide text-content-muted">Owed</span>
-            <p className="mt-0.5">
-              <MoneyValue
-                amount={String(totals.owed)}
-                currency={baseCurrency}
-                tone="expense"
-                hidden={hidden}
-              />
-            </p>
-          </div>
-        )}
-        {unconverted.size > 0 && (
-          <p className="order-last w-full text-xs text-semantic-warning">
-            Not counting your {[...unconverted].join(" and ")} balance
-            {unconverted.size === 1 ? "" : "s"} —{" "}
-            <Link href="/profile" className="pressable underline">
-              set an exchange rate
-            </Link>
-            .
-          </p>
-        )}
-        {excludedCount > 0 && (
-          <p className="order-last w-full text-xs text-content-muted">
-            {excludedCount} account{excludedCount === 1 ? " is" : "s are"} excluded from
-            these totals.
-          </p>
-        )}
-      </div>
 
       {/* ---------------------------------------------- mobile + tablet: carousel */}
       <div className="lg:hidden">
