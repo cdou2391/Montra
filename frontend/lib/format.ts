@@ -30,6 +30,24 @@ export function formatTime(iso: string): string {
   });
 }
 
+/**
+ * Weekday and day, for a list where several rows fall on different days.
+ *
+ * The weekday earns its place in a planning list — "Fri 28 Aug" answers "when
+ * do I get paid" in a way "28 Aug" does not. The year appears only when it is
+ * not the current one, so the common case stays short enough to sit beside an
+ * account name without truncating.
+ */
+export function formatDayShort(iso: string): string {
+  const value = new Date(iso);
+  return value.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(value.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
 export function formatDateTime(iso: string): string {
   return `${formatDate(iso)}, ${formatTime(iso)}`;
 }

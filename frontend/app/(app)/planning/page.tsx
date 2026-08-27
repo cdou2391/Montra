@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { LoanPaymentDue, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
-import { formatDate, formatMoney, formatTime } from "@/lib/format";
+import { formatDayShort, formatMoney, formatTime } from "@/lib/format";
 import { Icon } from "@/components/icons";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
@@ -16,19 +16,24 @@ import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui"
  * touched a balance yet — completing an item is what posts it.
  */
 
+// `dated` marks the groups that span more than one day, where a row has to
+// carry its own date. Under "Today" and "Tomorrow" the heading already says
+// which day it is, and repeating it on every row is noise.
 const BUCKETS = [
-  { key: "OVERDUE", label: "Overdue", tone: "expense" as const },
-  { key: "TODAY", label: "Today", tone: "warning" as const },
-  { key: "TOMORROW", label: "Tomorrow", tone: "neutral" as const },
-  { key: "THIS_WEEK", label: "This week", tone: "neutral" as const },
-  { key: "LATER", label: "Later", tone: "neutral" as const },
+  { key: "OVERDUE", label: "Overdue", tone: "expense" as const, dated: true },
+  { key: "TODAY", label: "Today", tone: "warning" as const, dated: false },
+  { key: "TOMORROW", label: "Tomorrow", tone: "neutral" as const, dated: false },
+  { key: "THIS_WEEK", label: "This week", tone: "neutral" as const, dated: true },
+  { key: "LATER", label: "Later", tone: "neutral" as const, dated: true },
 ];
 
 function PlannedRow({
   planned,
+  showDate,
   onChanged,
 }: {
   planned: PlannedTransaction;
+  showDate: boolean;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -52,7 +57,13 @@ function PlannedRow({
           <p className="truncate text-sm font-medium text-content-primary">
             {planned.description}
           </p>
-          <p className="mt-0.5 truncate text-xs text-content-secondary">
+          {/* Wraps rather than truncating: with a date in front, one line is
+              no longer enough for a transfer's two account names, and the row
+              has the vertical space to spare. */}
+          <p className="mt-0.5 text-xs text-content-secondary">
+            {/* Date first — which day it falls on is what tells two otherwise
+                identical recurring rows apart. */}
+            {showDate ? `${formatDayShort(planned.expected_at)}, ` : ""}
             {formatTime(planned.expected_at)}
             {planned.account ? ` · ${planned.account.name}` : ""}
             {/* Both sides, since a transfer without its destination is half a
@@ -124,8 +135,11 @@ function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
             <p className="truncate text-sm font-medium text-content-primary">
               {due.description}
             </p>
-            <p className="mt-0.5 truncate text-xs text-content-secondary">
-              {formatDate(`${due.due_date}T00:00:00`)}
+            <p className="mt-0.5 text-xs text-content-secondary">
+              {/* Same date format as the planned rows beside it. A loan is
+                  due on a day rather than at a time, so this stays put even
+                  under Today, where it is the row's only temporal anchor. */}
+              {formatDayShort(`${due.due_date}T00:00:00`)}
               {due.counterparty ? ` · ${due.counterparty}` : ""}
               {" · "}
               {owed ? "Loan payment" : "Repayment due to you"}
@@ -284,7 +298,12 @@ export default function Planning() {
                 </div>
                 <Card>
                   {group.items.map((p) => (
-                    <PlannedRow key={p.id} planned={p} onChanged={load} />
+                    <PlannedRow
+                      key={p.id}
+                      planned={p}
+                      showDate={group.dated}
+                      onChanged={load}
+                    />
                   ))}
                   {group.loans.map((l) => (
                     <LoanPaymentRow key={l.id} due={l} />
