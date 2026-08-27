@@ -151,10 +151,13 @@ export function CarouselPosition({
   label?: string;
 }) {
   if (count < 2) return null;
+  // Announced, not shown. The chevrons and the cards themselves say where you
+  // are well enough on screen, but arrowing through a carousel gives a screen
+  // reader nothing to go on without this.
   return (
-    <p aria-live="polite" className="mt-3 text-center text-xs text-content-muted">
-      <span className="text-content-secondary">{index + 1}</span> of {count}
-      {label ? <span className="sr-only"> — {label}</span> : null}
+    <p aria-live="polite" className="sr-only">
+      {index + 1} of {count}
+      {label ? ` — ${label}` : ""}
     </p>
   );
 }
