@@ -12,30 +12,26 @@ document set that is not published with the source.
 
 ## Current status
 
-Implemented through **Phase 23** of the implementation plan — milestones
-**M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**, **M4 (Planning)**,
-**M5 (Debt)**, **M6 (Family)**, and the dashboard and net-worth half of **M7**.
+Implemented through **Phase 29** of the implementation plan — milestones
+**M1 (Platform)** through **M7 (Reporting)**, plus search, attachments,
+auditing and security hardening.
 
-| Working | Not yet built |
+| Area | What works |
 |---|---|
-| Registration, login, logout, sessions | Cash-flow forecast and insights |
-| Default categories and onboarding | Attachments, audit log, CSV import/export |
-| Accounts of all eight types | |
-| The financial posting engine | |
-| Income, expenses, transfers | |
-| Balance reconciliation | |
-| Credit cards: limit, utilization, due date, payments | |
-| Prepaid cards and top-ups | |
-| Upcoming and recurring transactions | |
-| Reminders, worker, scheduler, notifications | |
-| Loans payable and receivable | |
-| Households, sharing, permissions | Cash-flow forecast and insights |
-| Personal / Family context switch | Attachments, audit log, CSV import/export |
-| Dashboard and net worth | |
+| Accounts | Eight types — checking, savings, cash, mobile money, credit card, prepaid card, investment, other. Reconciliation, archiving, per-account exclusion from totals |
+| Ledger | Income, expenses, transfers, fees as their own line, soft deletes, idempotent transfers |
+| Cards | Credit limit, utilization, available credit, statement and due dates, payments, prepaid top-ups, expiry warnings |
+| Planning | Upcoming and recurring transactions, rescheduling, completion, a 90-day recurrence window |
+| Debt | Loans payable and receivable, amortized schedules, principal/interest/fee splits |
+| Household | Three visibility levels, membership roles, sharing, personal/family context switch |
+| Reporting | Dashboard, net worth, 30-day cash-flow forecast, insights |
+| Money in | Paste a mobile-money, bank or card SMS and the form fills itself |
+| Currency | Multi-currency accounts converted to one base, with rates fetched daily |
+| Records | Receipts and proof attached to transactions, household audit trail, JSON backup and restore |
+| Interface | Installable PWA, light and dark themes, search and filters |
 
-Family sharing is deliberately refused rather than half-enforced: creating a
-`FAMILY_VISIBLE` or `SHARED` account returns `NO_ACTIVE_FAMILY` until the
-authorization rules in Phases 16-19 exist to back it up.
+Not built: CSV import/export, budgets, and the observability and production
+work of Phases 30-31. Backup and restore are JSON rather than CSV.
 
 ---
 
@@ -50,10 +46,16 @@ docker compose up -d
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
+| App, through the proxy | http://localhost:8080 |
+| Frontend, direct | http://localhost:3000 |
 | API | http://localhost:8000/api/v1 |
 | OpenAPI docs | http://localhost:8000/api/v1/docs |
+| Object storage console | http://localhost:9001 |
 | Mail catcher | http://localhost:8025 |
+
+Use the proxy for anything involving attachments: an upload is signed against
+the host that issued it, so reaching the frontend and the storage through the
+same origin is what makes the signature verify.
 
 Then apply migrations and open the app:
 
@@ -70,17 +72,27 @@ docker compose run --rm --no-deps api alembic upgrade head
 A modular monolith.
 
 ```text
-web (Next.js) ──▶ api (FastAPI) ──┬──▶ postgres   financial source of truth
-                                  └──▶ redis      queue and cache
-                                            ▲
-                       worker + scheduler ──┘     Celery: recurrence, reminders
+browser ──▶ proxy (nginx) ──┬──▶ web (Next.js)
+                            ├──▶ api (FastAPI)
+                            └──▶ minio         receipts, fetched on a signed URL
+
+api ──┬──▶ postgres   financial source of truth
+      ├──▶ redis      queue, cache, rate limiting
+      └──▶ minio      issues the signed URLs
+
+worker + scheduler ──▶ postgres, redis
+      Celery: recurrence, reminders, expiry warnings, FX rates
 ```
 
 Queues are `default`, `recurring`, `reminders` and `notifications`. Beat
 regenerates the 90-day recurrence window hourly, sweeps due reminders every 15
-minutes, and promotes due planned items on the hour. Every schedule and
-reminder definition lives in Postgres, never only in the broker: losing Redis
-loses no reminders, because the next run re-reads state from the database.
+minutes, promotes due planned items on the hour, warns about expiring cards at
+06:30, and refreshes exchange rates at 07:00 — published rates settle
+overnight, so the day's totals are current before anyone opens the app.
+
+Every schedule and reminder definition lives in Postgres, never only in the
+broker: losing Redis loses no reminders, because the next run re-reads state
+from the database.
 
 ```text
 backend/
@@ -90,13 +102,16 @@ backend/
     db/          engine, session, enums
     models/      SQLAlchemy models
     schemas/     Pydantic request models
-    services/    domain logic — posting, accounts, transactions, auth, authz
+    services/    domain logic — posting, accounts, transactions, auth, authz,
+                 forecast, insights, currency, sms_parser, attachments, audit
   alembic/       migrations
   tests/         ledger invariants and API behaviour
 frontend/
   app/           Next.js routes
   components/    shell, UI primitives, financial components
   lib/           API client, formatting
+infra/nginx/     the proxy that fronts the app and the object store
+scripts/         security-scan.sh — dependency and container advisories
 ```
 
 ---
@@ -146,7 +161,7 @@ account's perspective.
 make test
 ```
 
-295 tests. The ledger suites
+649 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
@@ -166,7 +181,15 @@ repayment is not all spending.
 the visibility matrix the plan gates the family work on, and
 [`test_transfer_redaction.py`](backend/tests/test_transfer_redaction.py) checks
 at the serialization layer that a private counterparty never leaves the API.
-Coverage elsewhere is deliberately lighter.
+[`test_sms_parser.py`](backend/tests/test_sms_parser.py) pins each message
+format the parser claims to read, including the ones it must refuse — a
+declined card authorisation fills nothing, because prefilling a purchase that
+never happened puts it one tap from being posted.
+[`test_currency.py`](backend/tests/test_currency.py) covers conversion and the
+rule that an unconvertible balance is named rather than added at 1:1, and
+[`test_security_hardening.py`](backend/tests/test_security_hardening.py) holds
+the password policy, rate limiting and origin checks. Coverage elsewhere is
+deliberately lighter.
 
 ---
 
@@ -213,3 +236,22 @@ Coverage elsewhere is deliberately lighter.
   leaving returns everything to private.
 - Private data is excluded from aggregates before they are summed, and scoping
   is by account, so a shared account counts once rather than once per member.
+- A ledger entry is denominated in its account's currency; there is no
+  per-transaction currency. Mixed-currency totals are converted first, and a
+  balance with no known rate is left out of the sum and named, because adding
+  dollars to francs at 1:1 gives a wrong total rather than a rough one.
+- Exchange rates are fetched daily into a shared table with two bases. A pair
+  neither base covers is crossed through one of them rather than fetched.
+- The SMS parser writes nothing. It returns a draft the user submits, so a
+  misread message costs a correction rather than a wrong balance. Every field
+  is optional: a blank field is obvious on the form, while an invented amount
+  looks exactly like a real one.
+- Attachments are uploaded and fetched on signed URLs issued by the API; the
+  bucket is never public. The signature covers the host as well as the path,
+  which is why the proxy passes the original `Host` through unchanged.
+- Passwords are checked on length and guessability rather than composition
+  rules. Rate limiting is fixed-window in Redis and fails open — an outage
+  degrades enforcement rather than locking everyone out.
+- Cross-origin writes are refused by comparing `Origin` against the host that
+  served the request, not against a fixed allowlist that breaks the moment the
+  app is reached by a hostname nobody thought to add.
