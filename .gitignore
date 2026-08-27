@@ -28,3 +28,8 @@ backend/celerybeat.pid
 .DS_Store
 .idea/
 .vscode/
+
+# pnpm content-addressable cache. A build fetches from the lockfile, so this
+# is a local cache rather than a source, and it carries files far past what
+# GitHub will accept.
+frontend/.pnpm-store/
