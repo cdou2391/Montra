@@ -61,7 +61,6 @@ export default function Home() {
   // An account the owner excluded from totals is left out first — it is still
   // listed and still spends, it just is not part of what they count as theirs.
   const counted = (accounts ?? []).filter((a) => !a.excluded_from_totals);
-  const excludedCount = (accounts ?? []).length - counted.length;
   const unconverted = new Set(
     counted.filter((a) => a.balance_in_base === null).map((a) => a.currency),
   );
@@ -124,17 +123,6 @@ export default function Home() {
                 .
               </p>
             )}
-            <p className="mt-1 text-xs text-content-muted">
-              Assets minus what you owe, across {counted.length} account
-              {counted.length === 1 ? "" : "s"}
-              {loans.length > 0
-                ? ` and ${loans.length} loan${loans.length === 1 ? "" : "s"}`
-                : ""}
-              {excludedCount > 0
-                ? `. ${excludedCount} account${excludedCount === 1 ? " is" : "s are"} excluded`
-                : ""}
-              .
-            </p>
           </Card>
 
           <div className="mb-6 grid grid-cols-2 gap-3">
