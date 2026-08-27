@@ -1,4 +1,4 @@
-"""Transaction query and mutation service (Implementation Plan Phase 6).
+"""Transaction query and mutation service.
 
 All balance-moving writes delegate to PostingService; nothing here decides a
 ledger direction on its own.
@@ -80,8 +80,7 @@ def create_transaction(
     if category_id is not None:
         _require_own_category(db, category_id, user)
 
-    # A client may post a naive local datetime; anchor it to the user's zone
-    # before it reaches the ledger, where everything is UTC.
+    # A naive local datetime is anchored to the user's zone; the ledger is UTC.
     occurred_at = ensure_aware(occurred_at, user.timezone)
 
     posting = PostingService(db)
@@ -117,27 +116,24 @@ def create_transaction(
         )
 
     if fee_amount is not None:
-        # Its own line, not an adjustment to the amount above. The bank charged
-        # two separate sums and the statement will show two; folding them
-        # together would make every reconciliation off by the fee, and would
-        # quietly overstate what the purchase itself cost.
+        # Its own line, not an adjustment to the amount above: the statement
+        # shows two sums, and folding them would overstate the purchase and
+        # leave every reconciliation off by the fee.
         posting.record_expense(
             account=account,
             amount=fee_amount,
             currency=account.currency,
             occurred_at=occurred_at,
             actor_id=user.id,
-            # Filed as a fee, not as whatever the charge was for. A bank
-            # charge on a grocery run is not money spent on groceries, and
-            # counting it there would quietly inflate that category.
+            # A charge on a grocery run is not money spent on groceries.
             category_id=category_service.fee_category_id(db, user_id=user.id),
             description=_fee_description(description, merchant),
             merchant=merchant,
             fee_for_transaction_id=txn.id,
         )
 
-    # Spending on a shared account is the household's business in a way that
-    # spending on a private one is not, so the two are distinguishable events.
+    # Spending on a shared account is the household's business; on a private
+    # one it is not.
     audit.record(
         db,
         actor=user,
@@ -201,8 +197,7 @@ def update_transaction(
             raise ValidationFailed(
                 details=[{"field": "amount", "message": "Amount must be greater than zero."}]
             )
-        # Direction is a function of type and account nature, both unchanged
-        # here, so re-deriving it is unnecessary: only the magnitude moves.
+        # Type and nature are unchanged, so only the magnitude moves.
         txn.amount = amount
     if occurred_at is not None:
         txn.occurred_at = ensure_aware(occurred_at, user.timezone)
@@ -231,9 +226,8 @@ def delete_transaction(db: DbSession, *, user: User, transaction_id: uuid.UUID) 
     account = get_transactable_account(db, txn.account_id, user)
     now = utcnow()
     txn.deleted_at = now
-    # The fee only existed because of this charge. Leaving it behind would
-    # strand a line nobody can explain, and leave the balance wrong by its
-    # value relative to what the user thinks they just removed.
+    # It existed only because of this charge; leaving it strands a line nobody
+    # can explain and a balance wrong by its value.
     for fee in db.scalars(
         select(Transaction).where(
             Transaction.fee_for_transaction_id == txn.id, Transaction.deleted_at.is_(None)
@@ -241,8 +235,7 @@ def delete_transaction(db: DbSession, *, user: User, transaction_id: uuid.UUID) 
     ):
         fee.deleted_at = now
     db.flush()
-    # The row is tombstoned, so the trail is the only thing that will still say
-    # this happened at all.
+    # The row is tombstoned, so the trail is the only remaining record.
     audit.record(
         db,
         actor=user,

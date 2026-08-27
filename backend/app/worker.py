@@ -41,9 +41,8 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
-    # Keep the forward window populated. Hourly is far more often than needed
-    # for a 90-day window, but the task is idempotent and cheap, and it means a
-    # missed run never leaves a gap.
+    # Far more often than a 90-day window needs, but idempotent and cheap, so
+    # a missed run never leaves a gap.
     "generate-recurring-occurrences": {
         "task": "montra.generate_recurring_occurrences",
         "schedule": crontab(minute=5),
@@ -56,14 +55,12 @@ celery_app.conf.beat_schedule = {
         "task": "montra.refresh_planned_status",
         "schedule": crontab(minute=0),
     },
-    # A card expiry moves once a day at most, so once a day is enough. Early
-    # morning, so the notice is waiting rather than arriving mid-evening.
+    # Early, so the notice is waiting rather than arriving mid-evening.
     "notify-expiring-cards": {
         "task": "montra.notify_expiring_cards",
         "schedule": crontab(hour=6, minute=30),
     },
-    # Published rates settle overnight; 07:00 means the day's totals are
-    # already current by the time anyone opens the app.
+    # Rates settle overnight, so totals are current before anyone opens the app.
     "refresh-exchange-rates": {
         "task": "montra.refresh_exchange_rates",
         "schedule": crontab(hour=7, minute=0),
@@ -100,7 +97,7 @@ def generate_recurring_occurrences() -> int:
             try:
                 created += len(generate_occurrences(db, rule, owner=owner))
             except Exception:
-                # One bad rule must not stop the rest of the run.
+                # One bad rule must not stop the run.
                 logger.exception("recurrence generation failed for rule %s", rule.id)
                 db.rollback()
         db.commit()

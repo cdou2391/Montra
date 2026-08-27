@@ -1,12 +1,12 @@
-"""Loan domain service (Implementation Plan Phase 15).
+"""Loan domain service.
 
-A loan payment is not one financial event but up to three, and conflating them
-is the mistake this module exists to prevent:
+A loan payment is up to three financial events, and conflating them is the
+mistake this module exists to prevent:
 
     principal  -> settles debt already carried, or returns money already lent.
                   Moves the loan balance. Never income or expense.
-    interest    -> a real cost (PAYABLE) or a real earning (RECEIVABLE).
-    fees        -> likewise.
+    interest   -> a real cost (PAYABLE) or earning (RECEIVABLE).
+    fees       -> likewise.
 
 Cash moves by the total; analytics move by interest and fees only.
 """
@@ -43,11 +43,8 @@ ZERO = Decimal("0")
 
 
 def get_loan(db: DbSession, loan_id: uuid.UUID, user: User) -> Loan:
-    """Fetch a loan the user may see.
-
-    404 rather than 403 when they may not, so the API never confirms that
-    someone else's private loan exists.
-    """
+    """Fetch a loan the user may see. 404 rather than 403, so the API never
+    confirms someone else's private loan exists."""
     loan = db.get(Loan, loan_id)
     if loan is None or loan.owner_user_id != user.id:
         raise NotFound("Loan not found.", code="LOAN_NOT_FOUND")
@@ -138,7 +135,7 @@ def principal_paid(db: DbSession, loan: Loan) -> Decimal:
 
 
 def outstanding_principal(db: DbSession, loan: Loan) -> Decimal:
-    """Data Model section 33: derived, never an overwritten column."""
+    """Derived, never an overwritten column."""
     return Decimal(loan.opening_outstanding_principal) - principal_paid(db, loan)
 
 
@@ -190,8 +187,7 @@ def record_payment(
             details=[{"field": "total_amount", "message": "Amount must be greater than zero."}]
         )
 
-    # The allocation must account for every unit of the payment, or the ledger
-    # and the loan balance disagree by the difference.
+    # Every unit must be allocated, or the ledger and the loan balance drift.
     if principal_amount + interest_amount + fee_amount != total_amount:
         raise ValidationFailed(
             "Principal, interest and fees must add up to the total.",
@@ -287,8 +283,7 @@ def record_payment(
     if outstanding_principal(db, loan) == 0 and loan.status is LoanStatus.ACTIVE:
         loan.status = LoanStatus.SETTLED
     else:
-        # Move the schedule on, or the loan stays permanently due on the same
-        # date and the upcoming list never changes.
+        # Or the loan stays due on the same date for ever.
         advance_schedule(db, loan, paid_on=payment_date)
 
     db.flush()
@@ -308,10 +303,9 @@ def record_payment(
 def advance_schedule(db: DbSession, loan: Loan, *, paid_on: date) -> date | None:
     """Move next_payment_date on by exactly one instalment.
 
-    One payment settles one scheduled instalment, whether it arrives early or
-    late. Advancing past the payment date instead would silently forgive missed
-    instalments on a late payment, and paying a few days early would leave the
-    loan still showing as due.
+    One payment settles one instalment, early or late. Advancing to "past
+    today" instead would forgive missed instalments on a late payment, and
+    paying early would leave the loan still showing as due.
     """
     if loan.payment_frequency is None or loan.next_payment_date is None:
         return loan.next_payment_date

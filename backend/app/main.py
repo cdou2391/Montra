@@ -23,8 +23,7 @@ configure_logging()
 def refuse_unsafe_production() -> None:
     """Fail loudly rather than run wide open.
 
-    Every one of these is a setting that is right on a laptop and wrong in
-    public, and each is the kind of thing that is noticed after it matters.
+    Each of these is right on a laptop, wrong in public, and noticed too late.
     """
     if not settings.is_production:
         return
@@ -38,11 +37,8 @@ def refuse_unsafe_production() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Startup and shutdown.
-
-    A lifespan rather than @app.on_event: the decorator is deprecated and
-    removed in current Starlette, and this is the form that keeps working.
-    """
+    """Startup and shutdown. A lifespan rather than @app.on_event, which
+    current Starlette has removed."""
     refuse_unsafe_production()
     yield
 
@@ -78,9 +74,8 @@ async def request_context(request: Request, call_next):
     return response
 
 
-# The API serves JSON, never a document, so the policy can be as narrow as it
-# gets: nothing may be loaded, and nothing may embed it. The frontend's own
-# policy is a separate matter and belongs at the proxy.
+# The API serves JSON, never a document, so nothing may be loaded and nothing
+# may embed it. The frontend's own policy belongs at the proxy.
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 
@@ -90,11 +85,10 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 def _own_origin(request: Request) -> str | None:
     """The origin this request was served from, as the browser saw it.
 
-    Behind the proxy the scheme is whatever the client used, not what reached
-    the API, so the forwarded header decides it. Neither Host nor Origin can
-    be set by a page forging a request: the browser fills in Origin with the
-    attacker's site and Host with the target, which is exactly why comparing
-    them detects the forgery.
+    Behind the proxy the scheme is the client's, not what reached the API, so
+    the forwarded header decides it. A forging page can set neither header: the
+    browser fills Origin with the attacker's site and Host with the target,
+    which is why comparing them detects it.
     """
     host = request.headers.get("host")
     if not host:
@@ -102,9 +96,8 @@ def _own_origin(request: Request) -> str | None:
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme).split(",")[0].strip()
     return f"{scheme}://{host}"
 
-# Bodies larger than this are refused before they are read. Attachments do not
-# come through here — they go straight to object storage on a signed URL — so
-# nothing legitimate posted to the API is anywhere near a megabyte.
+# Refused before being read. Attachments go straight to object storage on a
+# signed URL, so nothing legitimate here is near a megabyte.
 MAX_BODY_BYTES = 1_048_576
 
 
@@ -112,9 +105,7 @@ MAX_BODY_BYTES = 1_048_576
 async def enforce_request_limits(request: Request, call_next):
     """Reject an oversized body on its declared length.
 
-    Cheaper than reading it: a client that lies about Content-Length still has
-    to get past the proxy's own cap, and this stops the honest-but-enormous
-    request from being parsed at all.
+    Cheaper than reading it. A client that lies still meets the proxy's cap.
     """
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
@@ -135,15 +126,12 @@ async def enforce_request_limits(request: Request, call_next):
 async def verify_same_origin(request: Request, call_next):
     """Reject a state-changing request that came from somewhere else.
 
-    The session is a cookie, so a browser will attach it to a request the user
+    The session is a cookie, so a browser attaches it to requests the user
     never meant to make. SameSite=Lax already blocks the cross-site form post,
-    but it is one setting away from being wrong and says nothing about older
-    browsers — so the origin is checked as well.
+    but it is one setting from being wrong, so the origin is checked too.
 
-    Only unsafe methods are checked, and only when the browser told us where
-    the request came from. A native client or a script sends no Origin at all;
-    those are not the requests this protects against, because they carry no
-    ambient cookie to abuse.
+    Unsafe methods only, and only when the browser said where it came from: a
+    script sends no Origin and carries no ambient cookie to abuse.
     """
     if request.method in SAFE_METHODS:
         return await call_next(request)
@@ -153,11 +141,9 @@ async def verify_same_origin(request: Request, call_next):
         return await call_next(request)
 
     if origin == _own_origin(request):
-        # The request came from the very host that served it, which is what
-        # same-origin means. Checking against a fixed list instead breaks the
-        # moment the app is reached by any hostname nobody thought to add —
-        # a tunnel, a staging domain, an IP on the local network — and breaks
-        # it as a 403 on every write, including signing in.
+        # Same-origin: it came from the host that served it. A fixed allowlist
+        # instead breaks on any hostname nobody added — a tunnel, a staging
+        # domain, a LAN IP — as a 403 on every write, signing in included.
         return await call_next(request)
 
     if origin not in settings.cors_origin_list and origin not in settings.same_origin_list:
@@ -184,8 +170,8 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
     response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
     if settings.is_production:
-        # Only in production: sending this from a development server would
-        # pin a browser to HTTPS on localhost for a year.
+        # Production only: from a dev server this pins localhost to HTTPS for
+        # a year.
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
         )

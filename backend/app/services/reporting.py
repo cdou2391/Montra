@@ -1,18 +1,15 @@
-"""Dashboard and net worth (Implementation Plan Phases 22-23).
+"""Dashboard and net worth.
 
 Two rules govern everything here.
 
-*Private data is excluded before aggregation, not after.* Filtering a total
-after the fact leaks the total. The account scope is narrowed first, and the
-sums are computed from what survives.
+*Private data is excluded before aggregation, not after* — filtering a total
+after the fact leaks the total. The scope narrows first, then it sums.
 
-*A shared account counts once.* Aggregating across memberships would count a
-household account once per member (Data Model section 51), so scoping is done
-by account, never by joining through membership rows.
+*A shared account counts once*, so scoping is by account and never by joining
+through membership rows.
 
-Personal reporting deliberately does not attribute half a shared balance to
-each member (section 49). It reports what you own, and shows the household's
-shared position beside it.
+Personal reporting shows what you own with the household's shared position
+beside it, rather than attributing half a shared balance to each member.
 """
 
 from datetime import date
@@ -78,14 +75,10 @@ def _position(
 ) -> dict:
     """Assets, liabilities and the difference, for one set of records.
 
-    Everything is converted into the reporting currency first. Adding a dollar
-    balance to a franc one at 1:1 does not give an approximate total, it gives
-    a wrong one — so a balance with no known rate is left out of the sum and
-    named in `unconverted`, for the caller to say so.
-
-    An account the owner has marked `excluded_from_totals` is left out too, and
-    counted in `excluded_accounts` for the same reason: a total that quietly
-    omits something is worse than one that says what it omitted.
+    Converted into the reporting currency first: a dollar balance added to a
+    franc one at 1:1 gives a wrong total, not an approximate one. Anything left
+    out — no known rate, or excluded by its owner — is counted and named, since
+    a total that quietly omits something is worse than one that says so.
     """
     posting = PostingService(db)
     assets = ZERO
@@ -103,8 +96,7 @@ def _position(
 
     for account in accounts:
         if account.excluded_from_totals:
-            # Still a real account with a real balance — it simply is not part
-            # of what the owner considers theirs to count.
+            # A real account with a real balance, simply not theirs to count.
             excluded += 1
             continue
         balance = _in_base(posting.balance_of(account), account.currency)
@@ -135,7 +127,6 @@ def _position(
 
 
 def net_worth(db: DbSession, *, user: User, context: str = "personal") -> dict:
-    """Implementation Plan Phase 23."""
     access = authz.resolve(db, user)
 
     if context == "family":
@@ -170,8 +161,8 @@ def net_worth(db: DbSession, *, user: User, context: str = "personal") -> dict:
         currency=user.base_currency,
         account_count=len(owned),
         loan_count=len(_loans_in_scope(db, access, "personal")),
-        # Presented separately: attributing half a household balance to each
-        # member would be a guess dressed up as a number.
+        # Separate: halving a household balance per member is a guess dressed
+        # up as a number.
         shared=(
             {
                 **_position(db, shared_accounts, shared_loans, converter),
@@ -200,9 +191,8 @@ def month_flows(
 ) -> dict:
     """Income and expense for the current month.
 
-    Data Model section 52: transfers and adjustments are excluded. Moving your
-    own money is neither earning nor spending, and counting it as either is the
-    fastest way to make a dashboard lie.
+    Transfers and adjustments are excluded: moving your own money is neither
+    earning nor spending, and counting it as either makes a dashboard lie.
     """
     from app.core.timezone import day_start
 
@@ -226,8 +216,7 @@ def month_flows(
                 Transaction.occurred_at < day_start(end, user.timezone),
             )
         ).all()
-        # Same rule as the balance sheet: a month's spending in two currencies
-        # is not the sum of two raw numbers.
+        # As on the balance sheet: two currencies do not sum raw.
         running = ZERO
         for amount, code in rows:
             converted = converter.convert(Decimal(amount), code)
@@ -252,7 +241,6 @@ def month_flows(
 
 
 def dashboard(db: DbSession, *, user: User, context: str = "personal") -> dict:
-    """Implementation Plan Phase 22."""
     from app.core.timezone import to_local
     from app.db.base import utcnow
     from app.services import loans as loan_service
@@ -263,8 +251,7 @@ def dashboard(db: DbSession, *, user: User, context: str = "personal") -> dict:
     today = to_local(utcnow(), user.timezone).date()
 
     if context == "family" and not access.in_family:
-        # Asking for a household view without a household is not an error, it
-        # is simply empty.
+        # Not an error, simply empty.
         return {
             "context": "family",
             "currency": user.base_currency,

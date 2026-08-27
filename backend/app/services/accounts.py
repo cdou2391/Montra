@@ -31,11 +31,10 @@ def _resolve_sharing(
     visibility: Visibility,
     family_id: uuid.UUID | None,
 ) -> uuid.UUID | None:
-    """Work out which household a record belongs to, if any.
+    """Which household a record belongs to, if any.
 
-    Sharing is derived from the caller's active membership rather than trusted
-    from the request: a client must not be able to attach a record to a
-    household by naming its id.
+    Derived from the caller's active membership, never trusted from the
+    request: naming an id must not attach a record to that household.
     """
     from app.services.families import active_membership
 
@@ -226,8 +225,7 @@ def list_accounts(
     if account_type is not None:
         stmt = stmt.where(Account.account_type == account_type)
 
-    # Sorted here rather than in the client, so the accounts screen, every
-    # account dropdown and the API all agree on what comes first.
+    # Sorted here so every screen, dropdown and the API agree on the order.
     favorite = favorite_account_id(db, user)
     ordering = case((Account.id == favorite, 0), else_=1) if favorite else literal(1)
     return list(db.scalars(stmt.order_by(ordering, Account.name).limit(limit)))
@@ -253,17 +251,14 @@ def serialize_account(
     from app.core.money import serialize
     from app.services.authz import can_edit, can_transact, resolve
 
-    # Callers serializing a list pass this in, to avoid one membership lookup
-    # per account.
+    # Passed in by list callers, to avoid a membership lookup per account.
     if access is None:
         access = resolve(db, user)
 
-    # Callers serializing a list pass the favourite in, to avoid one query per
-    # account.
+    # Passed in by list callers, to avoid a query per account.
     if favorite is None:
         favorite = favorite_account_id(db, user)
-    # Callers serializing a list pass this in, so every row is converted at the
-    # same rate and the page issues one rate lookup rather than one per account.
+    # Passed in by list callers, so every row converts at the same rate.
     if converter is None:
         from app.services.currency import converter_for
 
@@ -279,9 +274,8 @@ def serialize_account(
         "account_nature": nature_for(account.account_type).value,
         "currency": account.currency,
         "balance": serialize(balance),
-        # The balance restated in the viewer's base currency, so a total of
-        # mixed-currency accounts is a real total. None when no rate is known —
-        # a client must leave it out rather than add the raw number.
+        # In the viewer's base currency, so mixed-currency totals are real.
+        # None when no rate is known; clients must omit rather than add it raw.
         "balance_in_base": serialize(in_base) if in_base is not None else None,
         "base_currency": user.base_currency,
         "opening_balance": serialize(Decimal(account.opening_balance)),
@@ -301,8 +295,7 @@ def serialize_account(
             "id": str(user.id),
             "display_name": user.display_name,
         },
-        # Only for the single-account view: it is an extra query per account,
-        # and a list of twenty has no use for it.
+        # Single-account view only: a query per account, useless in a list.
         **(
             {"has_activity": has_financial_activity(db, account)}
             if include_activity
@@ -310,8 +303,7 @@ def serialize_account(
         ),
         "can_edit": can_edit(account, access),
         "can_transact": can_transact(account, access),
-        # The balance is already computed above; a card gets its headroom from
-        # it rather than the client subtracting one from the other.
+        # Headroom comes from the balance above, not client subtraction.
         "credit_card": card_fields_payload(account, outstanding=balance),
         # Any card can expire, so this sits beside the account rather than
         # inside the credit-card block.

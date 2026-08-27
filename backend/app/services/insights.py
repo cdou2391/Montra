@@ -1,18 +1,13 @@
-"""Deterministic insights (Implementation Plan Phase 25).
+"""Deterministic insights.
 
-"Start deterministic. Avoid AI initially." Everything here is arithmetic over
-the caller's authorized reporting scope, so each insight can be checked by hand
-and none of them can be wrong in an interesting way.
+Arithmetic over the caller's authorized scope — no model, so each insight can
+be checked by hand. Two rules:
 
-Two rules:
-
-*Only say something when there is something to say.* An insight that fires on
-every account every month is furniture, not information — so each one has a
-threshold and returns nothing below it.
+*Only say something when there is something to say.* One that fires every month
+is furniture, so each has a threshold and returns nothing below it.
 
 *Never see more than the viewer does.* Scope comes from the same authorization
-used everywhere else, so a household insight cannot leak a private account by
-aggregating it into a total.
+as everywhere else, so a household insight cannot leak a private account.
 """
 
 from datetime import date

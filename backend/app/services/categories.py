@@ -44,10 +44,8 @@ DEFAULT_EXPENSE_CATEGORIES = [
 ]
 
 
-# The category a fee is filed under, whatever the charge it was taken on was
-# for. Part of the default set, so it exists for every user without asking.
-# Named for the transaction rather than the institution: a mobile-money charge
-# is a fee on a transaction, and nobody would file it under a bank.
+# Where a fee is filed, whatever the charge was for. Named for the transaction
+# rather than the institution: a mobile-money charge is not a bank fee.
 FEE_CATEGORY_NAME = "Transaction Fees"
 
 

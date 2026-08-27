@@ -1,8 +1,7 @@
 """Timezone handling for user-facing date boundaries.
 
-Timestamps are stored in UTC. A user asking for "August transactions" means
-August where they live, so date filters are widened into UTC instants using the
-user's own timezone (FSD section 5.8).
+Timestamps are stored UTC. "August transactions" means August where the user
+lives, so date filters widen into UTC instants using their own timezone.
 """
 
 from datetime import date, datetime, time, timedelta
@@ -33,8 +32,7 @@ def validate_timezone(timezone_name: str) -> str:
 def ensure_aware(value: datetime, timezone_name: str) -> datetime:
     """Attach the user's timezone to a naive datetime, then normalise to UTC.
 
-    A client that posts "2026-08-24T14:30" without an offset means half past two
-    where the user is, not in UTC.
+    "2026-08-24T14:30" with no offset means half past two where they are.
     """
     if value.tzinfo is None:
         value = value.replace(tzinfo=zone_for(timezone_name))
@@ -47,11 +45,8 @@ def day_start(day: date, timezone_name: str) -> datetime:
 
 
 def day_end(day: date, timezone_name: str) -> datetime:
-    """First instant of the following local day, as UTC.
-
-    Used as an exclusive upper bound so a transaction at 23:59:59.999 on the
-    last day of a range is still included.
-    """
+    """First instant of the following local day, as UTC. An exclusive upper
+    bound, so 23:59:59.999 on the last day is still included."""
     return day_start(day + timedelta(days=1), timezone_name)
 
 
