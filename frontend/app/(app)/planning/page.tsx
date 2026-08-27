@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { LoanPaymentDue, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatDayShort, formatMoney, formatTime } from "@/lib/format";
-import { Icon } from "@/components/icons";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 /**
@@ -132,24 +131,19 @@ function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
   return (
     <div className="border-b border-line/5 py-4 last:border-0">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-line/5 text-content-secondary">
-            <Icon name="handshake" size={18} />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-content-primary">
-              {due.description}
-            </p>
-            <p className="mt-0.5 text-xs text-content-secondary">
-              {/* Same date format as the planned rows beside it. A loan is
-                  due on a day rather than at a time, so this stays put even
-                  under Today, where it is the row's only temporal anchor. */}
-              {formatDayShort(`${due.due_date}T00:00:00`)}
-              {due.counterparty ? ` · ${due.counterparty}` : ""}
-              {" · "}
-              {owed ? "Loan payment" : "Repayment due to you"}
-            </p>
-          </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-content-primary">
+            {due.description}
+          </p>
+          <p className="mt-0.5 text-xs text-content-secondary">
+            {/* Same date format as the planned rows beside it. A loan is due
+                on a day rather than at a time, so this stays put even under
+                Today, where it is the row's only temporal anchor. */}
+            {formatDayShort(`${due.due_date}T00:00:00`)}
+            {due.counterparty ? ` · ${due.counterparty}` : ""}
+            {" · "}
+            {owed ? "Loan payment" : "Repayment due to you"}
+          </p>
         </div>
         <span
           className={`tabular shrink-0 text-sm font-semibold ${
@@ -161,7 +155,7 @@ function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 pl-12">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* Not completable inline: a loan payment splits across principal,
             interest and fees, and only the payer knows the split. */}
         <Link href={`/loans/${due.loan_id}/pay`}>
