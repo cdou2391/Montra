@@ -84,6 +84,12 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Kept out of the assets/liabilities/net-worth totals while still being a
+    # full account in every other respect — it holds a balance, it transacts,
+    # and its spending still counts. For money that is yours to administer but
+    # not yours to count: an account held for someone else, a business float,
+    # a pot already earmarked.
+    excluded_from_totals: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # --- Credit-card fields -------------------------------------------------
     # Data Model section 16: these live directly on Account for MVP and apply

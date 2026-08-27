@@ -101,10 +101,13 @@ export default function Accounts() {
   }
 
   // The base-currency figure, not the raw balance — see the note on Home.
+  // Excluded accounts stay in the list below but out of these two totals.
+  const counted = accounts.filter((a) => !a.excluded_from_totals);
+  const excludedCount = accounts.length - counted.length;
   const unconverted = new Set(
-    accounts.filter((a) => a.balance_in_base === null).map((a) => a.currency),
+    counted.filter((a) => a.balance_in_base === null).map((a) => a.currency),
   );
-  const totals = accounts.reduce(
+  const totals = counted.reduce(
     (acc, a) => {
       if (a.balance_in_base === null) return acc;
       const value = Number(a.balance_in_base);
@@ -174,6 +177,12 @@ export default function Accounts() {
               set an exchange rate
             </Link>
             .
+          </p>
+        )}
+        {excludedCount > 0 && (
+          <p className="order-last w-full text-xs text-content-muted">
+            {excludedCount} account{excludedCount === 1 ? " is" : "s are"} excluded from
+            these totals.
           </p>
         )}
       </div>

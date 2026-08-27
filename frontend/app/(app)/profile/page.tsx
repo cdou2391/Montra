@@ -13,7 +13,7 @@ import {
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { Avatar } from "@/components/avatar";
-import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
+import { Button, Card, ErrorNotice, Field, Input, Skeleton, Toggle } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
 import { ExchangeRates } from "@/components/exchange-rates";
@@ -26,47 +26,6 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-sm text-content-secondary">{label}</span>
       <span className="min-w-0 truncate text-sm font-medium text-content-primary">{value}</span>
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  hint,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className="pressable pressable-surface flex w-full items-center justify-between gap-4 border-b border-line/5 py-4 text-left last:border-0 disabled:opacity-50"
-    >
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-content-primary">{label}</span>
-        {hint && <span className="mt-0.5 block text-xs text-content-secondary">{hint}</span>}
-      </span>
-      <span
-        aria-hidden
-        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-          checked ? "bg-accent" : "bg-line/15"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-background-primary transition-all ${
-            checked ? "left-[22px]" : "left-0.5"
-          }`}
-        />
-      </span>
-    </button>
   );
 }
 

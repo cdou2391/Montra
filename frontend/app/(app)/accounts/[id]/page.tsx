@@ -93,6 +93,13 @@ export default function AccountDetail() {
             )}
           </Card>
         )}
+        {/* Sits under both the plain card and the credit-card summary: the
+            balance above is real either way, it simply is not counted. */}
+        {account.excluded_from_totals && (
+          <p className="mt-2 text-xs text-content-muted">
+            Not counted towards your assets, liabilities or net worth.
+          </p>
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap gap-3">

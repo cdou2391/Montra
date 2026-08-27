@@ -135,6 +135,8 @@ export type Account = {
   visibility: string;
   ownership_type: string;
   status: string;
+  /** Marked by the owner as not counting toward assets, liabilities or net worth. */
+  excluded_from_totals: boolean;
   can_edit: boolean;
   description: string | null;
   /** Only present on the single-account view. */
@@ -275,6 +277,8 @@ export type Position = {
   net_worth: string;
   account_count: number;
   loan_count: number;
+  /** How many accounts in scope were left out of the figures above. */
+  excluded_accounts: number;
 };
 
 export type NetWorth = Position & {

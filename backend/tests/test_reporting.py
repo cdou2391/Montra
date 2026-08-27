@@ -242,3 +242,91 @@ def test_family_dashboard_recent_activity_excludes_private(db, user, other_user,
     descriptions = [t["description"] for t in payload["recent"]]
     assert "Shared groceries" in descriptions
     assert "Secret purchase" not in descriptions
+
+
+# --------------------------------------------------- accounts held out of totals
+
+
+def test_an_excluded_account_is_left_out_of_assets(db, user):
+    make_account(db, user, "Bank", Visibility.PRIVATE, opening="1000000")
+    make_account(
+        db, user, "Held for a friend", Visibility.PRIVATE, opening="750000",
+        excluded_from_totals=True,
+    )
+    payload = reporting.net_worth(db, user=user, context="personal")
+    assert payload["assets"] == "1000000.00"
+    assert payload["net_worth"] == "1000000.00"
+
+
+def test_an_excluded_card_is_left_out_of_liabilities(db, user):
+    make_account(db, user, "Bank", Visibility.PRIVATE, opening="1000000")
+    make_account(
+        db,
+        user,
+        "Company card",
+        Visibility.PRIVATE,
+        opening="200000",
+        account_type=AccountType.CREDIT_CARD,
+        excluded_from_totals=True,
+    )
+    payload = reporting.net_worth(db, user=user, context="personal")
+    assert payload["liabilities"] == "0.00"
+    assert payload["net_worth"] == "1000000.00"
+
+
+def test_the_total_says_how_many_accounts_it_left_out(db, user):
+    """A total that quietly omits something is worse than one that says so."""
+    make_account(db, user, "Bank", Visibility.PRIVATE, opening="1000000")
+    assert reporting.net_worth(db, user=user, context="personal")["excluded_accounts"] == 0
+
+    make_account(
+        db, user, "Float", Visibility.PRIVATE, opening="500000", excluded_from_totals=True
+    )
+    assert reporting.net_worth(db, user=user, context="personal")["excluded_accounts"] == 1
+
+
+def test_excluding_an_account_does_not_hide_its_spending(db, user):
+    """The flag is about the balance sheet, not about the money moving.
+
+    An account kept out of net worth still spends real money, and a month that
+    silently dropped it would be the more misleading number of the two.
+    """
+    from app.db.enums import TransactionType
+    from app.services.transactions import create_transaction
+
+    account = make_account(
+        db, user, "Float", Visibility.PRIVATE, opening="500000", excluded_from_totals=True
+    )
+    create_transaction(
+        db,
+        user=user,
+        account_id=account.id,
+        transaction_type=TransactionType.EXPENSE,
+        amount=Decimal("20000"),
+        occurred_at=NOW,
+        description="Supplies",
+    )
+    db.commit()
+
+    from app.services import authz
+
+    flows = reporting.month_flows(
+        db,
+        user=user,
+        access=authz.resolve(db, user),
+        context="personal",
+        today=NOW.date(),
+    )
+    assert flows["expense"] == "20000.00"
+
+
+def test_an_excluded_shared_account_is_left_out_of_the_household_total(
+    db, user, other_user, family
+):
+    make_account(db, user, "Joint", Visibility.SHARED, opening="1000000")
+    make_account(
+        db, user, "Ring-fenced", Visibility.SHARED, opening="400000", excluded_from_totals=True
+    )
+    payload = reporting.net_worth(db, user=user, context="family")
+    assert payload["assets"] == "1000000.00"
+    assert payload["excluded_accounts"] == 1

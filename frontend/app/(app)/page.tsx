@@ -57,10 +57,15 @@ export default function Home() {
   // Sum the base-currency figure the API worked out, never the raw balance:
   // adding dollars to francs at 1:1 gives a wrong total, not a rough one. An
   // account with no rate is left out and named, so the gap is visible.
+  //
+  // An account the owner excluded from totals is left out first — it is still
+  // listed and still spends, it just is not part of what they count as theirs.
+  const counted = (accounts ?? []).filter((a) => !a.excluded_from_totals);
+  const excludedCount = (accounts ?? []).length - counted.length;
   const unconverted = new Set(
-    (accounts ?? []).filter((a) => a.balance_in_base === null).map((a) => a.currency),
+    counted.filter((a) => a.balance_in_base === null).map((a) => a.currency),
   );
-  const totals = (accounts ?? []).reduce(
+  const totals = counted.reduce(
     (acc, a) => {
       if (a.balance_in_base === null) return acc;
       const value = Number(a.balance_in_base);
@@ -120,10 +125,13 @@ export default function Home() {
               </p>
             )}
             <p className="mt-1 text-xs text-content-muted">
-              Assets minus what you owe, across {accounts.length} account
-              {accounts.length === 1 ? "" : "s"}
+              Assets minus what you owe, across {counted.length} account
+              {counted.length === 1 ? "" : "s"}
               {loans.length > 0
                 ? ` and ${loans.length} loan${loans.length === 1 ? "" : "s"}`
+                : ""}
+              {excludedCount > 0
+                ? `. ${excludedCount} account${excludedCount === 1 ? " is" : "s are"} excluded`
                 : ""}
               .
             </p>

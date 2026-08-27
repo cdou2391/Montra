@@ -73,6 +73,7 @@ def create_account(
     account_identifier: str | None = None,
     description: str | None = None,
     family_id: uuid.UUID | None = None,
+    excluded_from_totals: bool = False,
     card_fields: dict | None = None,
 ) -> Account:
     family_id = _resolve_sharing(db, user=user, visibility=visibility, family_id=family_id)
@@ -91,6 +92,7 @@ def create_account(
         account_identifier=account_identifier,
         description=description,
         status=AccountStatus.ACTIVE,
+        excluded_from_totals=excluded_from_totals,
         created_by=user.id,
     )
     if card_fields:
@@ -123,6 +125,7 @@ def update_account(
     institution_id: uuid.UUID | None = None,
     account_identifier: str | None = None,
     currency: str | None = None,
+    excluded_from_totals: bool | None = None,
     card_fields: dict | None = None,
 ) -> Account:
     if currency is not None and currency.upper() != account.currency:
@@ -140,6 +143,8 @@ def update_account(
         account.institution_id = institution_id
     if account_identifier is not None:
         account.account_identifier = account_identifier
+    if excluded_from_totals is not None:
+        account.excluded_from_totals = excluded_from_totals
     if card_fields:
         apply_card_fields(account, card_fields)
     db.flush()
@@ -285,6 +290,7 @@ def serialize_account(
         "visibility": account.visibility.value,
         "ownership_type": account.ownership_type.value,
         "status": account.status.value,
+        "excluded_from_totals": account.excluded_from_totals,
         "description": account.description,
         "institution": (
             {"id": str(account.institution.id), "name": account.institution.name}

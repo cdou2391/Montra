@@ -92,6 +92,7 @@ def create_account(
         account_identifier=payload.account_identifier,
         description=payload.description,
         family_id=parse_uuid(payload.family_id, "family_id"),
+        excluded_from_totals=payload.excluded_from_totals,
         card_fields=_card_fields(payload),
     )
     db.commit()
@@ -128,6 +129,7 @@ def update_account(
         institution_id=parse_uuid(payload.institution_id, "institution_id"),
         account_identifier=payload.account_identifier,
         currency=payload.currency,
+        excluded_from_totals=payload.excluded_from_totals,
         card_fields=_card_fields(payload),
     )
     db.commit()

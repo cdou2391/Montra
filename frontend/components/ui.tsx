@@ -151,3 +151,53 @@ export function ErrorNotice({ message }: { message: string }) {
     </div>
   );
 }
+
+/**
+ * A labelled on/off switch.
+ *
+ * A button with role="switch" rather than a checkbox: the whole row is the
+ * hit target, which is what a thumb needs, and the state is still announced.
+ */
+export function Toggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      // Without this it defaults to submit, and a toggle inside a form would
+      // save the form every time it is flipped.
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className="pressable pressable-surface flex w-full items-center justify-between gap-4 border-b border-line/5 py-4 text-left last:border-0 disabled:opacity-50"
+    >
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-content-primary">{label}</span>
+        {hint && <span className="mt-0.5 block text-xs text-content-secondary">{hint}</span>}
+      </span>
+      <span
+        aria-hidden
+        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+          checked ? "bg-accent" : "bg-line/15"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-background-primary transition-all ${
+            checked ? "left-[22px]" : "left-0.5"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}

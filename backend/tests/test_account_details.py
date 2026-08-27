@@ -145,3 +145,43 @@ def test_a_listing_does_not_pay_for_that_query(db, user, bank_account):
     """It is one query per account, and a list of twenty has no use for it."""
     payload = account_service.serialize_account(db, bank_account, user)
     assert "has_activity" not in payload
+
+
+# ------------------------------------------------------- excluding from totals
+
+
+def test_an_account_is_counted_by_default(fresh_account):
+    assert fresh_account.excluded_from_totals is False
+
+
+def test_the_exclusion_can_be_turned_on_and_off(db, fresh_account):
+    account_service.update_account(db, account=fresh_account, excluded_from_totals=True)
+    assert fresh_account.excluded_from_totals is True
+
+    account_service.update_account(db, account=fresh_account, excluded_from_totals=False)
+    assert fresh_account.excluded_from_totals is False
+
+
+def test_editing_other_details_leaves_the_exclusion_alone(db, fresh_account):
+    """The field is omitted far more often than it is sent.
+
+    Every other caller — renaming an account, setting a credit limit — passes
+    nothing here, and that has to mean "leave it" rather than "turn it off".
+    """
+    account_service.update_account(db, account=fresh_account, excluded_from_totals=True)
+    account_service.update_account(db, account=fresh_account, name="Renamed")
+    assert fresh_account.name == "Renamed"
+    assert fresh_account.excluded_from_totals is True
+
+
+def test_an_excluded_account_is_still_a_normal_account(db, user, fresh_account):
+    """It is left out of a total, not hidden, and not made read-only."""
+    account_service.update_account(db, account=fresh_account, excluded_from_totals=True)
+    db.commit()
+
+    payload = account_service.serialize_account(db, fresh_account, user)
+    assert payload["excluded_from_totals"] is True
+    assert payload["can_transact"] is True
+
+    listed = account_service.list_accounts(db, user=user)
+    assert fresh_account.id in {a.id for a in listed}

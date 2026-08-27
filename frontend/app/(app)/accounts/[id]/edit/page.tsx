@@ -5,7 +5,16 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Account, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
-import { AmountInput, Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
+import {
+  AmountInput,
+  Button,
+  Card,
+  ErrorNotice,
+  Field,
+  Input,
+  Skeleton,
+  Toggle,
+} from "@/components/ui";
 
 /**
  * Account details.
@@ -35,12 +44,14 @@ export default function EditCardPage() {
     interest_rate: "",
     expiry: "",
   });
+  const [excluded, setExcluded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     montra.account(id).then((a) => {
       setAccount(a);
+      setExcluded(a.excluded_from_totals);
       const card = a.credit_card;
       setForm({
         name: a.name,
@@ -78,6 +89,7 @@ export default function EditCardPage() {
       await montra.updateAccount(id, {
         name: form.name,
         description: form.description || null,
+        excluded_from_totals: excluded,
         ...(form.account_identifier
           ? { account_identifier: form.account_identifier }
           : {}),
@@ -242,6 +254,13 @@ export default function EditCardPage() {
             </Field>
           </div>
           )}
+
+          <Toggle
+            label="Exclude from totals"
+            hint="Keeps this account out of your assets, liabilities and net worth. It still appears in your accounts, and its transactions still count towards spending."
+            checked={excluded}
+            onChange={setExcluded}
+          />
 
           <div className="flex gap-3">
             <Button type="submit" disabled={busy} className="flex-1">

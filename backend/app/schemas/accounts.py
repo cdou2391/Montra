@@ -19,6 +19,7 @@ class AccountCreate(MontraModel):
     visibility: Visibility = Visibility.PRIVATE
     family_id: str | None = None
     description: str | None = None
+    excluded_from_totals: bool = False
 
     # Optional card metadata, rejected on non-card accounts by the service.
     credit_limit: Decimal | None = None
@@ -42,6 +43,7 @@ class AccountUpdate(MontraModel):
     institution_id: str | None = None
     account_identifier: str | None = Field(default=None, max_length=64)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
+    excluded_from_totals: bool | None = None
 
     credit_limit: Decimal | None = None
     statement_balance: Decimal | None = None

@@ -82,11 +82,16 @@ def _position(
     balance to a franc one at 1:1 does not give an approximate total, it gives
     a wrong one — so a balance with no known rate is left out of the sum and
     named in `unconverted`, for the caller to say so.
+
+    An account the owner has marked `excluded_from_totals` is left out too, and
+    counted in `excluded_accounts` for the same reason: a total that quietly
+    omits something is worse than one that says what it omitted.
     """
     posting = PostingService(db)
     assets = ZERO
     liabilities = ZERO
     unconverted: set[str] = set()
+    excluded = 0
 
     def _in_base(amount: Decimal, currency: str) -> Decimal | None:
         if converter is None:
@@ -97,6 +102,11 @@ def _position(
         return converted
 
     for account in accounts:
+        if account.excluded_from_totals:
+            # Still a real account with a real balance — it simply is not part
+            # of what the owner considers theirs to count.
+            excluded += 1
+            continue
         balance = _in_base(posting.balance_of(account), account.currency)
         if balance is None:
             continue
@@ -120,6 +130,7 @@ def _position(
         "liabilities": serialize(liabilities),
         "net_worth": serialize(assets - liabilities),
         "unconverted_currencies": sorted(unconverted),
+        "excluded_accounts": excluded,
     }
 
 
