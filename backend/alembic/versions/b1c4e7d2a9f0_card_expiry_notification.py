@@ -1,6 +1,6 @@
 """Card expiry notifications.
 
-The expiry columns already exist on accounts (Data Model section 16); what is
+The expiry columns already exist on accounts; what is
 new is a notification type for them.
 
 Revision ID: b1c4e7d2a9f0

@@ -1,4 +1,4 @@
-"""Finding a transaction again (Implementation Plan Phase 26).
+"""Finding a transaction again.
 
 The filters are only useful if they compose: a household member narrowing by
 person and by month at once should get the intersection, not the union. And no

@@ -1,4 +1,4 @@
-"""Household membership and invitations (Implementation Plan Phase 16).
+"""Household membership and invitations.
 
 A Family governs visibility; it never owns money. Accounts and loans keep their
 own owner, and membership only decides who may see or touch them.
@@ -200,7 +200,7 @@ def accept_invitation(db: DbSession, *, user: User, token: str) -> FamilyMembers
 
     Atomic: validate, check the caller is free to join, mark accepted, create
     membership. Existing accounts stay PRIVATE — joining a household shares
-    nothing by itself (Implementation Plan Phase 18).
+    nothing by itself.
     """
     invitation = _resolve_invitation(db, token)
 

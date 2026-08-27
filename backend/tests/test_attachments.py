@@ -1,4 +1,4 @@
-"""Attachments (Implementation Plan Phase 27).
+"""Attachments.
 
 The bytes live in object storage, so these tests stand in a fake bucket in its
 place. What is being checked here is not S3 — it is that authorization happens

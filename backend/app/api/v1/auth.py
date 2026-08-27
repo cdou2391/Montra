@@ -1,4 +1,4 @@
-"""Authentication and preference endpoints (API spec sections 13-14)."""
+"""Authentication and preference endpoints."""
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session as DbSession

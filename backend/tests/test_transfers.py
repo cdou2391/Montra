@@ -1,4 +1,4 @@
-"""Transfer invariants (Implementation Plan Phase 7).
+"""Transfer invariants.
 
 The plan names five: source decreases, destination increases, income unchanged,
 expense unchanged, net worth unchanged.

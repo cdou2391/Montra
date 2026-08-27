@@ -1,4 +1,4 @@
-"""Household membership (Implementation Plan Phase 16).
+"""Household membership.
 
 A Family is a permission boundary, not a wallet. It owns nothing itself:
 accounts and loans keep their own owner, and the family only governs who may
@@ -63,7 +63,7 @@ class FamilyMembership(UUIDPrimaryKey, Timestamped, Base):
     __table_args__ = (
         UniqueConstraint("family_id", "user_id", name="one_membership_per_family"),
         Index("ix_family_memberships_family", "family_id", "status"),
-        # One ACTIVE family per user for MVP (Data Model section 9). A partial
+        # One ACTIVE family per user for MVP. A partial
         # unique index, so the database refuses a second active membership
         # rather than trusting the service layer to remember.
         Index(

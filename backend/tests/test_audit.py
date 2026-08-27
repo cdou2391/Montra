@@ -1,4 +1,4 @@
-"""The audit trail (Implementation Plan Phase 28).
+"""The audit trail.
 
 The trail exists for a shared household: when an account changes hands or a
 transfer is cancelled, there must be a record that survives the thing it

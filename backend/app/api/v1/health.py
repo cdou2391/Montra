@@ -1,4 +1,4 @@
-"""Liveness and readiness endpoints (Architecture section 59)."""
+"""Liveness and readiness endpoints."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text

@@ -1,5 +1,4 @@
-"""Planned transaction, recurring rule and notification endpoints
-(API spec sections 22-23, 30-31)."""
+"""Planned transaction, recurring rule and notification endpoints."""
 
 import uuid
 from datetime import date

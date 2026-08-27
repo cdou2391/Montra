@@ -4,7 +4,7 @@ Implementation Plan Phase 17 calls this a security milestone and says the
 scenarios must be tested exhaustively before any family dashboard is built.
 This is that matrix.
 
-The rules under test (Data Model section 46):
+The rules under test:
 
     PRIVATE         owner only. Everyone else gets 404, never 403 — a 403
                     would confirm the account exists.
@@ -108,7 +108,7 @@ def test_shared_account_can_be_read_and_written_by_an_adult(db, user, other_user
 
 def test_shared_account_is_read_only_for_a_member_role(db, user, other_user, family):
     """MEMBER is reserved for reduced-permission household members and is
-    read-only for MVP (FSD section 4.2)."""
+    read-only for MVP."""
     account = make_account(db, user, "Household", Visibility.SHARED)
     set_member_role(
         db, user=user, family_id=family.id, member_user_id=other_user.id, role=FamilyRole.MEMBER

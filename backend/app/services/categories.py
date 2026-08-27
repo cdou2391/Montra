@@ -1,4 +1,4 @@
-"""Category management and the default category set (PRD sections 19.1-19.2)."""
+"""Category management and the default category set."""
 
 import uuid
 

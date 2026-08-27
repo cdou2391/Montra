@@ -1,4 +1,4 @@
-"""Account domain service (Implementation Plan Phase 4)."""
+"""Account domain service."""
 
 import uuid
 from datetime import datetime
@@ -318,7 +318,7 @@ def set_visibility(
     """Move an account between private, family-visible and shared.
 
     Visibility is inherited by everything the account holds, so this one field
-    decides what the household can see of its history too (API spec section 18).
+    decides what the household can see of its history too.
     """
     previous = account.visibility
     # Un-sharing clears family_id, and an event recorded against the cleared

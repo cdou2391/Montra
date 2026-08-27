@@ -1,4 +1,4 @@
-"""Account endpoints (API spec section 18)."""
+"""Account endpoints."""
 
 import uuid
 

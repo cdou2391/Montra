@@ -1,7 +1,5 @@
 """Planned transactions, recurrence generation and reminders.
 
-Implementation Plan Phases 11-13.
-
 The rule that shapes this module: a planned transaction is not a ledger entry.
 Creating, rescheduling and cancelling touch no balance. Only completion does,
 and completion delegates to the posting engine rather than writing its own.
@@ -36,7 +34,7 @@ from app.services.authz import get_transactable_account, get_viewable_account, v
 from app.services.posting import PostingService
 from app.services.recurrence import occurrences_between
 
-# Data Model section 31: keep a forward window rather than years of rows.
+# A forward window rather than years of rows.
 GENERATION_WINDOW_DAYS = 90
 
 
@@ -233,9 +231,9 @@ def complete_planned(
 ):
     """Turn a planned item into a real ledger entry.
 
-    API spec section 22 requires this to be atomic, idempotent and locked
-    against duplicates. The row is locked FOR UPDATE before its status is read,
-    so two concurrent completions cannot both see it as open and both post.
+    Atomic, idempotent and locked against duplicates: the row is locked FOR
+    UPDATE before its status is read, so two concurrent completions cannot both
+    see it as open and both post.
     """
     # Lock first, then read status. Checking before locking is the race.
     locked = db.execute(
@@ -415,7 +413,7 @@ def list_planned(
 
 
 def bucket_for_day(day: date, *, today: date, overdue: bool = False) -> str:
-    """Grouping used by the upcoming screen (Implementation Plan Phase 11).
+    """Grouping used by the upcoming screen.
 
     Pure date arithmetic, so anything with a due date can be placed in the same
     buckets — planned transactions and loan payments alike.

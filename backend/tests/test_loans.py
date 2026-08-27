@@ -1,4 +1,4 @@
-"""Loans (Implementation Plan Phase 15).
+"""Loans.
 
 The plan names the properties directly:
 

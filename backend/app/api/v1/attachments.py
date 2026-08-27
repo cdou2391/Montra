@@ -1,4 +1,4 @@
-"""Attachment endpoints (Implementation Plan Phase 27).
+"""Attachment endpoints.
 
 Three steps, because the bytes never pass through this service: ask for a
 link, upload to storage, then confirm. Reads are the same shape in reverse —

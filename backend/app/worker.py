@@ -1,4 +1,4 @@
-"""Celery application, queues and scheduled tasks (Implementation Plan Phase 13).
+"""Celery application, queues and scheduled tasks.
 
 Reminder and recurrence definitions live in PostgreSQL, never only in the
 broker. If Redis is lost, nothing scheduled is lost with it: the next run of a

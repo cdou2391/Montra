@@ -1,4 +1,4 @@
-"""Dashboard and net worth (API spec sections 26-27)."""
+"""Dashboard and net worth."""
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session as DbSession

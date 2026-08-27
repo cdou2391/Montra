@@ -1,4 +1,4 @@
-"""Deterministic insights (Implementation Plan Phase 25).
+"""Deterministic insights.
 
 Every figure is arithmetic over the caller's authorized scope, so each of these
 can be checked by hand. The tests care as much about silence as about output:

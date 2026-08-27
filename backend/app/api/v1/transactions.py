@@ -1,4 +1,4 @@
-"""Transaction, transfer and category endpoints (API spec sections 19-21)."""
+"""Transaction, transfer and category endpoints."""
 
 import uuid
 from datetime import date
@@ -223,7 +223,7 @@ def create_transfer(
             else None
         ),
     )
-    # One commit for the transfer and both ledger entries (Architecture section 23).
+    # One commit for the transfer and both ledger entries.
     db.commit()
     db.refresh(transfer)
     return single(txn_service.serialize_transfer(db, transfer, authz.resolve(db, user)))

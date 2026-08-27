@@ -1,4 +1,4 @@
-"""Credit-card and prepaid-card behaviour (Implementation Plan Phases 9-10).
+"""Credit-card and prepaid-card behaviour.
 
 The plan names three properties to test carefully:
 

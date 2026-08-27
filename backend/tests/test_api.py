@@ -209,7 +209,7 @@ def test_expense_and_income_move_the_balance(client):
 
 
 def test_amounts_serialize_as_strings(client):
-    """No JSON float may ever carry a financial value (API spec section 12)."""
+    """No JSON float may ever carry a financial value."""
     _register(client)
     account_id = _create_account(client).json()["data"]["id"]
     r = client.post(

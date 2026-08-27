@@ -1,4 +1,4 @@
-"""Loan endpoints (API spec sections 24-25)."""
+"""Loan endpoints."""
 
 import uuid
 from datetime import datetime, time

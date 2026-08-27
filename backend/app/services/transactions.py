@@ -364,9 +364,9 @@ def serialize_transaction(txn: Transaction, account: Account | None = None) -> d
 def redacted_account_ref(account, access) -> dict:
     """One side of a transfer, as this viewer is allowed to see it.
 
-    Implementation Plan Phase 20 and Data Model section 48: a household member
-    watching money leave a shared account may see that it went somewhere
-    private, and nothing more. Not the id, not the name, not the balance.
+    A household member watching money leave a shared account may see that it
+    went somewhere private, and nothing more: not the id, not the name, not
+    the balance.
 
     The linkage stays intact in the database; only the projection is reduced.
     """

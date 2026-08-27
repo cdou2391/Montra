@@ -317,7 +317,7 @@ class PostingService:
     def cancel_transfer(self, transfer: Transfer, *, actor_id: uuid.UUID) -> Transfer:
         """Cancel both sides as one operation.
 
-        Never leaves one side active without the other (API spec section 20).
+        Never leaves one side active without the other.
         """
         if transfer.status is TransferStatus.CANCELLED:
             raise Conflict("Transfer is already cancelled.", code="TRANSFER_ALREADY_CANCELLED")

@@ -1,4 +1,4 @@
-"""Audit trail (Implementation Plan Phase 28).
+"""Audit trail.
 
 Who did what, to which thing, when. The point is accountability in a shared
 household: when an account changes hands or a transfer is cancelled, there has
@@ -30,7 +30,7 @@ FAMILY = "FAMILY"
 LOAN = "LOAN"
 ATTACHMENT = "ATTACHMENT"
 
-# Event types, from Data Model section 43.
+# Event types.
 ACCOUNT_CREATED = "ACCOUNT_CREATED"
 ACCOUNT_SHARED = "ACCOUNT_SHARED"
 ACCOUNT_MADE_PRIVATE = "ACCOUNT_MADE_PRIVATE"

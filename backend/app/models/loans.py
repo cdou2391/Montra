@@ -1,8 +1,8 @@
-"""Loans and loan payments (Implementation Plan Phase 15).
+"""Loans and loan payments.
 
 A loan is not an Account. It carries its own outstanding principal, derived
 from its opening figure minus the principal actually paid off, so the original
-loan amount is never overwritten (Data Model section 33).
+loan amount is never overwritten.
 """
 
 import uuid

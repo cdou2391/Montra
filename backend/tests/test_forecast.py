@@ -1,4 +1,4 @@
-"""Cash-flow forecast (Implementation Plan Phase 24).
+"""Cash-flow forecast.
 
 The forecast projects what is already known — today's balances plus planned
 items and loan instalments that have not happened yet. It never extrapolates

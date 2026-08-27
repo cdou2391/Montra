@@ -1,4 +1,4 @@
-"""Error taxonomy and the standard error envelope (API spec sections 6.3, 7, 8)."""
+"""Error taxonomy and the standard error envelope."""
 
 from typing import Any
 

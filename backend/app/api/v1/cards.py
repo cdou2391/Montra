@@ -1,4 +1,4 @@
-"""Credit-card and prepaid-card endpoints (API spec sections 36-37).
+"""Credit-card and prepaid-card endpoints.
 
 Both are convenience layers over Account and the posting engine, not separate
 financial machinery.

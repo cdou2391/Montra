@@ -1,4 +1,4 @@
-"""Household endpoints (API spec sections 15-17)."""
+"""Household endpoints."""
 
 import uuid
 
@@ -187,7 +187,7 @@ def family_activity(
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """The household's audit trail (Implementation Plan Phase 28).
+    """The household's audit trail.
 
     Membership is the only requirement to read it: the trail exists so members
     can see what changed in the household, and it carries no financial detail

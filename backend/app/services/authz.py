@@ -52,7 +52,7 @@ class Access:
 
 
 def resolve(db: DbSession, user: User) -> Access:
-    """The FamilyContextResolver of Implementation Plan Phase 17."""
+    """The caller's access, resolved once."""
     from app.models.family import FamilyMembership
 
     membership = db.scalar(

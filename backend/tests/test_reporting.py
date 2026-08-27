@@ -1,4 +1,4 @@
-"""Dashboard and net worth (Implementation Plan Phases 22-23).
+"""Dashboard and net worth.
 
 Two properties matter more than the arithmetic:
 

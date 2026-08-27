@@ -1,4 +1,4 @@
-"""Standard response envelope (API spec section 6)."""
+"""Standard response envelope."""
 
 from typing import Any
 
