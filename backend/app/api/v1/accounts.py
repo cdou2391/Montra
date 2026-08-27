@@ -61,8 +61,7 @@ def list_accounts(
         context=context,
     )
     favorite = account_service.favorite_account_id(db, user)
-    # One converter for the whole list: every row converted at the same rate,
-    # and one rate lookup instead of one per account.
+    # One converter for the list: one lookup, and every row at the same rate.
     converter = currency.converter_for(db, user=user)
     payload = [
         account_service.serialize_account(db, a, user, favorite=favorite, converter=converter)
@@ -147,7 +146,7 @@ def change_visibility(
     """Share an account with the household, or take it back.
 
     Child records inherit account visibility, so this decides what the
-    household can see of its history too (API spec section 18).
+    household sees of its history too.
     """
     account = get_editable_account(db, account_id, user)
     account_service.set_visibility(db, account=account, user=user, visibility=payload.visibility)
@@ -202,8 +201,8 @@ def clear_favorite(
     user: User = Depends(current_user),
 ) -> dict:
     account = get_viewable_account(db, account_id, user)
-    # Only clear if this account is the one currently favourited, so a stale
-    # request cannot unset somebody's newer choice.
+    # Only if it is still the favourite, so a stale request cannot unset a
+    # newer choice.
     if account_service.favorite_account_id(db, user) == account.id:
         account_service.set_favorite_account(db, user=user, account_id=None)
     db.commit()
@@ -233,8 +232,8 @@ def create_balance_adjustment(
 ) -> dict:
     """Reconcile an account to an observed balance.
 
-    Phase 8: Montra records the difference as an explicit financial event. It
-    never rewrites history or edits the opening balance.
+    The difference is recorded as its own financial event; history is never
+    rewritten and the opening balance is never edited.
     """
     from app.services.authz import get_transactable_account
     from app.services.transactions import serialize_transaction
@@ -266,11 +265,7 @@ def reconciliation_preview(
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """What an adjustment would do, without doing it.
-
-    Lets the client show the difference before the user commits to writing a
-    financial event.
-    """
+    """What an adjustment would do, without doing it."""
     from app.core.money import to_decimal
 
     account = get_viewable_account(db, account_id, user)

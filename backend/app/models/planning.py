@@ -1,12 +1,12 @@
 """Forward-looking finance: planned transactions, recurrence, reminders and
-notifications (Implementation Plan Phases 11-14).
+notifications.
 
-The governing rule, from Phase 11:
+The governing rule:
 
     Planned transaction != ledger transaction
 
-until completion. Nothing in this module writes to a balance; completion hands
-off to the posting engine.
+until completion. Nothing here writes to a balance; completion hands off to the
+posting engine.
 """
 
 import uuid
@@ -123,9 +123,8 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
     expected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
-    # The local calendar day of expected_at, frozen at write time. Carries the
-    # documented uniqueness constraint for recurrence and keeps day-grouping
-    # queries off a timezone conversion.
+    # The local day of expected_at, frozen at write time: it carries the
+    # recurrence uniqueness constraint and keeps grouping off a conversion.
     occurrence_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     category_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -151,15 +150,14 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
     completed_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("transactions.id", ondelete="SET NULL")
     )
-    # A completed transfer is two ledger entries, so it is linked as a transfer
-    # rather than being forced into the single-transaction column.
+    # Two ledger entries, so linked as a transfer rather than forced into the
+    # single-transaction column.
     completed_transfer_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("transfers.id", ondelete="SET NULL")
     )
     original_expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    # Set on the first successful completion. A replayed key returns the same
-    # planned item rather than posting twice.
+    # A replayed key returns this item rather than posting twice.
     completion_key: Mapped[str | None] = mapped_column(String(255))
 
     created_by: Mapped[uuid.UUID] = mapped_column(
@@ -187,10 +185,10 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
 
 
 class Reminder(UUIDPrimaryKey, Timestamped, Base):
-    """One row per recipient (Data Model section 38).
+    """One row per recipient.
 
-    Reminder definitions live in Postgres, never only in the Celery queue, so a
-    lost broker cannot lose a reminder (Implementation Plan Phase 13).
+    Definitions live in Postgres, never only in the Celery queue, so a lost
+    broker cannot lose a reminder.
     """
 
     __tablename__ = "reminders"

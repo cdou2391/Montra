@@ -81,15 +81,12 @@ def parse_sms(
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """Read a mobile-money or bank SMS into a draft.
+    """Read a mobile-money, bank or card SMS into a draft.
 
-    Deliberately writes nothing. The client prefills its form and the user
-    submits, so a misread message costs a correction rather than a wrong
-    balance.
-
-    Account numbers are matched here rather than in the client, because the
-    stored identifiers never leave the server — a listing only carries the
-    masked tail.
+    Writes nothing: the client prefills and the user submits, so a misread
+    costs a correction rather than a wrong balance. Account numbers are matched
+    here because the stored identifiers never leave the server — a listing
+    carries only the masked tail.
     """
     from app.services import sms_parser
 
@@ -97,9 +94,8 @@ def parse_sms(
     draft = sms_parser.serialize(parsed)
 
     accounts = list(db.scalars(authz.visible_accounts(db, user)))
-    # A foreign purchase on a local card is quoted in the currency it was made
-    # in, and a ledger entry is in its account's currency — so the draft has to
-    # carry both, and say which is which.
+    # A foreign purchase is quoted in the currency it was made in, but the
+    # entry is in the account's, so the draft carries both.
     from app.services.currency import converter_for
 
     draft.update(
@@ -190,8 +186,7 @@ def create_transfer(
     user: User = Depends(current_user),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
-    # Replaying the same key returns the original transfer rather than
-    # posting a second one (API spec section 44).
+    # Replaying a key returns the original rather than posting again.
     if idempotency_key:
         existing = db.scalar(
             select(Transfer).where(
@@ -221,8 +216,7 @@ def create_transfer(
         notes=payload.notes,
         idempotency_key=idempotency_key,
         fee_amount=payload.fee_amount,
-        # Resolved here rather than in the posting engine, which knows nothing
-        # about categories and should keep it that way.
+        # Not in the posting engine, which knows nothing about categories.
         fee_category_id=(
             category_service.fee_category_id(db, user_id=user.id)
             if payload.fee_amount is not None

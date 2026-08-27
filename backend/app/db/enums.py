@@ -55,9 +55,8 @@ class TransactionType(StrEnum):
 class Direction(StrEnum):
     """Ledger effect, relative to the account's own balance scale.
 
-    Data Model section 19/20: INCREASE raises the account's own balance —
-    asset value for an ASSET account, outstanding debt for a LIABILITY account.
-    This is deliberately not double-entry debit/credit.
+    INCREASE raises the account's own balance: asset value for an ASSET,
+    outstanding debt for a LIABILITY. Deliberately not debit/credit.
     """
 
     INCREASE = "INCREASE"
@@ -92,7 +91,7 @@ class InstitutionType(StrEnum):
     OTHER = "OTHER"
 
 
-# Account type to nature, per Data Model section 73.
+# Account type to nature.
 ACCOUNT_NATURE_BY_TYPE: dict[AccountType, AccountNature] = {
     AccountType.CHECKING: AccountNature.ASSET,
     AccountType.SAVINGS: AccountNature.ASSET,
@@ -110,8 +109,6 @@ def nature_for(account_type: AccountType) -> AccountNature:
 
 
 class PlannedType(StrEnum):
-    """Data Model section 76 anticipated TRANSFER here from the start."""
-
     INCOME = "INCOME"
     EXPENSE = "EXPENSE"
     TRANSFER = "TRANSFER"
@@ -168,8 +165,8 @@ class NotificationType(StrEnum):
     SYSTEM = "SYSTEM"
 
 
-# Statuses a planned item can still move on from. Terminal states are excluded
-# so a completed item can never be rescheduled or completed twice.
+# Terminal states are excluded, so a completed item cannot be rescheduled or
+# completed twice.
 OPEN_PLANNED_STATUSES = frozenset({PlannedStatus.UPCOMING, PlannedStatus.DUE, PlannedStatus.MISSED})
 
 
@@ -192,11 +189,7 @@ class FamilyStatus(StrEnum):
 
 
 class FamilyRole(StrEnum):
-    """FSD section 4.2.
-
-    MEMBER is reserved for reduced-permission household members and is
-    read-only for MVP.
-    """
+    """MEMBER is a reduced-permission household member, read-only for now."""
 
     OWNER = "OWNER"
     ADULT = "ADULT"
@@ -217,5 +210,5 @@ class InvitationStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-# Roles permitted to transact on a shared account. MEMBER is read-only in MVP.
+# Roles permitted to transact on a shared account.
 TRANSACTING_ROLES = frozenset({FamilyRole.OWNER, FamilyRole.ADULT})

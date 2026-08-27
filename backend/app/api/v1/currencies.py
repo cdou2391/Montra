@@ -1,7 +1,6 @@
-"""Exchange rates the user maintains (PRD section 70).
+"""Exchange rates the user maintains.
 
-Reporting only. Nothing here changes what an account holds — a USD account
-holds dollars whatever rate is recorded against it.
+Reporting only: a USD account holds dollars whatever rate is recorded.
 """
 
 import uuid
@@ -41,11 +40,7 @@ def currencies_in_use(
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """Which currencies the user actually holds, and which still need a rate.
-
-    Drives the prompt: asking for a USD rate only matters once there is a
-    dollar account to convert.
-    """
+    """Which currencies the user holds, and which still need a rate."""
     codes = currency_service.currencies_in_use(db, user=user)
     converter = currency_service.converter_for(db, user=user)
     return single(
@@ -62,11 +57,8 @@ def refresh_rates(
     db: DbSession = Depends(db_session),
     user: User = Depends(current_user),
 ) -> dict:
-    """Fetch now, rather than waiting for the morning run.
-
-    Adding a foreign account at noon should not mean an uncounted balance
-    until tomorrow.
-    """
+    """Fetch now rather than waiting for the morning run: a foreign account
+    added at noon should not sit uncounted until tomorrow."""
     currency_service.refresh_market_rates(db)
     db.commit()
     return single(currency_service.market_summary(db))

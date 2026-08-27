@@ -95,10 +95,8 @@ def login(
     response: Response,
     db: DbSession = Depends(db_session),
 ) -> dict:
-    # Two counters doing different jobs. The address catches someone hammering
-    # one login; the account catches the same guessing spread across many
-    # addresses. The account limit is far looser on purpose — see the note on
-    # LOGIN_ACCOUNT, since a tight one is itself a way to lock someone out.
+    # The address catches someone hammering one login; the account catches the
+    # same guessing spread across many. See LOGIN_ACCOUNT for why it is loose.
     address = caller(request)
     account = payload.email.strip().casefold()
     hit("login-ip", address, LOGIN)
@@ -106,8 +104,7 @@ def login(
 
     user = auth_service.authenticate(db, email=payload.email, password=payload.password)
 
-    # Getting it right clears the count, so fumbling a password four times and
-    # then remembering it does not leave you locked out.
+    # Success clears the count, so four fumbles then success is not a lockout.
     clear("login-ip", address, LOGIN)
     clear("login-account", account, LOGIN_ACCOUNT)
 
@@ -199,8 +196,7 @@ def reset_profile(
 
     The login survives, so this is "start over", not "delete my account".
     """
-    # Password-guarded and irreversible: worth capping so a stolen session
-    # cannot be used to brute-force the password behind it.
+    # Capped so a stolen session cannot brute-force the password behind it.
     hit("profile-reset", str(user.id), SENSITIVE)
     deleted = profile_service.reset_profile(db, user=user, password=payload.password)
     db.commit()
@@ -214,8 +210,8 @@ def download_backup(
 ) -> Response:
     """Every financial record this user owns, as a downloadable document.
 
-    Served as an attachment with a dated filename, because a backup that lands
-    in a browser tab is not a backup.
+    An attachment with a dated filename: a backup that lands in a browser tab
+    is not a backup.
     """
     import json
 

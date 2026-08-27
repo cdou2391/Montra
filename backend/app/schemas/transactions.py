@@ -17,8 +17,7 @@ class TransactionCreate(MontraModel):
     merchant: str | None = Field(default=None, max_length=160)
     notes: str | None = None
     reference: str | None = Field(default=None, max_length=120)
-    # A charge levied alongside the expense — posted as its own line, not
-    # added to the amount above.
+    # Posted as its own line, not added to the amount above.
     fee_amount: Decimal | None = None
 
     _v_amount = amount_validator("amount")
@@ -44,8 +43,7 @@ class TransferCreate(MontraModel):
     destination_amount: Decimal | None = None
     occurred_at: datetime
     notes: str | None = None
-    # Charged to the sender, posted as its own expense line on the source
-    # account rather than being added to the amount that moves.
+    # Its own expense line on the source, not added to the amount that moves.
     fee_amount: Decimal | None = None
 
     _v_source = amount_validator("source_amount")

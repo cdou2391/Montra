@@ -84,17 +84,15 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # Kept out of the assets/liabilities/net-worth totals while still being a
-    # full account in every other respect — it holds a balance, it transacts,
-    # and its spending still counts. For money that is yours to administer but
-    # not yours to count: an account held for someone else, a business float,
-    # a pot already earmarked.
+    # Out of the net-worth totals while still a full account: it holds a
+    # balance, it transacts, and its spending still counts. For money that is
+    # yours to administer but not yours to count.
     excluded_from_totals: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # --- Credit-card fields -------------------------------------------------
-    # Data Model section 16: these live directly on Account for MVP and apply
-    # only where account_type = CREDIT_CARD. A CreditCardProfile table is the
-    # documented refactor once card functionality grows.
+    # On Account rather than their own table, and meaningful only where
+    # account_type = CREDIT_CARD. A CreditCardProfile is the refactor if cards
+    # grow.
     credit_limit: Mapped[Decimal | None] = mapped_column(AMOUNT)
     statement_balance: Mapped[Decimal | None] = mapped_column(AMOUNT)
     statement_closing_day: Mapped[int | None] = mapped_column(SmallInteger)
@@ -205,8 +203,7 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
         SAEnum(Direction, name="ledger_direction"), nullable=False
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    # When the money actually moved, distinct from created_at (when it was
-    # entered into Montra). Stored UTC; rendered in the user's timezone.
+    # When the money moved, as against created_at, when it was entered.
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[TransactionStatus] = mapped_column(
         SAEnum(TransactionStatus, name="transaction_status"),
@@ -226,10 +223,8 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
     loan_payment_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("loan_payments.id", ondelete="CASCADE"), index=True
     )
-    # A charge levied on another transaction — a withdrawal fee, a card
-    # surcharge. It is a transaction in its own right, because it is money that
-    # actually left the account and it belongs in the total; the link only says
-    # what it was charged on.
+    # A charge levied on another transaction. A transaction in its own right —
+    # the money really left — and the link only says what it was charged on.
     fee_for_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), index=True
     )
@@ -251,13 +246,10 @@ class Transaction(UUIDPrimaryKey, Timestamped, Base):
 class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
     """A rate the user maintains between two currencies.
 
-    Entered by hand rather than fetched: the PRD defers automatic rates, and a
-    balance that changes because a third party moved a number is worse than one
-    the user set deliberately and can explain.
+    Their override of the published number in `market_rates`, for when they
+    would rather state a rate than take the feed's.
 
-    Reporting only. Data Model section 65 is explicit that a converted value
-    never replaces an original amount — an account in USD holds dollars, and
-    that is what its own screens say.
+    Reporting only: a converted value never replaces an original amount.
     """
 
     __tablename__ = "exchange_rates"
@@ -267,13 +259,12 @@ class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
     )
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
     quote_currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    # One unit of base buys this much quote. Eight places because a rate like
-    # RWF→USD is a very small number and rounding it early loses real money.
+    # One unit of base buys this much quote. Eight places, because RWF→USD is
+    # small enough that early rounding loses real money.
     rate: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     as_of: Mapped[date] = mapped_column(Date, nullable=False)
-    # Where the number came from. The daily job refreshes what it owns and
-    # leaves a hand-entered rate alone: someone who typed a rate deliberately
-    # should not find it silently replaced overnight.
+    # The daily job refreshes what it owns and leaves a hand-entered rate
+    # alone, rather than replacing it overnight.
     source: Mapped[str] = mapped_column(String(30), nullable=False, default="MANUAL")
 
     __table_args__ = (
@@ -286,13 +277,9 @@ class ExchangeRate(UUIDPrimaryKey, Timestamped, Base):
 class MarketRate(UUIDPrimaryKey, Timestamped, Base):
     """A published rate, shared by everyone.
 
-    One table for the whole app rather than a copy per user: the price of a
-    dollar does not depend on who is asking. The daily job fills it from a
-    couple of requests, and every conversion reads from here — so adding users
-    or currencies costs no additional calls to anyone's API.
-
-    User-specific overrides still live in `exchange_rates`; this is only the
-    published number.
+    One table for the whole app: the price of a dollar does not depend on who
+    is asking, so adding users or currencies costs no extra API calls. User
+    overrides live in `exchange_rates`.
     """
 
     __tablename__ = "market_rates"

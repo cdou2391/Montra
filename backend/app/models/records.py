@@ -1,8 +1,7 @@
-"""Attachments and the audit trail (Implementation Plan Phases 27-28).
+"""Attachments and the audit trail.
 
-Both are records *about* financial data rather than financial data itself:
-neither participates in a balance, and nothing here is ever read by the posting
-engine.
+Records *about* financial data rather than financial data: neither participates
+in a balance, and the posting engine never reads them.
 """
 
 import uuid
@@ -20,9 +19,8 @@ from app.db.base import Base, UUIDPrimaryKey, utcnow
 class Attachment(UUIDPrimaryKey, Base):
     """A file in object storage, with its metadata here.
 
-    Data Model section 42. The bytes live in the bucket; this row records who
-    owns them, what they belong to, and where to find them. `storage_key` is
-    never handed to a client — it is the input to a signed URL, not a URL.
+    `storage_key` is never handed to a client: it is the input to a signed URL,
+    not a URL.
     """
 
     __tablename__ = "attachments"
@@ -37,8 +35,7 @@ class Attachment(UUIDPrimaryKey, Base):
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
-    # An upload is only usable once the bytes have actually landed; a row
-    # created at the moment we hand out a signed URL is a promise, not a file.
+    # Until the bytes land, the row is a promise rather than a file.
     uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
@@ -51,10 +48,9 @@ class Attachment(UUIDPrimaryKey, Base):
 class AuditEvent(UUIDPrimaryKey, Base):
     """Who did what, to which thing, when.
 
-    Data Model section 43. Append-only by convention: nothing in the
-    application updates or deletes a row here. The metadata column carries
-    identifiers and small facts — never a copy of the financial record, which
-    would turn the trail into a second, unreconciled ledger.
+    Append-only by convention. The metadata column carries identifiers and
+    small facts, never a copy of the record — that would make the trail a
+    second, unreconciled ledger.
     """
 
     __tablename__ = "audit_events"
