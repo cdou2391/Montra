@@ -1,12 +1,10 @@
-"""Receipts and documents attached to a transaction (Phase 27).
-
-The flow the plan asks for:
+"""Receipts and documents attached to a transaction.
 
     API authorization → signed upload → object storage → metadata
 
-Authorization happens first and here, not at the bucket. The client never
-learns a storage key and never receives a permanent URL; every read is a fresh
-signed link with minutes on the clock.
+Authorization happens here, not at the bucket. The client never learns a
+storage key and never gets a permanent URL: every read is a fresh signed link
+with minutes on the clock.
 """
 
 import uuid
@@ -63,16 +61,14 @@ def request_upload(
 ) -> tuple[Attachment, dict]:
     """Authorize, then hand back a link the browser can upload to.
 
-    The row is written before the bytes arrive, deliberately: it is what makes
-    the later "did it land?" check possible, and what stops an upload URL from
-    existing without a record of who asked for it. Until `uploaded_at` is set
-    the attachment is a promise and is not listed.
+    The row is written before the bytes arrive: it is what makes the later
+    "did it land?" check possible and stops an upload URL existing with no
+    record of who asked. Until `uploaded_at` is set it is a promise, not listed.
     """
     _validate(file_name=file_name, mime_type=mime_type, file_size=file_size)
 
-    # Attaching to a transaction writes to it, so the test is the same one the
-    # transaction's own edits use: being allowed to see a shared account is not
-    # being allowed to add to it.
+    # Attaching writes, so this uses the same test as the transaction's own
+    # edits: seeing a shared account is not adding to it.
     transaction = get_transaction(db, transaction_id, user)
     get_transactable_account(db, transaction.account_id, user)
 
@@ -103,10 +99,8 @@ def request_upload_for_transfer(
 ) -> tuple[Attachment, dict]:
     """Attach proof of payment to a transfer.
 
-    A transfer is two transactions, and the model attaches to one of them
-    (Data Model section 42 warns off adding more nullable keys). The receipt
-    goes on the outgoing side, which is where proof of payment belongs — and
-    reading a transfer's attachments finds it from either side.
+    A transfer is two transactions and the receipt goes on the outgoing side,
+    where proof of payment belongs. Reading finds it from either side.
     """
     from app.models.finance import Transfer
 
@@ -136,10 +130,9 @@ def request_upload_for_transfer(
 def confirm_upload(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> Attachment:
     """Mark an attachment usable, once the object is really there.
 
-    Trusting the client's word would let a row claim a file that was never
-    uploaded, so the bucket is asked directly. The recorded size comes from the
-    bucket too — the size sent up front was only ever a claim used to reject
-    obviously oversized uploads early.
+    The bucket is asked directly; the client's word would let a row claim a
+    file never uploaded. The size comes from the bucket too — the one sent up
+    front was a claim, used only to reject oversized uploads early.
     """
     attachment = _own_attachment(db, user=user, attachment_id=attachment_id)
     if attachment.uploaded_at is not None:
@@ -183,9 +176,8 @@ def list_for_transaction(
 ) -> list[Attachment]:
     """Everything attached to a transaction the user may see.
 
-    A transfer's receipt is stored on its outgoing side, but it describes the
-    whole movement — so opening either side finds it, rather than the
-    destination looking mysteriously empty.
+    A transfer's receipt lives on its outgoing side but describes the whole
+    movement, so either side finds it and neither looks mysteriously empty.
     """
     transaction = get_transaction(db, transaction_id, user)
 
@@ -222,16 +214,14 @@ def download_url(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> str:
 def delete_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> None:
     """Remove the file and tombstone the row.
 
-    The object goes for real — a receipt someone deleted should not linger in a
-    bucket — while the row is kept as a tombstone so the audit trail still has
-    something to point at.
+    The object goes for real; the row stays so the audit trail has something to
+    point at.
     """
     attachment = _own_attachment(db, user=user, attachment_id=attachment_id)
     storage.delete_object(key=attachment.storage_key)
     attachment.deleted_at = utcnow()
     db.flush()
-    # The file is gone from the bucket for real, so this is the only record
-    # that it was ever there.
+    # The bucket copy is gone, so this row is the only record it existed.
     audit.record(
         db,
         actor=user,
@@ -246,8 +236,7 @@ def _own_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> A
     """An attachment the user may change — theirs, and not already gone."""
     attachment = db.get(Attachment, attachment_id)
     if attachment is None or attachment.deleted_at is not None or attachment.user_id != user.id:
-        # 404 rather than 403: someone else's attachment should not be
-        # distinguishable from one that never existed.
+        # 404, not 403: someone else's should look like one that never existed.
         raise NotFound("Attachment not found.", code="ATTACHMENT_NOT_FOUND")
     return attachment
 
@@ -255,9 +244,8 @@ def _own_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> A
 def _viewable_attachment(db: DbSession, *, user: User, attachment_id: uuid.UUID) -> Attachment:
     """An attachment the user may read.
 
-    Not the same question as ownership: a receipt on a shared account is
-    readable by the household, and the transaction's own visibility rules are
-    the authority on that.
+    Not ownership: a receipt on a shared account is readable by the household,
+    and the transaction's visibility rules are the authority.
     """
     attachment = db.get(Attachment, attachment_id)
     if attachment is None or attachment.deleted_at is not None:

@@ -1,17 +1,15 @@
 """Converting balances into a reporting currency.
 
-Two rules from Data Model section 65 shape everything here:
+Two rules shape everything here:
 
-* The original currency and amount are never replaced. An account in USD holds
-  dollars, and its own screens say so. Conversion exists so that *totals* mean
-  something, and nowhere else.
+* The original currency and amount are never replaced. Conversion exists so
+  that *totals* mean something, and nowhere else.
 * A missing rate is not a licence to add the numbers anyway. Summing USD into
-  RWF at 1:1 does not produce an approximate total, it produces a wrong one —
-  so an unconvertible balance is left out and reported as left out.
+  RWF at 1:1 gives a wrong total, not an approximate one, so an unconvertible
+  balance is left out and reported as left out.
 
-Rates are entered by the user. The PRD defers automatic rates, and a net worth
-that moves because a third party changed a number is worse than one the user
-set deliberately and can explain.
+Rates come from a published feed refreshed daily into a shared table; a rate
+the user sets themselves overrides it.
 """
 
 import logging
@@ -30,9 +28,8 @@ logger = logging.getLogger(__name__)
 
 MANUAL = "MANUAL"
 
-# The bases the shared table is kept in. Two is enough: everything else is
-# reached by crossing through one of them, and each base costs one request a
-# day however many currencies it covers.
+# Two bases is enough: everything else is reached by crossing through one, and
+# each base costs one request a day however many currencies it covers.
 MARKET_BASES = ("RWF", "USD")
 
 QUANTUM = Decimal("0.0001")
@@ -53,13 +50,10 @@ def normalize(code: str) -> str:
 class Converter:
     """Converts many balances against one snapshot of the rates.
 
-    Built once per request rather than queried per account: a page listing
-    accounts would otherwise issue one lookup per row, and every row would be
-    free to disagree with the others about the rate.
+    Built once per request, not queried per account: otherwise every row of a
+    listing issues its own lookup and is free to disagree with the others.
 
-    Two layers, in order. A rate the user set themselves wins, because it is a
-    deliberate statement about their own money. Otherwise the shared published
-    table answers.
+    A rate the user set wins over the shared published table.
     """
 
     def __init__(
@@ -76,19 +70,17 @@ class Converter:
         direct = table.get((source, target))
         if direct is not None:
             return direct
-        # One rate defines the pair both ways. Storing USD→RWF and then
-        # refusing RWF→USD would make the user enter the same fact twice and
-        # give them a way to contradict themselves.
+        # One rate defines the pair both ways; requiring both entries would let
+        # a user contradict themselves.
         inverse = table.get((target, source))
         if inverse is not None and inverse > 0:
             return (Decimal(1) / inverse).quantize(RATE_QUANTUM, rounding=ROUND_HALF_UP)
         return None
 
     def _cross(self, source: str, target: str) -> Decimal | None:
-        """Go via a currency the table has rates for both sides of.
+        """Go via a currency the table has both sides of.
 
-        Tracking two bases covers far more than two currencies: with RWF→USD
-        and RWF→EUR on hand, USD→EUR follows without ever fetching it.
+        With RWF→USD and RWF→EUR on hand, USD→EUR follows without a fetch.
         """
         for pivot in MARKET_BASES:
             if pivot in (source, target):
@@ -145,9 +137,8 @@ def set_rate(
 ) -> ExchangeRate:
     """Record or update one pair.
 
-    Upserts rather than appending: the user is stating what a currency is worth
-    now, and keeping every past guess would leave the reporting to choose
-    between them.
+    Upserts: the user is stating what a currency is worth now, and keeping past
+    guesses would leave reporting to choose between them.
     """
     base_currency = normalize(base_currency)
     quote_currency = normalize(quote_currency)
@@ -170,8 +161,8 @@ def set_rate(
             ExchangeRate.quote_currency == quote_currency,
         )
     )
-    # The same pair entered the other way round is the same fact. Updating it
-    # in place stops a user holding two rates that disagree.
+    # The pair the other way round is the same fact; updating in place stops
+    # two rates that disagree.
     inverted = db.scalar(
         select(ExchangeRate).where(
             ExchangeRate.user_id == user.id,
@@ -225,8 +216,7 @@ def delete_rate(db: DbSession, *, user: User, rate_id: uuid.UUID) -> None:
 def currencies_in_use(db: DbSession, *, user: User) -> list[str]:
     """Every currency the user actually holds something in.
 
-    Drives the prompt to set a rate: asking for USD only matters once there is
-    a dollar account to convert.
+    Asking for a USD rate only matters once a dollar account exists.
     """
     from app.models.finance import Account
 
@@ -242,12 +232,9 @@ def currencies_in_use(db: DbSession, *, user: User) -> list[str]:
 def refresh_market_rates(db: DbSession, *, fetcher=None) -> int:
     """Pull the published rates into the shared table.
 
-    One request per base, however many currencies come back and however many
-    users the app has — which is the point of the table. Previously each user
-    triggered a call for each currency they held.
-
-    Nothing is written unless a real number came back, so a feed being down
-    leaves yesterday's rates in place rather than replacing them with a gap.
+    One request per base however many currencies or users — the point of the
+    table. Nothing is written unless a real number came back, so a feed being
+    down leaves yesterday's rates rather than a gap.
     """
     from app.services import fx_feed
 

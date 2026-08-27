@@ -1,10 +1,8 @@
-"""Credit-card behaviour layered over the account and posting models.
+"""Credit-card behaviour over the account and posting models.
 
-Implementation Plan Phase 9. Nothing here computes a balance or a ledger
-direction of its own: outstanding balance comes from PostingService, and a card
-payment is a transfer, so it goes through transfer_funds like any other.
-
-The three properties the plan asks to guard:
+Computes no balance or direction of its own: the outstanding balance comes from
+PostingService, and a payment is a transfer like any other. The properties that
+matter:
 
     Purchase  = Expense + increased liability
     Payment   = reduced cash + reduced liability
@@ -23,13 +21,11 @@ from app.models.finance import Account, Transfer
 from app.models.user import User
 from app.services.posting import PostingService
 
-# Utilization bands from UI/UX section 36. Returned by the API so the client
-# does not re-derive thresholds and drift from them.
+# Returned by the API so the client does not re-derive them and drift.
 UTILIZATION_BANDS = ((30, "NORMAL"), (60, "NEUTRAL"), (80, "WARNING"))
 
 
-# Both kinds of plastic carry an expiry date. Everything else in this module is
-# credit-specific, but an expiry belongs to the card, not to how it is funded.
+# An expiry belongs to the card, not to how it is funded, so both kinds have one.
 CARD_ACCOUNT_TYPES = (AccountType.CREDIT_CARD, AccountType.PREPAID_CARD)
 
 
@@ -54,17 +50,14 @@ def require_card(account: Account) -> Account:
     return account
 
 
-# How much warning is useful before a card stops working: long enough to order
-# a replacement and move recurring charges across, short enough that the notice
-# still feels current.
+# Long enough to order a replacement and move recurring charges across.
 EXPIRY_NOTICE_DAYS = 60
 
 
 def expiry_date(account: Account) -> date | None:
     """The last day the card works.
 
-    A card printed 08/28 is good for the whole of August 2028, so expiry falls
-    at the end of that month rather than on its first day.
+    08/28 is good for all of August 2028, so expiry is the month's end.
     """
     if account.expiry_month is None or account.expiry_year is None:
         return None
@@ -89,9 +82,8 @@ def expiry_state(account: Account, *, today: date | None = None) -> dict | None:
         "expires_on": expires_on.isoformat(),
         "days_remaining": days_remaining,
         "status": status,
-        # What to do about it depends on what the card holds: a credit card
-        # carries charges to move, a prepaid card carries money to lose. The
-        # rule lives here so the notification and the screen cannot drift.
+        # A credit card carries charges to move, a prepaid one money to lose.
+        # Kept here so the notification and the screen cannot drift.
         "advice": _expiry_advice(account, expired=status == "EXPIRED"),
     }
 
@@ -109,8 +101,7 @@ def require_credit_card(account: Account) -> Account:
 def headroom(outstanding: Decimal, limit: Decimal | None) -> tuple[Decimal | None, Decimal | None]:
     """What is left to spend, and how much of the limit is used.
 
-    Available credit can legitimately go negative when a card is over its
-    limit. Reporting the real number beats clamping to zero and hiding it.
+    Goes negative when a card is over its limit; clamping would hide that.
     """
     if limit is None:
         return None, None
@@ -135,8 +126,7 @@ def utilization_band(percentage: Decimal | None) -> str | None:
 def next_occurrence(day_of_month: int, *, today: date) -> date:
     """Next calendar date falling on that day of the month.
 
-    Clamped to the length of the target month, so a card due on the 31st still
-    resolves in February rather than raising.
+    Clamped to the month's length, so the 31st still resolves in February.
     """
 
     def clamp(year: int, month: int) -> date:
@@ -209,10 +199,9 @@ def pay_card(
 ) -> Transfer:
     """Pay down a card from another account.
 
-    A convenience wrapper over the posting engine, not a second code path. The
-    engine resolves both sides from account nature, which is what keeps a
-    payment out of expense analytics: both entries are TRANSFER, and both are
-    DECREASE — the asset loses value and the liability loses debt.
+    A wrapper over the posting engine, not a second code path. Both entries are
+    TRANSFER and both DECREASE, which is what keeps a payment out of expense
+    analytics.
     """
     require_credit_card(card)
 
@@ -254,9 +243,8 @@ def top_up_prepaid(
 ) -> Transfer:
     """Load funds onto a prepaid card.
 
-    Prepaid cards are assets, so a top-up is an ordinary asset-to-asset move:
-    money changes location, net worth does not change, and no expense is
-    recorded (Implementation Plan Phase 10).
+    Prepaid cards are assets, so this is an ordinary asset-to-asset move: money
+    changes location, net worth does not, and nothing is spent.
     """
     if card.account_type is not AccountType.PREPAID_CARD:
         raise ValidationFailed(
@@ -280,9 +268,8 @@ def top_up_prepaid(
 def card_fields_payload(account: Account, *, outstanding: Decimal | None = None) -> dict | None:
     """Card metadata for account serialization, omitted for non-cards.
 
-    Carries what is left to spend as well as the limit, so a list of accounts
-    can show headroom without a second request per card — and without the
-    client subtracting balances of its own.
+    Carries headroom as well as the limit, so a list needs no second request
+    per card and the client subtracts nothing itself.
     """
     if account.account_type is not AccountType.CREDIT_CARD:
         return None
@@ -333,8 +320,8 @@ def apply_card_fields(account: Account, values: dict) -> None:
         require_credit_card(account)
     elif named:
         require_card(account)
-    # None is applied rather than skipped: clearing an expiry recorded by
-    # mistake is a real edit, and callers only send the keys they mean.
+    # None is applied, not skipped: clearing a mistaken expiry is a real edit,
+    # and callers send only the keys they mean.
     for field, value in values.items():
         setattr(account, field, value)
 
@@ -344,8 +331,7 @@ def expiring_cards(
 ) -> list[tuple[Account, dict]]:
     """Every active card at or past its notice window, oldest expiry first.
 
-    Archived cards are skipped: an account you have already put away does not
-    need chasing about a card you have presumably already replaced.
+    Archived cards are skipped; they need no chasing.
     """
     from sqlalchemy import select
 
@@ -375,10 +361,8 @@ def notify_expiring_cards(
 ) -> int:
     """Raise one notification per card, per expiry.
 
-    The task runs daily, so it must not send daily. The guard is the notice
-    window itself: a card is announced once after its window opens, and only
-    announced again if the expiry date moves — which is exactly what happens
-    when the card is replaced and the new date recorded.
+    The task runs daily and must not send daily: a card is announced once, and
+    again only if the expiry moves — which is what happens when it is replaced.
     """
     from sqlalchemy import select
 

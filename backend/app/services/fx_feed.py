@@ -1,15 +1,11 @@
 """Daily exchange rates from a published feed.
 
-Frankfurter (https://frankfurter.dev) is the primary source: ECB reference
-rates, free, no key. It publishes thirty currencies and RWF is not one of
-them — which matters here, because RWF is the base currency this app was
-built for. So a second free source fills the gap for anything the ECB does
-not publish.
+Frankfurter is primary: ECB rates, free, no key. It does not publish RWF —
+this app's base currency — so a second free source fills the gap.
 
-Both are read-only and best-effort. A feed being down is not an error the
-user should see: the rates already stored stay usable, and the next run tries
-again. What must never happen is a fetch failure leaving a *wrong* rate
-behind, so nothing is written unless a real number came back.
+Best-effort. A feed being down is not the user's problem: stored rates stay
+usable and the next run retries. What must never happen is a failure leaving a
+*wrong* rate, so nothing is written unless a real number came back.
 """
 
 import json
@@ -28,8 +24,7 @@ CURRENCY_FREAKS_URL = "https://api.currencyfreaks.com/v2.0/rates/latest"
 FRANKFURTER_URL = "https://api.frankfurter.dev/v1/latest"
 OPEN_ER_API_URL = "https://open.er-api.com/v6/latest"
 
-# Long enough for a slow morning, short enough that a hung feed does not hold
-# a worker for minutes.
+# Long enough for a slow morning, short enough not to hold a worker.
 TIMEOUT_SECONDS = 15
 
 
@@ -56,9 +51,8 @@ def _as_decimal(value) -> Decimal | None:
 def _from_currency_freaks(base: str, wanted: list[str]) -> dict[str, tuple[Decimal, str]]:
     """CurrencyFreaks, used only when a key is configured.
 
-    Its free tier quotes against USD, so a non-USD base is derived by crossing
-    through it rather than assumed to be honoured. Both legs come from the same
-    response, so the cross is internally consistent.
+    Its free tier quotes against USD, so a non-USD base is crossed through it
+    rather than assumed honoured. Both legs come from one response.
     """
     from app.core.config import settings
 
@@ -88,10 +82,9 @@ def _from_currency_freaks(base: str, wanted: list[str]) -> dict[str, tuple[Decim
 
 
 def fetch_all(base: str) -> dict[str, tuple[Decimal, str]]:
-    """Every rate a feed publishes for one base, in a single request.
+    """Every rate a feed publishes for one base, in one request.
 
-    This is what makes a shared rate table cheap: one call returns the whole
-    row, so tracking a new currency costs nothing extra.
+    What makes the shared table cheap: tracking a new currency costs nothing.
     """
     base = base.upper()
     found: dict[str, tuple[Decimal, str]] = {}
@@ -119,10 +112,8 @@ def fetch_all(base: str) -> dict[str, tuple[Decimal, str]]:
 def fetch(base: str, symbols: list[str]) -> dict[str, tuple[Decimal, str]]:
     """One unit of `base` in each requested currency, with its source.
 
-    CurrencyFreaks first when a key is configured, then Frankfurter, then the
-    keyless fallback for whatever is still missing. Anything no feed publishes
-    is simply absent from the result — the caller leaves those alone rather
-    than inventing a number.
+    CurrencyFreaks when keyed, then Frankfurter, then the keyless fallback for
+    what is missing. What no feed publishes is absent rather than invented.
     """
     base = base.upper()
     wanted = [s.upper() for s in symbols if s.upper() != base]

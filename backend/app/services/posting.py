@@ -1,20 +1,14 @@
 """The financial posting engine.
 
-Implementation Plan Phase 5 and Architecture section 18: every balance-moving
-operation in Montra goes through this service. API routes must never construct a
-Transaction or mutate a balance directly.
+Every balance-moving operation goes through this service; routes never construct
+a Transaction or mutate a balance directly.
 
-The engine's single responsibility is translating a financial *operation* plus an
-account's *nature* into a ledger `direction`, where direction is defined against
-the account's own balance scale (Data Model sections 19-20):
+Its one job is turning an *operation* plus an account's *nature* into a
+`direction`, defined against that account's own balance scale: INCREASE means
+its balance goes up — asset value up, or debt owed up.
 
-    INCREASE -> the account's own balance goes up
-                (asset value up, or debt owed up)
-    DECREASE -> the account's own balance goes down
-                (asset value down, or debt owed down)
-
-This is deliberately not double-entry debit/credit. There are no contra
-accounts; only a transfer produces two entries.
+Deliberately not double-entry: no contra accounts, and only a transfer writes
+two entries.
 """
 
 import uuid
@@ -47,24 +41,18 @@ class Operation(StrEnum):
     TRANSFER_IN = "TRANSFER_IN"
 
 
-# The entire accounting rulebook, in one table.
-#
-# Read a row as: this operation, landing on an account of this nature, moves
-# that account's own balance in this direction.
+# The entire accounting rulebook: this operation, on an account of this nature,
+# moves that account's own balance in this direction.
 DIRECTION_RULES: dict[tuple[Operation, AccountNature], Direction] = {
-    # Money earned.
     (Operation.INCOME, AccountNature.ASSET): Direction.INCREASE,
-    # Income onto a liability is a refund/credit against the card: debt falls.
+    # A refund against a card: debt falls.
     (Operation.INCOME, AccountNature.LIABILITY): Direction.DECREASE,
-    # Money spent.
     (Operation.EXPENSE, AccountNature.ASSET): Direction.DECREASE,
-    # Spending on a card does not move cash; it borrows more: debt rises.
+    # A card purchase moves no cash; it borrows more.
     (Operation.EXPENSE, AccountNature.LIABILITY): Direction.INCREASE,
-    # Money leaving an account.
     (Operation.TRANSFER_OUT, AccountNature.ASSET): Direction.DECREASE,
-    # Drawing funds out of a card (cash advance) borrows more: debt rises.
+    # A cash advance borrows more.
     (Operation.TRANSFER_OUT, AccountNature.LIABILITY): Direction.INCREASE,
-    # Money arriving in an account.
     (Operation.TRANSFER_IN, AccountNature.ASSET): Direction.INCREASE,
     # Money arriving at a card is a repayment: debt falls.
     (Operation.TRANSFER_IN, AccountNature.LIABILITY): Direction.DECREASE,
@@ -90,8 +78,8 @@ class Posting:
 
 
 class PostingService:
-    """Creates ledger entries and derives balances. Never called from a route directly
-    without a service or unit-of-work owning the commit."""
+    """Creates ledger entries and derives balances. A service or unit of work
+    owns the commit, never a route."""
 
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -189,8 +177,8 @@ class PostingService:
         actor_id: uuid.UUID,
         **fields,
     ) -> Transaction:
-        """Also the credit-card purchase path: on a LIABILITY account this
-        raises debt rather than lowering cash, with no branching at the call site."""
+        """Also the card-purchase path: on a LIABILITY account this raises debt
+        rather than lowering cash, with no branching at the call site."""
         self._require_currency_match(account, currency)
         return self._write(
             Posting(account, Operation.EXPENSE, amount, TransactionType.EXPENSE),
@@ -215,11 +203,9 @@ class PostingService:
     ) -> Transfer:
         """Create a transfer and both of its ledger entries.
 
-        Caller owns the surrounding database transaction (Architecture section 23).
-
-        A transfer is not always one INCREASE and one DECREASE. A credit-card
-        repayment decreases both sides: the asset loses value and the liability
-        loses debt. Direction is derived per side from that side's nature.
+        Not always one INCREASE and one DECREASE: a card repayment decreases
+        both sides, the asset losing value and the liability losing debt.
+        Direction is derived per side from that side's nature.
         """
         if source.id == destination.id:
             raise ValidationFailed(
@@ -235,8 +221,7 @@ class PostingService:
         if fee_amount is not None:
             self._require_positive(fee_amount, "fee_amount")
 
-        # MVP is same-currency only; the columns already carry both sides so
-        # that FX can arrive without a migration.
+        # Same-currency only for now; the columns carry both sides already.
         if source.currency != destination.currency:
             raise ValidationFailed(
                 "Cross-currency transfers are not supported yet.",
@@ -292,10 +277,8 @@ class PostingService:
         )
 
         if fee_amount is not None:
-            # The sender pays the charge, so it comes off the source account —
-            # and it is an expense, not part of the movement. The amount that
-            # arrived is what arrived; a fee added to the transfer would claim
-            # the destination received it.
+            # An expense on the source, not part of the movement: folding it in
+            # would claim the destination received it.
             self._write(
                 Posting(source, Operation.EXPENSE, fee_amount, TransactionType.EXPENSE),
                 actor_id=actor_id,
@@ -318,14 +301,10 @@ class PostingService:
     ) -> Transaction:
         """Move the principal portion of a loan payment.
 
-        Repaying principal settles a debt you already carried; collecting
-        principal returns money you already lent. Neither creates or consumes
-        wealth, so both post as TRANSFER and stay out of income and expense
-        analytics — the same reasoning that keeps a credit-card payment from
-        counting as spending a second time.
-
-        Interest and fees are separate entries, and those *are* real income or
-        expense.
+        Settling a debt already carried creates no wealth, so principal posts as
+        TRANSFER and stays out of income and expense analytics — the same reason
+        a card payment is not spending twice. Interest and fees post separately,
+        and those are real income or expense.
         """
         operation = Operation.TRANSFER_OUT if outgoing else Operation.TRANSFER_IN
         return self._write(
@@ -351,9 +330,7 @@ class PostingService:
         for side in sides:
             side.status = TransactionStatus.CANCELLED
 
-        # A cancelled transfer leaves the balance as if it never happened, so a
-        # surviving fee would charge the user for a movement the ledger no
-        # longer shows.
+        # A surviving fee would charge for a movement the ledger no longer shows.
         fees = self.db.scalars(
             select(Transaction).where(
                 Transaction.fee_for_transaction_id.in_([s.id for s in sides])
@@ -367,8 +344,7 @@ class PostingService:
 
         from app.services import audit
 
-        # Cancelling moves two balances at once, and the transfer row itself
-        # keeps no record of who did it.
+        # Two balances move at once, and the transfer row records no actor.
         audit.record(
             self.db,
             actor=None,
@@ -388,10 +364,10 @@ class PostingService:
         actor_id: uuid.UUID,
         reason: str | None = None,
     ) -> Transaction | None:
-        """Reconcile an account to an observed balance.
+        """Reconcile to an observed balance.
 
-        The delta is expressed on the account's own scale, so a positive delta is
-        an INCREASE for assets and liabilities alike.
+        The delta is on the account's own scale, so a positive delta is an
+        INCREASE for assets and liabilities alike.
         """
         current = self.balance_of(account)
         delta = actual_balance - current
@@ -417,13 +393,12 @@ class PostingService:
     # -------------------------------------------------------------- balances
 
     def balance_of(self, account: Account, *, as_of: datetime | None = None) -> Decimal:
-        """Balance derived from the ledger, never from a cached column.
+        """Derived from the ledger, never from a cached column:
 
-        Data Model section 72:
             opening_balance + SUM(INCREASE) - SUM(DECREASE)
 
-        One formula serves both natures, because direction is already defined
-        from the account's own balance perspective.
+        One formula serves both natures, direction already carrying the
+        account's own perspective.
         """
         stmt = select(Transaction.direction, Transaction.amount).where(
             Transaction.account_id == account.id,

@@ -1,12 +1,8 @@
-"""Object storage for attachments (Implementation Plan Phase 27).
+"""Object storage for attachments.
 
-Files never touch Postgres and are never reachable from a permanent public
-URL. The API authorizes a request, then hands back a short-lived signed link
-that the browser uses directly — so a receipt is only fetchable by someone who
-asked us for it in the last few minutes and was allowed to.
-
-The same code runs against MinIO locally and any S3-compatible bucket in
-production; only the endpoint and credentials differ.
+Files never touch Postgres and have no permanent public URL: the API authorizes,
+then hands back a short-lived signed link the browser uses directly. Runs
+against MinIO locally and any S3-compatible bucket in production.
 """
 
 import uuid
@@ -21,12 +17,11 @@ from app.core.config import settings
 
 @lru_cache
 def _client(*, public: bool = False):
-    """A boto3 S3 client.
+    """A boto3 S3 client — two, in fact.
 
-    Two of them, in fact. Server-side calls go to the in-network endpoint;
-    signed URLs must be signed for the hostname the *browser* will use, or the
-    signature covers a host the browser never contacts and the request is
-    rejected.
+    Server-side calls use the in-network endpoint. Signed URLs must be signed
+    for the hostname the *browser* will use, or the signature covers a host it
+    never contacts and the request is rejected.
     """
     return boto3.client(
         "s3",
@@ -50,9 +45,8 @@ def ensure_bucket() -> None:
 def build_key(*, user_id: uuid.UUID, file_name: str) -> str:
     """Where the object lives.
 
-    Prefixed by owner so a bucket listing cannot be walked across users, and
-    suffixed with a fresh UUID so two receipts named IMG_0001.jpg never
-    collide. The original name is metadata, not part of the key.
+    Prefixed by owner so a listing cannot be walked across users, and suffixed
+    with a UUID so two IMG_0001.jpg never collide.
     """
     suffix = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "bin"
     if not suffix.isalnum() or len(suffix) > 8:
@@ -63,8 +57,8 @@ def build_key(*, user_id: uuid.UUID, file_name: str) -> str:
 def signed_upload_url(*, key: str, content_type: str) -> dict:
     """A URL the browser can PUT one specific object to, once, soon.
 
-    The content type is part of the signature, so a client that promised a JPEG
-    cannot then upload something else under the same link.
+    The content type is signed too, so a client that promised a JPEG cannot
+    upload something else under the same link.
     """
     url = _client(public=True).generate_presigned_url(
         "put_object",
@@ -86,8 +80,7 @@ def signed_download_url(*, key: str, file_name: str) -> str:
         Params={
             "Bucket": settings.s3_bucket,
             "Key": key,
-            # Keeps the browser from rendering an uploaded file inline, and
-            # gives the download the name the user recognises.
+            # No inline rendering, and the name the user recognises.
             "ResponseContentDisposition": f'attachment; filename="{file_name}"',
         },
         ExpiresIn=settings.s3_signed_url_ttl_seconds,
@@ -114,5 +107,5 @@ def delete_object(*, key: str) -> None:
     try:
         _client().delete_object(Bucket=settings.s3_bucket, Key=key)
     except ClientError:
-        # The row is going either way; a missing object is the desired state.
+        # The row is going either way; a missing object is the goal.
         pass

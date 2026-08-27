@@ -1,12 +1,8 @@
 """Profile reset.
 
-Not in the API specification — added on request. It wipes a user's financial
-data while keeping their login, which is the difference between "start over"
-and "delete my account".
-
-The operation is irreversible, so it is deliberately awkward: it requires the
-account password, and it reports exactly what it is about to destroy before
-it does so.
+Wipes a user's financial data while keeping their login — the difference
+between "start over" and "delete my account". Irreversible, so deliberately
+awkward: it requires the password and names what it will destroy first.
 """
 
 from sqlalchemy import delete, func, select
@@ -26,11 +22,8 @@ def _count(db: DbSession, model, *conditions) -> int:
 
 
 def reset_summary(db: DbSession, user: User) -> dict:
-    """What a reset would destroy.
-
-    A warning that names real numbers is a warning; "this cannot be undone" on
-    its own is wallpaper.
-    """
+    """What a reset would destroy. A warning naming real numbers is a warning;
+    "this cannot be undone" on its own is wallpaper."""
     account_ids = select(Account.id).where(Account.owner_user_id == user.id)
     return {
         "accounts": _count(db, Account, Account.owner_user_id == user.id),
@@ -55,9 +48,8 @@ def reset_summary(db: DbSession, user: User) -> dict:
 def reset_profile(db: DbSession, *, user: User, password: str) -> dict:
     """Delete every financial record this user owns and start them fresh.
 
-    Re-authentication is required: a borrowed session should not be able to
-    destroy someone's history. Caller owns the surrounding database
-    transaction, so a failure part-way leaves nothing deleted.
+    Re-authentication required: a borrowed session must not destroy a history.
+    The caller owns the transaction, so a failure part-way deletes nothing.
     """
     if not verify_password(user.password_hash, password):
         raise InvalidCredentials("That password is not correct.")
@@ -65,8 +57,7 @@ def reset_profile(db: DbSession, *, user: User, password: str) -> dict:
     summary = reset_summary(db, user)
     account_ids = select(Account.id).where(Account.owner_user_id == user.id)
 
-    # Order matters: rows are removed before whatever they point at, so no
-    # RESTRICT foreign key ever blocks the delete.
+    # Children before parents, so no RESTRICT foreign key blocks the delete.
     db.execute(delete(PlannedTransaction).where(PlannedTransaction.created_by == user.id))
     db.execute(delete(RecurringRule).where(RecurringRule.created_by == user.id))
     db.execute(delete(Reminder).where(Reminder.user_id == user.id))

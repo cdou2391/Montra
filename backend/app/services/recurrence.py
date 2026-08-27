@@ -1,13 +1,12 @@
 """Recurrence date arithmetic.
 
-Kept separate from persistence so the rules can be tested directly, and so the
-generation task has nothing to decide for itself.
+Separate from persistence so the rules test directly and the generation task
+decides nothing itself.
 
-Month-based recurrence anchors on the rule's start day and clamps to the length
-of each target month: a rule starting on the 31st lands on the 30th in April
-and the 28th in February, then returns to the 31st in May. Stepping from the
-previous occurrence instead would let a rule drift permanently earlier after
-one short month.
+Month-based recurrence anchors on the rule's start day and clamps to each
+month's length: the 31st lands on the 30th in April, the 28th in February, then
+returns to the 31st in May. Stepping from the previous occurrence instead would
+drift the rule permanently earlier after one short month.
 """
 
 import calendar
@@ -36,11 +35,8 @@ def occurrence_after(
     interval: int,
     anchor: date,
 ) -> date:
-    """The occurrence that follows `previous` for this rule.
-
-    `anchor` is the rule's start date, which fixes the day-of-month for
-    month-based frequencies.
-    """
+    """The occurrence after `previous`. `anchor` is the rule's start date,
+    fixing the day-of-month for month-based frequencies."""
     if interval < 1:
         raise ValueError("interval must be at least 1")
 
@@ -50,8 +46,8 @@ def occurrence_after(
         return previous + timedelta(weeks=interval)
 
     months = MONTHS_PER_STEP[frequency] * interval
-    # Count whole steps from the anchor so a clamped short month does not
-    # permanently pull the series earlier.
+    # Whole steps from the anchor, so a clamped short month does not pull the
+    # series earlier for good.
     steps = 0
     candidate = anchor
     while candidate <= previous:
@@ -70,11 +66,8 @@ def occurrences_between(
     end_date: date | None = None,
     limit: int = 500,
 ) -> list[date]:
-    """Every occurrence falling inside the window, inclusive.
-
-    `limit` is a safety valve: a daily rule over a long window should not be
-    able to generate an unbounded list.
-    """
+    """Every occurrence inside the window, inclusive. `limit` stops a daily
+    rule over a long window generating an unbounded list."""
     results: list[date] = []
     current = start
 

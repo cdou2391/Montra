@@ -1,22 +1,16 @@
 """Server-side authorization for account-scoped resources.
 
-Architecture ADR-009 and section 35, and Implementation Plan Phase 17, which
-calls this a security milestone. Every rule about who may see or touch a
-financial record lives here, and nothing else is permitted to decide.
+Every rule about who may see or touch a financial record lives here. Three
+visibilities, and reading is not writing:
 
-The model has three visibilities and two questions — may I read it, may I write
-to it — and they are not the same question:
+    PRIVATE         owner only. Everyone else gets 404, not 403, so the API
+                    never confirms the record exists.
+    FAMILY_VISIBLE  the household may read; only the owner may write. Showing
+                    someone a salary account is not handing them a pen.
+    SHARED          the household may read, OWNER/ADULT may write.
 
-    PRIVATE         owner only, for both. Everyone else gets 404, not 403,
-                    so the API never confirms the record exists.
-    FAMILY_VISIBLE  household members may read. Only the owner may write:
-                    showing someone a salary account is not handing them a pen.
-    SHARED          household members may read, and OWNER/ADULT may write.
-                    MEMBER is read-only for MVP.
-
-Child records — transactions, planned items, recurring rules — are never
-authorized on their own `created_by`. They resolve through their account
-(Data Model section 47), because the account is what carries the visibility.
+Child records resolve through their account, never their own `created_by`:
+the account is what carries the visibility.
 """
 
 import uuid
@@ -39,10 +33,9 @@ from app.models.user import User
 
 @dataclass(frozen=True)
 class Access:
-    """A caller plus the household they are currently acting in.
+    """A caller plus the household they are acting in.
 
-    Resolved once per request. Passing it around beats re-querying membership
-    for every account in a list.
+    Resolved once per request rather than per account in a list.
     """
 
     user: User
@@ -117,9 +110,8 @@ def can_transact(account: Account, access: Access) -> bool:
 def _access(db: DbSession, who: "User | Access") -> Access:
     """Accept a caller either way.
 
-    Routes that touch one account can pass the user and let membership resolve
-    here; anything iterating accounts resolves once and passes the Access, so a
-    list does not run one membership query per row.
+    One account can pass the user; anything iterating resolves once and passes
+    the Access, so a list runs no membership query per row.
     """
     return who if isinstance(who, Access) else resolve(db, who)
 
@@ -136,18 +128,16 @@ def visible_accounts(
 ) -> Select:
     """Accounts the caller may see, in the requested context.
 
-    Personal includes everything they own plus the household's shared accounts,
-    since a shared account is genuinely theirs to use. Family includes what the
-    household can see — FAMILY_VISIBLE and SHARED — and never PRIVATE, whoever
-    owns it (Data Model sections 49-50).
+    Personal is what they own plus the household's shared accounts, which are
+    genuinely theirs to use. Family is FAMILY_VISIBLE and SHARED, never
+    PRIVATE, whoever owns it.
     """
     access = _access(db, who)
     owned = Account.owner_user_id == access.user.id
 
     if context == "family":
         if not access.in_family:
-            # No household, nothing to show. An impossible predicate rather
-            # than a silent fallback to personal data.
+            # An impossible predicate, not a silent fallback to personal data.
             return select(Account).where(Account.id.is_(None))
         stmt = select(Account).where(
             Account.family_id == access.family_id,
