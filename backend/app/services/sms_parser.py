@@ -100,14 +100,25 @@ CARD_ALERT = re.compile(
     # Grouped, because the same terminal writes its balance as "RWF268 026" and
     # formats a purchase over 999 the same way.
     rf"\b({CURRENCY_NC})\s*{AMOUNT_GROUPED}\s+"
-    r"(?:purchase|payment|withdrawal)\s+approved\s+"
+    # Whatever the terminal calls it: "Purchase", "Mail/phone Order", "ATM
+    # Withdrawal". Listing the ones seen so far only works until the next one
+    # arrives, so the anchor is "approved with <card>", which is the part that
+    # makes this a card alert at all.
+    r"([A-Za-z][A-Za-z/&.\- ]{0,40}?)\s+approved\s+"
     r"with\s+([*xX\d]{4,})",
     re.IGNORECASE,
 )
 
+# Money coming back rather than going out. The wording is the same up to the
+# descriptor, and filing a refund as spending would be wrong twice over.
+CARD_RETURNING = re.compile(r"refund|reversal|return|credit", re.IGNORECASE)
+
 # Where it was spent, which is all the description this message offers. Ends at
 # the time that follows, so "Amsterdam" does not run on into the date.
-CARD_LOCATION = re.compile(r"\bat\s+([^\n\d]{2,60}?)\s+on\s+\d{1,2}:\d{2}", re.IGNORECASE)
+#
+# Digits are allowed: a phone order names the merchant by its number, and
+# "855-836-3987" is the only identification that message carries.
+CARD_LOCATION = re.compile(r"\bat\s+([^\n]{2,60}?)\s+on\s+\d{1,2}:\d{2}", re.IGNORECASE)
 
 # "01:35 26.08.26" — the time first, then a dotted date. Read day-first, which
 # is what this sender writes and what the dots imply; the form shows the date
@@ -379,15 +390,22 @@ def _read_card_alert(text: str, result: ParsedSms) -> None:
     if not found:
         return
 
-    currency, amount, card = found.groups()
+    currency, amount, descriptor, card = found.groups()
     result.amount = _decimal(amount)
     if result.amount is None:
         return
     result.currency = currency.upper()
-    result.transaction_type = "EXPENSE"
-    result.matched.append("expense")
+    returning = bool(CARD_RETURNING.search(descriptor))
+    result.transaction_type = "INCOME" if returning else "EXPENSE"
+    result.matched.append("income" if returning else "expense")
 
-    result.debited_identifier = card
+    # Which end the card is depends on which way the money went. Both resolve
+    # the same way; naming the wrong one would still fill the form correctly
+    # and still be a lie about what the message said.
+    if returning:
+        result.credited_identifier = card
+    else:
+        result.debited_identifier = card
     result.matched.append("accounts")
 
     where = CARD_LOCATION.search(text)

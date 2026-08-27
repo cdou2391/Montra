@@ -770,3 +770,51 @@ def test_the_balance_keeps_its_own_currency():
     assert result.currency == "USD"
     assert result.balance_currency == "RWF"
     assert result.balance_after == Decimal("268026")
+
+
+# The terminal has more than one word for a purchase, and a phone order names
+# its merchant by number rather than by name.
+
+
+PHONE_ORDER = (
+    "RUGAMBA,USD20 Mail/phone Order approved with **4124 at 855-836-3987 "
+    "on 15:40 27.08.26.Avail Bal RWF190 563.Queries?Call +250788143000."
+)
+
+
+def test_a_phone_order_is_read_like_any_other_card_purchase():
+    """Anchored on "approved with <card>" rather than on a list of words for
+    what was bought — that list only works until the next wording arrives."""
+    result = parse(PHONE_ORDER)
+    assert result.understood is True
+    assert result.transaction_type == "EXPENSE"
+    assert result.amount == Decimal("20")
+    assert result.currency == "USD"
+    assert result.debited_identifier == "**4124"
+
+
+def test_a_merchant_named_by_number_is_still_a_merchant():
+    """The only identification the message carries."""
+    assert parse(PHONE_ORDER).counterparty == "855-836-3987"
+
+
+def test_the_phone_order_reads_its_own_date_and_balance():
+    result = parse(PHONE_ORDER)
+    assert result.occurred_at == datetime(2026, 8, 27, 15, 40, 0)
+    assert result.balance_after == Decimal("190563")
+
+
+def test_a_card_refund_is_money_coming_back():
+    """Same wording up to the descriptor. Filing it as spending would be wrong
+    twice over — the sign and the total."""
+    result = parse(PHONE_ORDER.replace("Mail/phone Order", "Refund"))
+    assert result.transaction_type == "INCOME"
+    # Credited, not debited: the card received the money.
+    assert result.credited_identifier == "**4124"
+    assert result.debited_identifier is None
+
+
+def test_a_declined_phone_order_still_fills_nothing():
+    result = parse(PHONE_ORDER.replace("approved", "declined"))
+    assert result.understood is False
+    assert result.transaction_type is None
