@@ -630,3 +630,73 @@ def test_the_direct_debit_keeps_its_reference_and_balance():
 )
 def test_the_earlier_formats_still_name_the_same_party(message, expected):
     assert parse(message).counterparty == expected
+
+
+# ------------------------------------------------- a card authorisation alert
+
+
+CARD_PURCHASE = (
+    "RUGAMBA,USD10 Purchase approved with **4124 at Amsterdam on 01:35 26.08.26."
+    "Avail Bal RWF268 026.Queries?Call +250788143000."
+)
+
+
+def test_a_card_purchase_is_spending():
+    result = parse(CARD_PURCHASE)
+    assert result.understood is True
+    assert result.transaction_type == "EXPENSE"
+    assert result.amount == Decimal("10")
+    assert result.currency == "USD"
+
+
+def test_the_card_alert_names_the_card_it_used():
+    """The masked digits are the only thing in the message that says which
+    card this was, so they are carried as the debited account."""
+    result = parse(CARD_PURCHASE)
+    assert result.debited_identifier == "**4124"
+
+
+def test_the_masked_card_selects_the_card():
+    accounts = _accounts(("BK Credit Card", "4124"), ("BK Prepaid", "8527"))
+    resolved = resolve_accounts(parse(CARD_PURCHASE), accounts)
+    assert resolved["source_account_id"] == "BK Credit Card"
+    assert resolved["destination_account_id"] is None
+    assert resolved["transaction_type"] == "EXPENSE"
+
+
+def test_an_unknown_card_selects_nothing():
+    """Pointing at the wrong card is worse than pointing at none."""
+    accounts = _accounts(("BK Credit Card", "9999"))
+    assert resolve_accounts(parse(CARD_PURCHASE), accounts)["source_account_id"] is None
+
+
+def test_the_card_alert_reads_where_and_when():
+    result = parse(CARD_PURCHASE)
+    assert result.counterparty == "Amsterdam"
+    # "01:35 26.08.26" — time first, then a day-first dotted date.
+    assert result.occurred_at == datetime(2026, 8, 26, 1, 35, 0)
+
+
+def test_the_card_balance_survives_its_space():
+    """The terminal groups thousands with a space: RWF268 026."""
+    assert parse(CARD_PURCHASE).balance_after == Decimal("268026")
+
+
+def test_a_declined_card_purchase_fills_nothing():
+    """No money moved. Prefilling it would put a purchase that never happened
+    in front of someone who only has to press Add."""
+    declined = CARD_PURCHASE.replace("approved", "declined")
+    result = parse(declined)
+    assert result.understood is False
+    assert result.transaction_type is None
+    assert result.amount is None
+
+
+def test_a_large_card_purchase_keeps_its_spaces():
+    """The terminal groups the amount the way it groups the balance."""
+    result = parse(
+        "RUGAMBA,RWF1 250 000 Purchase approved with **4124 at Kigali "
+        "on 01:35 26.08.26.Avail Bal RWF268 026."
+    )
+    assert result.amount == Decimal("1250000")
+    assert result.currency == "RWF"

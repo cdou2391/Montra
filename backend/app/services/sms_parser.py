@@ -41,8 +41,16 @@ FEE = re.compile(
     rf"(?:fee|transaction\s+charge|charge)[:\s]*(?:{CURRENCY_NC}\s*)?{AMOUNT}\s*{CURRENCY}?",
     re.IGNORECASE,
 )
+# A card terminal separates thousands with a space and abbreviates the label:
+# "Avail Bal RWF268 026". The digits are grouped in threes, so a space is only
+# swallowed when three digits follow it — "Bal 5000 RWF" keeps its 5000.
+# The grouped branch demands at least one separator, or it would match "254"
+# out of "254107" and stop there — the alternation takes the first branch that
+# succeeds, not the longest.
+AMOUNT_GROUPED = r"(\d{1,3}(?:[ ,]\d{3})+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?)"
 BALANCE = re.compile(
-    rf"(?:new|available|current)?\s*balance[:\s]*(?:{CURRENCY_NC}\s*)?{AMOUNT}\s*{CURRENCY}?",
+    rf"(?:new|available|avail\.?|current)?\s*\bbal(?:ance)?\b[:\s]*"
+    rf"(?:{CURRENCY_NC}\s*)?{AMOUNT_GROUPED}\s*{CURRENCY}?",
     re.IGNORECASE,
 )
 REFERENCE = re.compile(
@@ -72,6 +80,38 @@ BILL_SUBJECT = re.compile(
 # everything else in the message: it is what gets typed into the meter, and it
 # exists nowhere else once the SMS is gone.
 VOUCHER = re.compile(r"voucher\s*#?\s*:?\s*(\S{6,64})", re.IGNORECASE)
+
+# A card authorisation alert, sent by the card network rather than the wallet:
+#
+#   RUGAMBA,USD10 Purchase approved with **4124 at Amsterdam on 01:35 26.08.26.
+#   Avail Bal RWF268 026.
+#
+# The masked digits are the valuable part. They name the card outright, so the
+# account is resolved from the number rather than guessed from the wording —
+# which matters here because nothing else in the message says which card it is.
+#
+# Only an approved authorisation is read. A declined one moves no money, and a
+# parser that prefilled it would put a purchase that never happened in front of
+# someone who only has to press Add.
+CARD_ALERT = re.compile(
+    # Grouped, because the same terminal writes its balance as "RWF268 026" and
+    # formats a purchase over 999 the same way.
+    rf"\b({CURRENCY_NC})\s*{AMOUNT_GROUPED}\s+"
+    r"(?:purchase|payment|withdrawal)\s+approved\s+"
+    r"with\s+([*xX\d]{4,})",
+    re.IGNORECASE,
+)
+
+# Where it was spent, which is all the description this message offers. Ends at
+# the time that follows, so "Amsterdam" does not run on into the date.
+CARD_LOCATION = re.compile(r"\bat\s+([^\n\d]{2,60}?)\s+on\s+\d{1,2}:\d{2}", re.IGNORECASE)
+
+# "01:35 26.08.26" — the time first, then a dotted date. Read day-first, which
+# is what this sender writes and what the dots imply; the form shows the date
+# it chose, which is the only honest place to settle an ambiguous one.
+TIMESTAMP_DOTTED = re.compile(
+    r"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(\d{1,2})\.(\d{1,2})\.(\d{2,4})\b"
+)
 
 # A counterparty runs to the phone number, the timestamp, a full stop, or a
 # run of digits — whichever comes first. Names carry spaces and mixed case, so
@@ -226,7 +266,9 @@ def _decimal(raw: str | None) -> Decimal | None:
     if raw is None:
         return None
     try:
-        value = Decimal(raw.replace(",", "").strip())
+        # Separators only: a number never contains meaningful whitespace, and
+        # a card terminal groups thousands with a space rather than a comma.
+        value = Decimal(re.sub(r"[,\s]", "", raw))
     except (InvalidOperation, AttributeError):
         return None
     return value if value > 0 else None
@@ -320,6 +362,51 @@ def _read_labelled(text: str, result: ParsedSms) -> None:
         result.transaction_type = "EXPENSE"
 
 
+def _read_card_alert(text: str, result: ParsedSms) -> None:
+    """Read a card authorisation alert.
+
+    The card is recorded as the debited account so it resolves the same way a
+    statement's account number does — the caller matches it against the user's
+    real accounts, and an unmatched card leaves the field blank rather than
+    falling back to a default.
+    """
+    found = CARD_ALERT.search(text)
+    if not found:
+        return
+
+    currency, amount, card = found.groups()
+    result.amount = _decimal(amount)
+    if result.amount is None:
+        return
+    result.currency = currency.upper()
+    result.transaction_type = "EXPENSE"
+    result.matched.append("expense")
+
+    result.debited_identifier = card
+    result.matched.append("accounts")
+
+    where = CARD_LOCATION.search(text)
+    if where:
+        result.counterparty = _clean_party(where.group(1))
+
+
+def _read_dotted_timestamp(text: str, result: ParsedSms) -> None:
+    found = TIMESTAMP_DOTTED.search(text)
+    if not found:
+        return
+    hour, minute, second, day, month, year = found.groups()
+    year = int(year)
+    if year < 100:
+        year += 2000
+    try:
+        result.occurred_at = datetime(
+            year, int(month), int(day), int(hour), int(minute), int(second or 0)
+        )
+    except ValueError:
+        return
+    result.matched.append("timestamp")
+
+
 def parse(message: str) -> ParsedSms:
     """Read what the message plainly says, and nothing more."""
     result = ParsedSms()
@@ -331,6 +418,10 @@ def parse(message: str) -> ParsedSms:
     # A labelled statement is unambiguous where prose is not, so it is read
     # first and the sentence patterns are skipped when it succeeds.
     _read_labelled(text, result)
+    # A card alert is as unambiguous as a labelled statement — it names the
+    # card outright — so it is read before the prose patterns too.
+    if result.amount is None:
+        _read_card_alert(text, result)
 
     result.channel = _channel(text)
     if result.channel:
@@ -378,6 +469,8 @@ def parse(message: str) -> ParsedSms:
     stamp = TIMESTAMP.search(text)
     if stamp is None:
         _read_slash_timestamp(text, result)
+        if result.occurred_at is None:
+            _read_dotted_timestamp(text, result)
     if stamp:
         raw = f"{stamp.group(1)} {stamp.group(2)}"
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
