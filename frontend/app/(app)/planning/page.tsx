@@ -122,6 +122,11 @@ function PlannedRow({
   );
 }
 
+/** One row of a bucket, whichever endpoint it came from. */
+type Entry =
+  | { kind: "planned"; at: number; planned: PlannedTransaction }
+  | { kind: "loan"; at: number; due: LoanPaymentDue };
+
 function LoanPaymentRow({ due }: { due: LoanPaymentDue }) {
   const owed = due.direction === "PAYABLE";
   return (
@@ -203,11 +208,34 @@ export default function Planning() {
     );
   }
 
-  const grouped = BUCKETS.map((b) => ({
-    ...b,
-    items: rows.filter((r) => r.bucket === b.key),
-    loans: loanDues.filter((l) => l.bucket === b.key),
-  })).filter((b) => b.items.length > 0 || b.loans.length > 0);
+  // Planned items and loan payments come from different endpoints, and a
+  // bucket has to interleave them by date. Rendered as two blocks they were
+  // ordered by source instead: every loan sat below every planned item, so a
+  // 28 September instalment came after a 26 October transfer.
+  //
+  // Sorted on the value each row actually displays — a loan is due on a day
+  // rather than at a time, so it takes local midnight and leads that day.
+  const entriesIn = (key: string): Entry[] =>
+    [
+      ...rows
+        .filter((r) => r.bucket === key)
+        .map((planned): Entry => ({
+          kind: "planned",
+          at: new Date(planned.expected_at).getTime(),
+          planned,
+        })),
+      ...loanDues
+        .filter((l) => l.bucket === key)
+        .map((due): Entry => ({
+          kind: "loan",
+          at: new Date(`${due.due_date}T00:00:00`).getTime(),
+          due,
+        })),
+    ].sort((a, b) => a.at - b.at);
+
+  const grouped = BUCKETS.map((b) => ({ ...b, entries: entriesIn(b.key) })).filter(
+    (b) => b.entries.length > 0,
+  );
 
   // Transfers are excluded from both: money moving between your own accounts
   // is neither going out nor coming in.
@@ -292,22 +320,21 @@ export default function Planning() {
               <section key={group.key}>
                 <div className="mb-2 flex items-center gap-2">
                   <h2 className="text-section">{group.label}</h2>
-                  <StatusChip tone={group.tone}>
-                    {group.items.length + group.loans.length}
-                  </StatusChip>
+                  <StatusChip tone={group.tone}>{group.entries.length}</StatusChip>
                 </div>
                 <Card>
-                  {group.items.map((p) => (
-                    <PlannedRow
-                      key={p.id}
-                      planned={p}
-                      showDate={group.dated}
-                      onChanged={load}
-                    />
-                  ))}
-                  {group.loans.map((l) => (
-                    <LoanPaymentRow key={l.id} due={l} />
-                  ))}
+                  {group.entries.map((entry) =>
+                    entry.kind === "planned" ? (
+                      <PlannedRow
+                        key={entry.planned.id}
+                        planned={entry.planned}
+                        showDate={group.dated}
+                        onChanged={load}
+                      />
+                    ) : (
+                      <LoanPaymentRow key={entry.due.id} due={entry.due} />
+                    ),
+                  )}
                 </Card>
               </section>
             ))}
