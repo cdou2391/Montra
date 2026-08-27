@@ -33,3 +33,7 @@ backend/celerybeat.pid
 # is a local cache rather than a source, and it carries files far past what
 # GitHub will accept.
 frontend/.pnpm-store/
+
+# The specification set. Kept locally as the source of truth for behaviour,
+# deliberately not published.
+docs/

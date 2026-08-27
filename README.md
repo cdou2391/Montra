@@ -5,18 +5,16 @@ Personal and household finance tracking. Mobile-first web application.
 Montra answers five questions: how much you have, how much you owe, where the
 money went, what is coming next, and what your household's position looks like.
 
-The full specification set lives in [`docs/`](docs/). This README covers running
-the code; the documents are the source of truth for behaviour.
+This README covers running the code. Behaviour is specified in a separate
+document set that is not published with the source.
 
 ---
 
 ## Current status
 
-Implemented through **Phase 23** of the
-[implementation plan](docs/Montra%20—%20End%20to%20End%20Implementation%20Plan.md) —
-milestones **M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**,
-**M4 (Planning)**, **M5 (Debt)**, **M6 (Family)**, and the dashboard and
-net-worth half of **M7**.
+Implemented through **Phase 23** of the implementation plan — milestones
+**M1 (Platform)**, **M2 (Financial Core)**, **M3 (Cards)**, **M4 (Planning)**,
+**M5 (Debt)**, **M6 (Family)**, and the dashboard and net-worth half of **M7**.
 
 | Working | Not yet built |
 |---|---|
@@ -69,8 +67,7 @@ docker compose run --rm --no-deps api alembic upgrade head
 
 ## Architecture
 
-A modular monolith, following the
-[technical architecture spec](docs/Montra%20—%20Technical%20Architecture%20Specification.md).
+A modular monolith.
 
 ```text
 web (Next.js) ──▶ api (FastAPI) ──┬──▶ postgres   financial source of truth
