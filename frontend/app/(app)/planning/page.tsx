@@ -5,11 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { LoanPaymentDue, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
+import { MetricCard } from "@/components/financial";
 import { formatDayShort, formatMoney, formatTime } from "@/lib/format";
 import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
 
 /**
- * Upcoming screen (Implementation Plan Phase 11).
+ * Upcoming screen.
  *
  * Grouped Overdue / Today / Tomorrow / This Week / Later. Nothing here has
  * touched a balance yet — completing an item is what posts it.
@@ -284,30 +285,28 @@ export default function Planning() {
         />
       ) : (
         <>
-          <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-            {/* Only shown when there is something to show: a list made only of
-                transfers would otherwise report "going out 0". */}
-            {outstanding > 0 && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-content-muted">
-                  Going out
-                </span>
-                <p className="tabular mt-0.5 font-semibold text-semantic-expense">
-                  {formatMoney(String(outstanding), currency)}
-                </p>
-              </div>
-            )}
-            {incoming > 0 && (
-              <div>
-                <span className="text-xs uppercase tracking-wide text-content-muted">
-                  Coming in
-                </span>
-                <p className="tabular mt-0.5 font-semibold text-semantic-income">
-                  {formatMoney(String(incoming), currency)}
-                </p>
-              </div>
-            )}
-          </div>
+          {/* The pair is shown or hidden together, so the two cards are always
+              even. Suppressed entirely when both are zero: a list made only of
+              transfers has nothing going out or coming in, and a row of noughts
+              says less than no row at all. */}
+          {(outstanding > 0 || incoming > 0) && (
+            <div className="mb-6 grid grid-cols-2 gap-3">
+              <MetricCard
+                label="Going out"
+                amount={String(outstanding)}
+                currency={currency}
+                // As on Home: neutral at zero, coloured once there is
+                // something to say.
+                tone={outstanding > 0 ? "expense" : "neutral"}
+              />
+              <MetricCard
+                label="Coming in"
+                amount={String(incoming)}
+                currency={currency}
+                tone={incoming > 0 ? "income" : "neutral"}
+              />
+            </div>
+          )}
 
           <div className="space-y-6">
             {grouped.map((group) => (
