@@ -249,6 +249,33 @@ export type AppMeta = {
   version: string;
 };
 
+/** A budget with this period's spending derived against it. */
+export type BudgetRow = {
+  id: string;
+  category: { id: string; name: string };
+  amount: string;
+  spent: string;
+  /** Negative once it is over: "how far past" rather than "zero left". */
+  remaining: string;
+  used_percent: string;
+  /** Where this period lands if the rest of it looks like the part so far. */
+  projected: string;
+  state: "UNDER" | "NEAR" | "OVER";
+  currency: string;
+  visibility: string;
+  period: string;
+};
+
+export type BudgetStatus = {
+  period_start: string;
+  period_end: string;
+  currency: string;
+  budgets: BudgetRow[];
+  totals: { amount: string; spent: string; remaining: string } | null;
+  /** Spending left out of the figures above, for want of a rate. */
+  unconverted_currencies: string[];
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -768,6 +795,13 @@ export const montra = {
   markNotificationRead: (id: string) => api.post<void>(`/notifications/${id}/read`),
   markAllNotificationsRead: () => api.post<void>("/notifications/read-all"),
 
+  budgets: (context = "personal") =>
+    api.get<Envelope<BudgetStatus>>(`/budgets?context=${context}`).then((r) => r.data),
+  createBudget: (payload: Record<string, unknown>) =>
+    api.post<Envelope<unknown>>("/budgets", payload).then((r) => r.data),
+  updateBudget: (id: string, payload: Record<string, unknown>) =>
+    api.patch<Envelope<unknown>>(`/budgets/${id}`, payload).then((r) => r.data),
+  archiveBudget: (id: string) => api.post<Envelope<unknown>>(`/budgets/${id}/archive`),
   categories: (type?: "INCOME" | "EXPENSE") =>
     api
       .get<Collection<Category>>(`/categories${type ? `?type=${type}` : ""}`)

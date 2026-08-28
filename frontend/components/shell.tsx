@@ -53,6 +53,12 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
   },
   { href: "/transactions", label: "Transactions", icon: "list", hint: "Everything you have recorded" },
   {
+    href: "/budgets",
+    label: "Budgets",
+    icon: "scale",
+    hint: "Monthly limits, and what is left",
+  },
+  {
     href: "/planning/forecast",
     label: "Forecast",
     icon: "trendingUp",
