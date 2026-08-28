@@ -7,7 +7,8 @@ import { Account, MontraApiError, ReconciliationPreview, montra } from "@/lib/ap
 import { PageHeader } from "@/components/shell";
 import { MoneyValue } from "@/components/financial";
 import { formatMoney, toLocalInputValue } from "@/lib/format";
-import { AmountInput, Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
+import { AmountInput, Button, Card, ErrorNotice, Field, Input } from "@/components/ui";
+import { SkeletonForm } from "@/components/skeletons";
 
 /**
  * Reconciliation (Implementation Plan Phase 8).
@@ -71,7 +72,7 @@ export default function Reconcile() {
     return (
       <>
         <PageHeader title="Reconcile" icon="scale" />
-        <Skeleton className="h-48 w-full" />
+        <SkeletonForm fields={3} />
       </>
     );
   }

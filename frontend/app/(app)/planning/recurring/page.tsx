@@ -7,7 +7,8 @@ import { Loan, RecurringRule, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatMoney } from "@/lib/format";
 import { Icon } from "@/components/icons";
-import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
+import { Button, Card, EmptyState, StatusChip } from "@/components/ui";
+import { ListSkeleton } from "@/components/skeletons";
 
 const CADENCE: Record<string, string> = {
   DAILY: "day",
@@ -190,7 +191,7 @@ export default function Recurring() {
       />
 
       {rules === null ? (
-        <Skeleton className="h-48 w-full" />
+        <ListSkeleton />
       ) : rules.length === 0 && loans.length === 0 ? (
         <EmptyState
           title="No recurring items"

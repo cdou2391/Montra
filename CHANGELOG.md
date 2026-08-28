@@ -10,6 +10,18 @@ displays it.
 
 ---
 
+## 0.4.6
+
+**The rest of the loading states.** Planning, Recurring, Forecast,
+Transactions, Loans, Notifications, the detail screens and the forms all
+preview their own structure now, on four shapes: grouped rows, a form's
+labelled fields, a record's figure over its detail, and a headline over a
+chart.
+
+Planning also joins Accounts in rendering one header across every state, so
+its Add, Forecast and Recurring controls no longer appear only once the data
+does.
+
 ## 0.4.5
 
 **Loading states shaped like what replaces them.** Every page showed a single

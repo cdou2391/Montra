@@ -8,7 +8,8 @@ import { ContextSwitch, useFinancialContext } from "@/components/context";
 import { ForecastChart, ForecastTable } from "@/components/forecast-chart";
 import { Icon } from "@/components/icons";
 import { formatMoney } from "@/lib/format";
-import { Card, EmptyState, Skeleton } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
+import { SkeletonChart } from "@/components/skeletons";
 
 /**
  * Cash-flow forecast (Implementation Plan Phase 24).
@@ -59,7 +60,7 @@ export default function ForecastPage() {
       </div>
 
       {forecast === null ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonChart />
       ) : forecast.points.length === 0 ? (
         <EmptyState
           title="Nothing to project"

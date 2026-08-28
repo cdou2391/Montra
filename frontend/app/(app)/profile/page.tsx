@@ -15,6 +15,7 @@ import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
+import { SkeletonDetail } from "@/components/skeletons";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -130,7 +131,7 @@ export default function Profile() {
       <>
         <PageHeader title="Profile"
         icon="user" />
-        <Skeleton className="h-48 w-full" />
+        <SkeletonDetail rows={3} />
       </>
     );
   }

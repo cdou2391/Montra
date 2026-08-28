@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Account, Loan, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatMoney } from "@/lib/format";
-import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select, Skeleton } from "@/components/ui";
+import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import { SkeletonForm } from "@/components/skeletons";
 
 /**
  * Record a loan payment.
@@ -94,7 +95,7 @@ export default function RecordPayment() {
     return (
       <>
         <PageHeader title="Record payment" icon="handshake" />
-        <Skeleton className="h-56 w-full" />
+        <SkeletonForm fields={5} />
       </>
     );
   }

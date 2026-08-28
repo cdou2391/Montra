@@ -5,16 +5,8 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Account, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
-import {
-  AmountInput,
-  Button,
-  Card,
-  ErrorNotice,
-  Field,
-  Input,
-  Skeleton,
-  Toggle,
-} from "@/components/ui";
+import { SkeletonForm } from "@/components/skeletons";
+import { AmountInput, Button, Card, ErrorNotice, Field, Input, Toggle } from "@/components/ui";
 
 /**
  * Account details.
@@ -123,7 +115,7 @@ export default function EditCardPage() {
     }
   }
 
-  if (!account) return <Skeleton className="h-64 w-full" />;
+  if (!account) return <SkeletonForm fields={5} />;
 
   return (
     <>

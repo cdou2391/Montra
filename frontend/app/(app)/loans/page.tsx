@@ -6,8 +6,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Loan, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatMoney } from "@/lib/format";
-import { Button, EmptyState, Skeleton } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
 import { LoanCard } from "@/components/loan-card";
+import { ListSkeleton } from "@/components/skeletons";
 
 /**
  * Loan list (UI/UX sections 50-51).
@@ -49,7 +50,7 @@ export default function Loans() {
       />
 
       {loans === null ? (
-        <Skeleton className="h-56 w-full" />
+        <ListSkeleton />
       ) : loans.length === 0 ? (
         <EmptyState
           title="No loans yet"

@@ -9,6 +9,7 @@ import { useFinancialContext } from "@/components/context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ActivityLog } from "@/components/activity-log";
 import { Icon } from "@/components/icons";
+import { ListSkeleton } from "@/components/skeletons";
 import { formatMoney } from "@/lib/format";
 import {
   Button,
@@ -141,7 +142,7 @@ function SharingControls({ onChanged }: { onChanged: () => void }) {
     }
   }
 
-  if (accounts === null) return <Skeleton className="h-40 w-full" />;
+  if (accounts === null) return <ListSkeleton cards={2} />;
   // can_edit already means "yours to change", which is exactly the set whose
   // sharing you may decide.
   const mine = accounts;

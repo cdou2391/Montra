@@ -11,7 +11,8 @@ import { TransactionRow } from "@/components/financial";
 import { TransactionTable } from "@/components/transaction-table";
 import { FilterControls, FilterSheet, Filters, EMPTY_FILTERS, activeCount } from "@/components/filters";
 import { Icon } from "@/components/icons";
-import { Button, Card, EmptyState, Input, Skeleton } from "@/components/ui";
+import { Button, Card, EmptyState, Input } from "@/components/ui";
+import { SkeletonRows } from "@/components/skeletons";
 
 /**
  * Transactions (Implementation Plan Phase 26).
@@ -170,7 +171,7 @@ function Transactions() {
       )}
 
       {loading ? (
-        <Skeleton className="h-64 w-full" />
+        <SkeletonRows rows={6} />
       ) : rows.length === 0 ? (
         <EmptyState
           title="Nothing to show"

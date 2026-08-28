@@ -9,16 +9,8 @@ import { PageHeader } from "@/components/shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MoneyValue } from "@/components/financial";
 import { Attachments } from "@/components/attachments";
-import {
-  Button,
-  Card,
-  ErrorNotice,
-  Field,
-  Input,
-  Select,
-  Skeleton,
-  StatusChip,
-} from "@/components/ui";
+import { SkeletonDetail } from "@/components/skeletons";
+import { Button, Card, ErrorNotice, Field, Input, Select, StatusChip } from "@/components/ui";
 import { formatDate, formatTime } from "@/lib/format";
 
 /**
@@ -91,7 +83,7 @@ export default function TransactionDetail() {
     }
   }
 
-  if (!txn) return <Skeleton className="h-64 w-full" />;
+  if (!txn) return <SkeletonDetail rows={4} />;
 
   // A real transfer leg, as opposed to a loan payment that merely posts as a
   // transfer: the ledger refuses to edit one side of a movement on its own.

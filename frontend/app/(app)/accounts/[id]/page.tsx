@@ -7,7 +7,8 @@ import { Account, CardSummary, Transaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { MoneyValue, TransactionRow } from "@/components/financial";
 import { CreditCardSummaryCard, ExpiryNotice } from "@/components/credit-card";
-import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
+import { Button, Card, EmptyState, StatusChip } from "@/components/ui";
+import { SkeletonDetail } from "@/components/skeletons";
 
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
@@ -42,7 +43,7 @@ export default function AccountDetail() {
   if (loading) {
     return (
       <>
-        <Skeleton className="h-40 w-full" />
+        <SkeletonDetail />
       </>
     );
   }

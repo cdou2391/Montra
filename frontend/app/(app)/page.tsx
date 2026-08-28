@@ -14,7 +14,7 @@ import { InsightList } from "@/components/insights";
 import { ForecastChart } from "@/components/forecast-chart";
 import { HomeSkeleton } from "@/components/skeletons";
 import { formatMoney } from "@/lib/format";
-import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { Button, Card, EmptyState } from "@/components/ui";
 import { ProfileAvatarLink } from "@/components/avatar";
 
 /**

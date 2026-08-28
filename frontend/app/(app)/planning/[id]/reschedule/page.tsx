@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { MontraApiError, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatMoney, toLocalInputValue } from "@/lib/format";
-import { AmountInput, Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
+import { AmountInput, Button, Card, ErrorNotice, Field, Input } from "@/components/ui";
+import { SkeletonForm } from "@/components/skeletons";
 
 export default function Reschedule() {
   const { id } = useParams<{ id: string }>();
@@ -55,7 +56,7 @@ export default function Reschedule() {
     return (
       <>
         <PageHeader title="Reschedule" icon="calendar" />
-        <Skeleton className="h-48 w-full" />
+        <SkeletonForm fields={2} />
       </>
     );
   }

@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { Account, MontraApiError, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatMoney, toLocalInputValue } from "@/lib/format";
-import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select, Skeleton } from "@/components/ui";
+import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import { SkeletonForm } from "@/components/skeletons";
 
 /**
  * Completing a planned item — the moment it becomes a real ledger entry.
@@ -71,7 +72,7 @@ export default function CompletePlanned() {
     return (
       <>
         <PageHeader title="Complete" icon="calendar" />
-        <Skeleton className="h-48 w-full" />
+        <SkeletonForm fields={3} />
       </>
     );
   }

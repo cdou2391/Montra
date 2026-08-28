@@ -7,7 +7,8 @@ import { LoanPaymentDue, PlannedTransaction, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { MetricCard } from "@/components/financial";
 import { formatDayShort, formatMoney, formatTime } from "@/lib/format";
-import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
+import { Button, Card, EmptyState, StatusChip } from "@/components/ui";
+import { SkeletonGroups } from "@/components/skeletons";
 
 /**
  * Upcoming screen.
@@ -193,12 +194,35 @@ export default function Planning() {
 
   useEffect(load, [load]);
 
+  // The same header in every state: its title and actions do not depend on
+  // the data, so a lesser one first only makes the bar rearrange.
+  const header = (
+    <PageHeader
+      title="Upcoming"
+      icon="calendar"
+      action={
+        <div className="flex items-center gap-3">
+          {/* Hidden on the narrowest phones so the page title is not
+              crushed; still reachable from More. */}
+          <Link href="/planning/forecast" className="hidden text-xs text-accent sm:inline">
+            Forecast
+          </Link>
+          <Link href="/planning/recurring" className="hidden text-xs text-accent sm:inline">
+            Recurring
+          </Link>
+          <Link href="/planning/new">
+            <Button>Add</Button>
+          </Link>
+        </div>
+      }
+    />
+  );
+
   if (rows === null) {
     return (
       <>
-        <PageHeader title="Upcoming"
-        icon="calendar" />
-        <Skeleton className="h-64 w-full" />
+        {header}
+        <SkeletonGroups />
       </>
     );
   }
@@ -253,25 +277,7 @@ export default function Planning() {
 
   return (
     <>
-      <PageHeader
-        title="Upcoming"
-        icon="calendar"
-        action={
-          <div className="flex items-center gap-3">
-            {/* Hidden on the narrowest phones so the page title is not
-                crushed; still reachable from More. */}
-            <Link href="/planning/forecast" className="hidden text-xs text-accent sm:inline">
-              Forecast
-            </Link>
-            <Link href="/planning/recurring" className="hidden text-xs text-accent sm:inline">
-              Recurring
-            </Link>
-            <Link href="/planning/new">
-              <Button>Add</Button>
-            </Link>
-          </div>
-        }
-      />
+      {header}
 
       {rows.length === 0 && loanDues.length === 0 ? (
         <EmptyState

@@ -6,7 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AppNotification, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatDateTime } from "@/lib/format";
-import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { Button, Card, EmptyState } from "@/components/ui";
+import { SkeletonRows } from "@/components/skeletons";
 
 export default function Notifications() {
   const [rows, setRows] = useState<AppNotification[] | null>(null);
@@ -43,7 +44,7 @@ export default function Notifications() {
       />
 
       {rows === null ? (
-        <Skeleton className="h-48 w-full" />
+        <SkeletonRows rows={5} />
       ) : rows.length === 0 ? (
         <EmptyState
           title="Nothing yet"

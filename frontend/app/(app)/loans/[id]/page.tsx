@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { Loan, LoanPayment, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { formatDate, formatMoney } from "@/lib/format";
-import { Button, Card, EmptyState, Skeleton, StatusChip } from "@/components/ui";
+import { Button, Card, EmptyState, StatusChip } from "@/components/ui";
+import { SkeletonDetail } from "@/components/skeletons";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -44,7 +45,7 @@ export default function LoanDetail() {
     return (
       <>
         <PageHeader title="Loan" icon="handshake" />
-        <Skeleton className="h-56 w-full" />
+        <SkeletonDetail />
       </>
     );
   }

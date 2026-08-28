@@ -133,3 +133,90 @@ export function ListSkeleton({ cards = 3 }: { cards?: number }) {
     </>
   );
 }
+
+/** Grouped sections of rows: the upcoming screen and anything like it. */
+export function SkeletonGroups({ groups = 2, rows = 2 }: { groups?: number; rows?: number }) {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: groups }).map((_, g) => (
+        <section key={g}>
+          <div className="mb-2 flex items-center gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-5 w-6 rounded-full" />
+          </div>
+          <Card>
+            {Array.from({ length: rows }).map((_, i) => (
+              <div key={i} className="border-b border-line/5 py-4 last:border-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/5" />
+                    <Skeleton className="h-3 w-4/5" />
+                  </div>
+                  <Skeleton className="h-4 w-24 shrink-0" />
+                </div>
+                {/* The action pills each row carries. */}
+                <div className="mt-3 flex gap-2">
+                  <Skeleton className="h-9 w-28 rounded-full" />
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                  <Skeleton className="h-9 w-20 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </Card>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** A form: labelled fields and the button that submits them. */
+export function SkeletonForm({ fields = 4 }: { fields?: number }) {
+  return (
+    <Card>
+      <div className="space-y-4">
+        {Array.from({ length: fields }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-11 w-full" />
+          </div>
+        ))}
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </Card>
+  );
+}
+
+/** A record: the figure at the top, then the detail beneath it. */
+export function SkeletonDetail({ rows = 5 }: { rows?: number }) {
+  return (
+    <>
+      <Card className="mb-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-8 w-48" />
+        <Skeleton className="mt-3 h-3 w-32" />
+      </Card>
+      <div className="mb-6 flex flex-wrap gap-2">
+        <Skeleton className="h-11 w-32 rounded-full" />
+        <Skeleton className="h-11 w-28 rounded-full" />
+      </div>
+      <SkeletonRows rows={rows} />
+    </>
+  );
+}
+
+/** A headline figure over a chart. */
+export function SkeletonChart() {
+  return (
+    <Card className="mb-4">
+      <div className="flex items-baseline justify-between gap-4">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      <Skeleton className="mt-4 h-40 w-full" />
+      <div className="mt-3 flex items-center justify-between">
+        <Skeleton className="h-3 w-14" />
+        <Skeleton className="h-3 w-14" />
+      </div>
+    </Card>
+  );
+}
