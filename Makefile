@@ -44,3 +44,25 @@ shell-db:  ## psql into the development database
 reset:  ## Destroy all data and start clean
 	docker compose down -v
 	docker compose up -d
+
+# --------------------------------------------------------------------- UAT
+
+# One command, and it rebuilds everything.
+#
+# The version the app shows comes from the API image, so rebuilding only the
+# service you changed leaves About reporting whatever the API was last built
+# at. Naming no service is what keeps the two in step.
+UAT = docker compose -p montra-uat --env-file .env.uat -f docker-compose.prod.yml
+
+uat:  ## Build and start the UAT stack (production images, plain HTTP)
+	$(UAT) up -d --build
+	$(UAT) restart proxy
+	@echo "waiting for the API..."
+	@until curl -sf localhost:$${PROXY_PORT:-8090}/api/v1/health/live >/dev/null; do sleep 2; done
+	@echo "UAT serving $$(curl -s localhost:$${PROXY_PORT:-8090}/api/v1/meta)"
+
+uat-down:  ## Stop the UAT stack, keeping its data
+	$(UAT) down
+
+uat-logs:  ## Tail the UAT logs
+	$(UAT) logs -f --tail 100

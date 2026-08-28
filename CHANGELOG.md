@@ -10,6 +10,17 @@ displays it.
 
 ---
 
+## 0.4.10
+
+**A make target for UAT, because deploying half of it showed a stale version.**
+The version the app displays comes from the API image, so rebuilding only the
+service that changed left About reporting whatever the API was last built at —
+0.4.8 while the repository said 0.4.9.
+
+`make uat` builds and starts the whole stack, names no service, restarts the
+proxy so it does not hold a stale upstream, waits for health, and prints the
+version it ends up serving. `make uat-down` and `make uat-logs` alongside it.
+
 ## 0.4.9
 
 **Sign in.** The password can be revealed, the fields freeze while the request
