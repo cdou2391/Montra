@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
@@ -23,6 +24,8 @@ from app.db.base import Base, Timestamped, UUIDPrimaryKey
 from app.db.enums import (
     AccountStatus,
     AccountType,
+    BudgetPeriod,
+    BudgetStatus,
     CategoryStatus,
     CategoryType,
     Direction,
@@ -150,6 +153,63 @@ class Category(UUIDPrimaryKey, Timestamped, Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "name", "category_type", name="user_category_name"),
+    )
+
+
+class Budget(UUIDPrimaryKey, Timestamped, Base):
+    """A ceiling on spending in one category, per period.
+
+    Holds no money and posts nothing: it is a number to compare a query
+    against. Progress is derived from the ledger every time it is asked for,
+    the same rule the balances follow, so a budget can never disagree with the
+    transactions underneath it.
+    """
+
+    __tablename__ = "budgets"
+
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    family_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), index=True)
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
+    )
+    # In the owner's base currency. Spending in another currency is converted
+    # before it is compared, the same way a total is.
+    amount: Mapped[Decimal] = mapped_column(AMOUNT, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    period: Mapped[BudgetPeriod] = mapped_column(
+        SAEnum(BudgetPeriod, name="budget_period"),
+        default=BudgetPeriod.MONTHLY,
+        nullable=False,
+    )
+    visibility: Mapped[Visibility] = mapped_column(
+        SAEnum(Visibility, name="visibility", create_type=False),
+        default=Visibility.PRIVATE,
+        nullable=False,
+    )
+    status: Mapped[BudgetStatus] = mapped_column(
+        SAEnum(BudgetStatus, name="budget_status"),
+        default=BudgetStatus.ACTIVE,
+        nullable=False,
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    category: Mapped[Category] = relationship()
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="budget_amount_positive"),
+        # One live budget per category. A second would leave two answers to
+        # "what is my limit", and the archived ones are the history.
+        Index(
+            "uq_budget_active_category",
+            "owner_user_id",
+            "category_id",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
     )
 
 

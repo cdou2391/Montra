@@ -84,6 +84,21 @@ class CategoryStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
+class BudgetStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class BudgetPeriod(StrEnum):
+    """Only calendar months for now.
+
+    Named as an enum rather than assumed, because a weekly or yearly budget is
+    the same shape and the column should not have to change to allow one.
+    """
+
+    MONTHLY = "MONTHLY"
+
+
 class InstitutionType(StrEnum):
     BANK = "BANK"
     MOBILE_MONEY = "MOBILE_MONEY"
