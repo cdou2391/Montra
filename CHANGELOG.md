@@ -10,6 +10,17 @@ displays it.
 
 ---
 
+## 0.4.7
+
+**The last of the loading states, and an empty dropdown.** Settings, the reset
+warning and Household lose their inline slabs for toggle rows and count rows.
+
+The form pages keep no skeleton, deliberately: they render whole and only
+their pickers fill in a moment later, so replacing them would take away fields
+that were already usable. But six account pickers rendered with no options at
+all while their fetch was in flight — a select that opens onto nothing. They
+now say "Loading accounts…" until the list arrives.
+
 ## 0.4.6
 
 **The rest of the loading states.** Planning, Recurring, Forecast,

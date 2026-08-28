@@ -120,7 +120,10 @@ export default function PayCard() {
                   value={form.source_account_id}
                   onChange={(e) => update("source_account_id", e.target.value)}
                 >
-                  {sources.map((a) => (
+                  {sources.length === 0 && (
+                <option value="">Loading accounts…</option>
+              )}
+              {sources.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name} — {formatMoney(a.balance, a.currency)}
                     </option>

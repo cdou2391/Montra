@@ -130,6 +130,9 @@ export default function CompletePlanned() {
               value={form.account_id}
               onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
             >
+              {accounts.length === 0 && (
+                <option value="">Loading accounts…</option>
+              )}
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}

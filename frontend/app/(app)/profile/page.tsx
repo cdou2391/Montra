@@ -15,7 +15,7 @@ import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
-import { SkeletonDetail } from "@/components/skeletons";
+import { SkeletonCounts, SkeletonDetail } from "@/components/skeletons";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -340,7 +340,7 @@ export default function Profile() {
             undone" on its own is wallpaper. */}
         <div className="mt-4 rounded-control border border-semantic-expense/30 bg-semantic-expense/10 p-4">
           {preview === null ? (
-            <Skeleton className="h-24 w-full" />
+            <SkeletonCounts />
           ) : (
             <ul className="space-y-1 text-sm text-content-primary">
               {[

@@ -127,6 +127,9 @@ export default function RecordPayment() {
               value={form.account_id}
               onChange={(e) => update("account_id", e.target.value)}
             >
+              {accounts.length === 0 && (
+                <option value="">Loading accounts…</option>
+              )}
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} — {formatMoney(a.balance, a.currency)}

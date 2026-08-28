@@ -6,6 +6,7 @@ import { AppMeta, MontraApiError, Preferences, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { Card, ErrorNotice, Field, Input, Skeleton, Toggle } from "@/components/ui";
 import { ExchangeRates } from "@/components/exchange-rates";
+import { SkeletonToggles } from "@/components/skeletons";
 import { useBalancePrivacy } from "@/components/balance-privacy";
 import { useTheme } from "@/components/theme";
 
@@ -98,7 +99,7 @@ export default function AppSettings() {
           </div>
         )}
         {prefs === null ? (
-          <Skeleton className="h-24 w-full" />
+          <SkeletonToggles rows={2} />
         ) : (
           <>
             <Toggle
@@ -122,7 +123,13 @@ export default function AppSettings() {
       <Card className="mb-4">
         <p className="mb-1 text-xs uppercase tracking-wide text-content-muted">Notifications</p>
         {prefs === null ? (
-          <Skeleton className="h-24 w-full" />
+          <>
+            <SkeletonToggles rows={1} />
+            <div className="space-y-2 pt-4">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-11 w-full" />
+            </div>
+          </>
         ) : (
           <>
             <Toggle

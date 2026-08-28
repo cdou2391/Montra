@@ -398,7 +398,7 @@ export default function FamilyPage() {
     <>
       <PageHeader title="Household" icon="users" />
       {loading ? (
-        <Skeleton className="h-48 w-full" />
+        <ListSkeleton cards={2} />
       ) : family ? (
         <Household family={family} onChanged={refresh} />
       ) : (
