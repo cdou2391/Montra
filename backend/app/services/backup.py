@@ -28,13 +28,24 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.core.errors import ValidationFailed
 from app.db.base import utcnow
-from app.models.finance import Account, Category, Institution, Transaction, Transfer
+from app.models.finance import (
+    Account,
+    Budget,
+    Category,
+    ExchangeRate,
+    Goal,
+    Institution,
+    Transaction,
+    Transfer,
+)
 from app.models.loans import Loan, LoanPayment
 from app.models.planning import PlannedTransaction, RecurringRule, Reminder
 from app.models.user import User, UserPreference
 from app.services.profile import reset_profile
 
-BACKUP_VERSION = 1
+# 2 adds budgets, goals and exchange rates, and the columns version 1 dropped
+# on its way out — a recurring transfer's destination among them.
+BACKUP_VERSION = 2
 
 # Explicit allowlists. Exporting by field name rather than dumping the model
 # keeps secrets out by construction, and means a new column cannot silently
@@ -59,6 +70,33 @@ ACCOUNT_FIELDS = (
     "interest_rate",
     "expiry_month",
     "expiry_year",
+    "excluded_from_totals",
+)
+
+BUDGET_FIELDS = (
+    "amount",
+    "currency",
+    "period",
+    "visibility",
+    "status",
+)
+
+GOAL_FIELDS = (
+    "name",
+    "target_amount",
+    "currency",
+    "target_date",
+    "visibility",
+    "status",
+    "achieved_at",
+)
+
+RATE_FIELDS = (
+    "base_currency",
+    "quote_currency",
+    "rate",
+    "as_of",
+    "source",
 )
 TRANSACTION_FIELDS = (
     "transaction_type",
@@ -184,6 +222,9 @@ def export_backup(db: DbSession, user: User) -> dict:
     loans = list(db.scalars(select(Loan).where(Loan.owner_user_id == user.id)))
     payments = list(db.scalars(select(LoanPayment).where(LoanPayment.created_by == user.id)))
     reminders = list(db.scalars(select(Reminder).where(Reminder.user_id == user.id)))
+    budgets = list(db.scalars(select(Budget).where(Budget.owner_user_id == user.id)))
+    goals = list(db.scalars(select(Goal).where(Goal.owner_user_id == user.id)))
+    rates = list(db.scalars(select(ExchangeRate).where(ExchangeRate.user_id == user.id)))
     preferences = db.scalar(select(UserPreference).where(UserPreference.user_id == user.id))
 
     def link(value: uuid.UUID | None) -> str | None:
@@ -222,6 +263,7 @@ def export_backup(db: DbSession, user: User) -> dict:
                 **_dump(t, TRANSFER_FIELDS),
                 "source_account_id": link(t.source_account_id),
                 "destination_account_id": link(t.destination_account_id),
+                "goal_id": link(t.goal_id),
             }
             for t in transfers
         ],
@@ -240,6 +282,7 @@ def export_backup(db: DbSession, user: User) -> dict:
                 "category_id": link(t.category_id),
                 "transfer_id": link(t.transfer_id),
                 "loan_payment_id": link(t.loan_payment_id),
+                "fee_for_transaction_id": link(t.fee_for_transaction_id),
             }
             for t in transactions
         ],
@@ -248,6 +291,10 @@ def export_backup(db: DbSession, user: User) -> dict:
                 **_dump(r, RULE_FIELDS),
                 "account_id": link(r.account_id),
                 "category_id": link(r.category_id),
+                # Version 1 dropped this, so a restored recurring transfer had
+                # nowhere to send the money.
+                "destination_account_id": link(r.destination_account_id),
+                "goal_id": link(r.goal_id),
             }
             for r in rules
         ],
@@ -258,12 +305,22 @@ def export_backup(db: DbSession, user: User) -> dict:
                 "category_id": link(p.category_id),
                 "recurring_rule_id": link(p.recurring_rule_id),
                 "completed_transaction_id": link(p.completed_transaction_id),
+                "completed_transfer_id": link(p.completed_transfer_id),
+                "destination_account_id": link(p.destination_account_id),
+                "goal_id": link(p.goal_id),
             }
             for p in planned
         ],
         "reminders": [
             {**_dump(r, REMINDER_FIELDS), "entity_id": link(r.entity_id)} for r in reminders
         ],
+        "budgets": [
+            {**_dump(b, BUDGET_FIELDS), "category_id": link(b.category_id)} for b in budgets
+        ],
+        "goals": [
+            {**_dump(g, GOAL_FIELDS), "account_id": link(g.account_id)} for g in goals
+        ],
+        "exchange_rates": [_dump(r, RATE_FIELDS) for r in rates],
     }
 
 
@@ -281,6 +338,8 @@ def summarize(payload: dict) -> dict:
             "planned_transactions",
             "recurring_rules",
             "categories",
+            "budgets",
+            "goals",
         )
     }
 
@@ -459,6 +518,7 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
                 ),
                 expiry_month=item.get("expiry_month"),
                 expiry_year=item.get("expiry_year"),
+                excluded_from_totals=bool(item.get("excluded_from_totals")),
             )
         )
     db.flush()
@@ -502,6 +562,62 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
         )
     db.flush()
 
+    # After accounts, which they point at; before transfers, which point at
+    # them.
+    for item in rows("goals"):
+        account_id = ids.get(item.get("account_id"))
+        if account_id is None:
+            continue  # A goal with no account has nowhere to measure progress.
+        db.add(
+            Goal(
+                id=ids.issue(item.get("id")),
+                owner_user_id=user.id,
+                created_by=user.id,
+                account_id=account_id,
+                name=item.get("name") or "Unnamed",
+                target_amount=_decimal(item.get("target_amount", 0), "target_amount"),
+                currency=item.get("currency") or user.base_currency,
+                target_date=_d(item.get("target_date"), "target_date"),
+                visibility=item.get("visibility") or "PRIVATE",
+                status=item.get("status") or "ACTIVE",
+                achieved_at=_dt(item.get("achieved_at"), "achieved_at"),
+            )
+        )
+    db.flush()
+
+    for item in rows("budgets"):
+        category_id = ids.get(item.get("category_id"))
+        if category_id is None:
+            continue  # A budget is a limit on a category; without one it is nothing.
+        db.add(
+            Budget(
+                id=ids.issue(item.get("id")),
+                owner_user_id=user.id,
+                created_by=user.id,
+                category_id=category_id,
+                amount=_decimal(item.get("amount", 0), "amount"),
+                currency=item.get("currency") or user.base_currency,
+                period=item.get("period") or "MONTHLY",
+                visibility=item.get("visibility") or "PRIVATE",
+                status=item.get("status") or "ACTIVE",
+            )
+        )
+    db.flush()
+
+    for item in rows("exchange_rates"):
+        db.add(
+            ExchangeRate(
+                id=ids.issue(item.get("id")),
+                user_id=user.id,
+                base_currency=item.get("base_currency"),
+                quote_currency=item.get("quote_currency"),
+                rate=_decimal(item.get("rate", 0), "rate"),
+                as_of=_d(item.get("as_of"), "as_of") or utcnow().date(),
+                source=item.get("source") or "MANUAL",
+            )
+        )
+    db.flush()
+
     for item in rows("transfers"):
         source = ids.get(item.get("source_account_id"))
         destination = ids.get(item.get("destination_account_id"))
@@ -523,6 +639,7 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
                 notes=item.get("notes"),
                 status=item.get("status") or "COMPLETED",
                 cancelled_at=_dt(item.get("cancelled_at"), "cancelled_at"),
+                goal_id=ids.get(item.get("goal_id")),
             )
         )
     db.flush()
@@ -575,6 +692,16 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
         )
     db.flush()
 
+    # A second pass: a fee points at another transaction, which may appear
+    # after it in the file.
+    for item in rows("transactions"):
+        parent = ids.get(item.get("fee_for_transaction_id"))
+        if parent is not None:
+            row = db.get(Transaction, ids.get(item.get("id")))
+            if row is not None:
+                row.fee_for_transaction_id = parent
+    db.flush()
+
     for item in rows("recurring_rules"):
         account_id = ids.get(item.get("account_id"))
         if account_id is None:
@@ -585,6 +712,8 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
                 created_by=user.id,
                 account_id=account_id,
                 category_id=ids.get(item.get("category_id")),
+                destination_account_id=ids.get(item.get("destination_account_id")),
+                goal_id=ids.get(item.get("goal_id")),
                 planned_type=item.get("planned_type"),
                 amount=_decimal(item.get("amount", 0), "amount"),
                 currency=item.get("currency") or user.base_currency,
@@ -614,6 +743,9 @@ def restore_backup(db: DbSession, *, user: User, payload: dict, password: str) -
                 category_id=ids.get(item.get("category_id")),
                 recurring_rule_id=ids.get(item.get("recurring_rule_id")),
                 completed_transaction_id=ids.get(item.get("completed_transaction_id")),
+                completed_transfer_id=ids.get(item.get("completed_transfer_id")),
+                destination_account_id=ids.get(item.get("destination_account_id")),
+                goal_id=ids.get(item.get("goal_id")),
                 planned_type=item.get("planned_type"),
                 amount=_decimal(item.get("amount", 0), "amount"),
                 currency=item.get("currency") or user.base_currency,

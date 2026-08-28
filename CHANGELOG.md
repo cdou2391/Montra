@@ -10,6 +10,32 @@ displays it.
 
 ---
 
+## 0.4.1
+
+**The backup had fallen behind, in one place since before this release.**
+Backup format version 2.
+
+Missing entirely: budgets, goals, and your own exchange-rate overrides.
+Missing from things it did export: an account's excluded-from-totals flag, the
+goal tag on transfers, rules and planned items, the link from a fee to what it
+was charged on, and — the oldest and worst — the destination account of a
+recurring or planned transfer. A restored recurring transfer had nowhere to
+send the money, and the restore side was already reading a field the export
+never wrote.
+
+A backup that silently drops things is worse than none: accounts and balances
+come back, so it looks like it worked.
+
+Two guards now hold it in step. One fails when a table is neither exported nor
+on a list of deliberate exclusions with a reason; the other fails when an
+account gains a column the backup does not carry. Both were checked by
+breaking them on purpose.
+
+**Profile reset was broken for anyone with a goal.** A goal holds its account
+with RESTRICT, and the reset never deleted goals, so it failed at the database
+after the password had already been accepted. Found by the backup round-trip
+test, not by the reset's own suite.
+
 ## 0.4.0
 
 **Recurring contributions to a goal.** A recurring transfer can now name the

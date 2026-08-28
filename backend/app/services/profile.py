@@ -10,7 +10,15 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.core.errors import InvalidCredentials
 from app.core.security import verify_password
-from app.models.finance import Account, Category, Institution, Transaction, Transfer
+from app.models.finance import (
+    Account,
+    Budget,
+    Category,
+    Goal,
+    Institution,
+    Transaction,
+    Transfer,
+)
 from app.models.loans import Loan, LoanPayment
 from app.models.planning import Notification, PlannedTransaction, RecurringRule, Reminder
 from app.models.user import User, UserPreference
@@ -62,6 +70,12 @@ def reset_profile(db: DbSession, *, user: User, password: str) -> dict:
     db.execute(delete(RecurringRule).where(RecurringRule.created_by == user.id))
     db.execute(delete(Reminder).where(Reminder.user_id == user.id))
     db.execute(delete(Notification).where(Notification.user_id == user.id))
+    # Before the accounts and categories they point at. A goal holds its
+    # account with RESTRICT on purpose — losing the account would leave a goal
+    # measuring progress against nothing — so it has to go first rather than
+    # be dragged out by a cascade.
+    db.execute(delete(Budget).where(Budget.owner_user_id == user.id))
+    db.execute(delete(Goal).where(Goal.owner_user_id == user.id))
     db.execute(delete(Transaction).where(Transaction.account_id.in_(account_ids)))
     db.execute(delete(LoanPayment).where(LoanPayment.created_by == user.id))
     db.execute(delete(Loan).where(Loan.owner_user_id == user.id))

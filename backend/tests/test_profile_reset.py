@@ -176,3 +176,57 @@ def test_reset_does_not_touch_another_user(db, user, other_user, bank_account):
     survivors = db.scalars(select(Account)).all()
     assert [a.id for a in survivors] == [theirs.id]
     assert db.scalars(select(Category).where(Category.user_id == other_user.id)).all() != []
+
+
+def test_a_goal_does_not_block_the_reset(db, user, bank_account, savings_account):
+    """A goal holds its account with RESTRICT, so it has to be deleted first.
+
+    Without that the reset fails outright for anyone who has ever set a goal —
+    and it fails at the database, after the password has been accepted.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.models.finance import Account, Goal
+    from app.services import goals as goal_service
+
+    goal_service.create_goal(
+        db,
+        user=user,
+        name="Laptop",
+        account=savings_account,
+        target_amount=Decimal("500000"),
+    )
+    db.commit()
+
+    profile.reset_profile(db, user=user, password=PASSWORD)
+    db.commit()
+
+    assert db.scalars(select(Goal).where(Goal.owner_user_id == user.id)).all() == []
+    assert db.scalars(select(Account).where(Account.owner_user_id == user.id)).all() == []
+
+
+def test_a_budget_does_not_survive_the_reset(db, user, bank_account):
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.db.enums import CategoryType
+    from app.models.finance import Budget, Category
+    from app.services import budgets as budget_service
+
+    category = db.scalar(
+        select(Category).where(
+            Category.user_id == user.id, Category.category_type == CategoryType.EXPENSE
+        )
+    )
+    budget_service.create_budget(
+        db, user=user, category_id=category.id, amount=Decimal("100000")
+    )
+    db.commit()
+
+    profile.reset_profile(db, user=user, password=PASSWORD)
+    db.commit()
+
+    assert db.scalars(select(Budget).where(Budget.owner_user_id == user.id)).all() == []

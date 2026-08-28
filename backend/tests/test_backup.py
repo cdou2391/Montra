@@ -98,7 +98,7 @@ def test_export_captures_everything(db, user, bank_account, savings_account, cre
     _populate(db, user, bank_account, savings_account, credit_card)
     payload = backup.export_backup(db, user)
 
-    assert payload["montra_backup_version"] == 1
+    assert payload["montra_backup_version"] == backup.BACKUP_VERSION
     assert len(payload["accounts"]) == 3
     assert len(payload["loans"]) == 1
     assert len(payload["transfers"]) == 1
@@ -288,3 +288,159 @@ def test_restore_preserves_planned_items_and_their_links(
     assert planned.description == "Rent"
     # The link was remapped, not carried over stale.
     assert db.get(Account, planned.account_id) is not None
+
+
+# ------------------------------------------------------- keeping it in step
+
+
+# Tables a backup deliberately does not carry, and why. Anything not listed
+# here and not exported makes the guard below fail, which is the point: the
+# export is written by hand, so nothing else would notice a new table.
+NOT_BACKED_UP = {
+    # Files live in object storage; a JSON document cannot carry them, and a
+    # row pointing at a key that no longer exists is worse than no row.
+    "attachments",
+    # A record of what happened, not data to be recreated. Restoring it would
+    # let someone manufacture a history.
+    "audit_events",
+    # Published rates, shared by everyone and refetched daily. The user's own
+    # overrides are in exchange_rates and are backed up.
+    "market_rates",
+    # Rebuilt from the data, not restored: a notification about a thing that
+    # no longer exists is noise.
+    "notifications",
+    # Identity, sessions and credentials. Never in a backup by design.
+    "users",
+    "user_preferences",
+    "sessions",
+    "families",
+    "family_memberships",
+    "family_invitations",
+}
+
+
+def test_every_table_is_either_backed_up_or_deliberately_not(db, user):
+    """The export names its tables by hand, so nothing fails when one is added.
+
+    This does. A new table is either in the backup or on the list above with a
+    reason — which is a decision someone made, rather than an omission nobody
+    noticed.
+    """
+    from app.db.base import Base
+
+    payload = backup.export_backup(db, user)
+    exported = set(payload.keys())
+    # The export keys are plural table-ish names; map the few that differ.
+    aliases = {"recurring_rules", "planned_transactions", "loan_payments", "exchange_rates"}
+
+    missing = []
+    for table in sorted(Base.metadata.tables):
+        if table in NOT_BACKED_UP:
+            continue
+        if table in exported or table in aliases:
+            continue
+        missing.append(table)
+
+    assert not missing, (
+        f"these tables are neither exported nor listed as deliberately excluded: {missing}"
+    )
+
+
+def test_the_export_carries_every_column_of_an_account(db, user, bank_account):
+    """Columns drift the same way tables do, and the account is the one where
+    a silent omission changes a number — excluded_from_totals did exactly
+    that."""
+    from app.models.finance import Account
+
+    payload = backup.export_backup(db, user)
+    exported = set(payload["accounts"][0].keys())
+
+    # Set by the restore rather than carried: identity and ownership.
+    handled_elsewhere = {"owner_user_id", "created_by", "family_id", "created_at", "updated_at"}
+    missing = {
+        c.name for c in Account.__table__.columns
+    } - exported - handled_elsewhere
+
+    assert not missing, f"account columns missing from the backup: {sorted(missing)}"
+
+
+def test_a_round_trip_keeps_what_the_old_version_dropped(db, user, bank_account, savings_account):
+    """Export, wipe, restore — and the things version 1 lost are still there.
+
+    A backup that silently drops data is worse than none: the accounts and the
+    balances come back, so it looks like it worked.
+    """
+    from datetime import date
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.db.enums import Frequency, PlannedType
+    from app.models.finance import Budget, Goal
+    from app.models.planning import RecurringRule
+    from app.services import budgets as budget_service
+    from app.services import goals as goal_service
+    from app.services import planning as planning_service
+
+    category = db.scalar(
+        select(Category).where(Category.user_id == user.id, Category.name == "Food")
+    )
+    goal = goal_service.create_goal(
+        db,
+        user=user,
+        name="Laptop",
+        account=savings_account,
+        target_amount=Decimal("500000"),
+        target_date=date(2026, 12, 1),
+    )
+    budget_service.create_budget(
+        db, user=user, category_id=category.id, amount=Decimal("120000")
+    )
+    planning_service.create_rule(
+        db,
+        user=user,
+        name="Monthly saving",
+        planned_type=PlannedType.TRANSFER,
+        account_id=bank_account.id,
+        destination_account_id=savings_account.id,
+        amount=Decimal("75000"),
+        frequency=Frequency.MONTHLY,
+        start_date=date(2026, 8, 1),
+        goal_id=goal.id,
+    )
+    goal_service.contribute(
+        db,
+        user=user,
+        goal=goal,
+        source=bank_account,
+        amount=Decimal("100000"),
+        occurred_at=NOW,
+    )
+    bank_account.excluded_from_totals = True
+    db.commit()
+
+    payload = backup.export_backup(db, user)
+    backup.restore_backup(db, user=user, payload=payload, password=PASSWORD)
+    db.commit()
+
+    # The whole tables version 1 never carried.
+    restored_goal = db.scalar(select(Goal).where(Goal.owner_user_id == user.id))
+    assert restored_goal is not None
+    assert restored_goal.name == "Laptop"
+    assert restored_goal.target_date == date(2026, 12, 1)
+    assert db.scalar(select(Budget).where(Budget.owner_user_id == user.id)) is not None
+
+    # The column that decided whether an account counted towards net worth.
+    restored_bank = db.scalar(
+        select(Account).where(Account.owner_user_id == user.id, Account.name == "BK Current")
+    )
+    assert restored_bank.excluded_from_totals is True
+
+    # The one that left a recurring transfer with nowhere to send the money.
+    rule = db.scalar(select(RecurringRule).where(RecurringRule.created_by == user.id))
+    assert rule.destination_account_id is not None
+    assert rule.goal_id == restored_goal.id
+
+    # And the tag, without which the contribution would come back as a plain
+    # transfer and the goal would restore at zero.
+    assert goal_service.list_goals(db, user=user)[0]["saved"] == "100000.00"
