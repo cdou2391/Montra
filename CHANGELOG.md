@@ -10,6 +10,22 @@ displays it.
 
 ---
 
+## 0.4.2
+
+**Reconciliation tests.** Whole scenarios played through the real services,
+checked against arithmetic written out in the test so a reader can verify the
+expected numbers without running anything. The plan's reference sequence is
+there verbatim, alongside fees, a loan payment's three-way split, foreign
+balances, an excluded account, and a realistic month that exercises all of it
+at once.
+
+Every other suite asserts one behaviour in isolation. These exist because the
+bugs that got through — a backup dropping a recurring transfer's destination,
+a reset a goal blocked — were interaction bugs that passed 717 isolated tests.
+
+Verified by breaking the code on purpose: inverting the card-purchase
+direction fails three of them, removing currency conversion fails two.
+
 ## 0.4.1
 
 **The backup had fallen behind, in one place since before this release.**
