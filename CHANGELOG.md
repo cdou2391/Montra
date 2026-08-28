@@ -10,6 +10,21 @@ displays it.
 
 ---
 
+## 0.4.8
+
+**One loading state on refresh, not two.** The session guard replaced the whole
+app with three grey slabs while it restored the session, and only then let the
+page mount and show its own, differently shaped placeholder. A refresh went
+slab, then skeleton, then content.
+
+The page now renders while the session is still being restored. Every page
+already handles its data not having arrived, so there is nothing for a second
+placeholder to do. A refresh of Home now holds one shape throughout.
+
+Nothing is exposed by rendering early: without a session the requests come
+back empty and the redirect fires when /me resolves, no later than the block
+used to lift. Verified on four guarded pages with no cookie.
+
 ## 0.4.7
 
 **The last of the loading states, and an empty dropdown.** Settings, the reset

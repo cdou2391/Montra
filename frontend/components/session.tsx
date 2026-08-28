@@ -1,12 +1,11 @@
 "use client";
 
-/** Session restoration and route protection (Implementation Plan Phase 2). */
+/** Session restoration and route protection. */
 
 import { useRouter } from "next/navigation";
 import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 
 import { CurrentUser, montra } from "@/lib/api";
-import { Skeleton } from "@/components/ui";
 
 type SessionState = { user: CurrentUser | null; loading: boolean; refresh: () => void };
 
@@ -51,15 +50,17 @@ export function RequireSession({ children }: { children: ReactNode }) {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
-  if (loading) {
-    return (
-      <div className="space-y-4 p-6">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-28 w-full" />
-      </div>
-    );
-  }
-  if (!user) return null;
+  // The page renders while the session is still being restored, rather than
+  // being replaced by a placeholder of its own.
+  //
+  // Every page already handles its data not having arrived, and its skeleton
+  // is shaped like the page. Blocking here put a second, differently shaped
+  // one in front of it, so a refresh showed two unrelated loading states one
+  // after the other before anything real appeared.
+  //
+  // Nothing is exposed by rendering early: without a session the requests
+  // come back empty and the redirect below fires as soon as /me resolves,
+  // which is no later than the block used to lift.
+  if (!loading && !user) return null;
   return <>{children}</>;
 }
