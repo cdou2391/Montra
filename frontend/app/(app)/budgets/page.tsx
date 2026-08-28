@@ -107,6 +107,7 @@ export default function Budgets() {
   const [adding, setAdding] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
+  const [visibility, setVisibility] = useState("PRIVATE");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -135,7 +136,7 @@ export default function Budgets() {
     setSaving(true);
     setError(null);
     try {
-      await montra.createBudget({ category_id: categoryId, amount });
+      await montra.createBudget({ category_id: categoryId, amount, visibility });
       setAdding(false);
       setCategoryId("");
       setAmount("");
@@ -195,6 +196,25 @@ export default function Budgets() {
                 onChange={(e) => setAmount(e.target.value)}
               />
             </Field>
+
+            {/* Only where there is a household to share with: the API refuses
+                otherwise, and an option that always errors is worse than no
+                option. Same words the Household page uses. */}
+            {family && (
+              <Field
+                label="Who can see it"
+                hint="Shared means the household can add to it too."
+              >
+                <Select
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value)}
+                >
+                  <option value="PRIVATE">Only me</option>
+                  <option value="FAMILY_VISIBLE">Household can see</option>
+                  <option value="SHARED">Shared</option>
+                </Select>
+              </Field>
+            )}
             <Button type="submit" disabled={saving || !categoryId || !amount}>
               {saving ? "Adding…" : "Add budget"}
             </Button>

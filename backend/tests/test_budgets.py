@@ -336,3 +336,78 @@ def test_the_over_ones_come_first(db, user, food, travel):
 
     names = [b["category"]["name"] for b in _status(db, user)["budgets"]]
     assert names[0] == "Transport"
+
+
+# ------------------------------------------------------------------ household
+
+
+def test_a_shared_budget_is_visible_to_the_household(db, user, other_user, family, food):
+    budget_service.create_budget(
+        db,
+        user=user,
+        category_id=food.id,
+        amount=Decimal("100000"),
+        visibility=Visibility.SHARED,
+    )
+    db.commit()
+
+    seen = budget_service.status(db, user=other_user, context="family", today=TODAY)
+    assert [b["category"]["name"] for b in seen["budgets"]] == ["Food"]
+
+
+def test_a_family_visible_budget_is_visible_to_the_household(db, user, other_user, family, food):
+    budget_service.create_budget(
+        db,
+        user=user,
+        category_id=food.id,
+        amount=Decimal("100000"),
+        visibility=Visibility.FAMILY_VISIBLE,
+    )
+    db.commit()
+
+    seen = budget_service.status(db, user=other_user, context="family", today=TODAY)
+    assert len(seen["budgets"]) == 1
+
+
+def test_a_private_budget_stays_out_of_the_household_view(db, user, other_user, family, food):
+    """The rule the accounts follow: private is excluded before the total is
+    built, not filtered out of it afterwards."""
+    budget_service.create_budget(db, user=user, category_id=food.id, amount=Decimal("100000"))
+    db.commit()
+
+    seen = budget_service.status(db, user=other_user, context="family", today=TODAY)
+    assert seen["budgets"] == []
+
+
+def test_someone_outside_the_household_sees_nothing(db, user, third_user, family, food):
+    budget_service.create_budget(
+        db,
+        user=user,
+        category_id=food.id,
+        amount=Decimal("100000"),
+        visibility=Visibility.SHARED,
+    )
+    db.commit()
+
+    seen = budget_service.status(db, user=third_user, context="family", today=TODAY)
+    assert seen["budgets"] == []
+
+
+def test_sharing_without_a_household_is_refused(db, user, food):
+    """Sharing is derived from the caller's own membership, so there is nothing
+    to share into until they have one."""
+    with pytest.raises(ValidationFailed):
+        budget_service.create_budget(
+            db,
+            user=user,
+            category_id=food.id,
+            amount=Decimal("100000"),
+            visibility=Visibility.SHARED,
+        )
+
+
+def test_the_household_view_is_empty_without_a_household(db, user, food):
+    budget_service.create_budget(db, user=user, category_id=food.id, amount=Decimal("100000"))
+    db.commit()
+    # Not an error, simply empty.
+    assert budget_service.status(db, user=user, context="family", today=TODAY)["budgets"] == []

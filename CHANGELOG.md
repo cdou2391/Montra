@@ -10,6 +10,17 @@ displays it.
 
 ---
 
+## 0.3.1
+
+**Shared budgets and goals.** Both create forms now offer who can see it, where
+there is a household to share with. A goal can also be shared after it is made,
+which budgets could already do.
+
+The household scoping itself was already working — it simply had no tests and
+no way to reach it from the interface. It has thirteen tests now, covering
+each visibility level, the member who should see it, the outsider who should
+not, and the refusal to share when there is no household to share into.
+
 ## 0.3.0
 
 **Goals.** An amount to save into an account, optionally by a date. A goal

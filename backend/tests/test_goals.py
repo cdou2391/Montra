@@ -372,3 +372,72 @@ def test_the_date_can_be_removed_once_set(db, user, pot):
     goal_service.update_goal(db, goal=goal, clear_target_date=True)
     db.commit()
     assert _row(db, user)["target_date"] is None
+
+
+# ------------------------------------------------------------------ household
+
+
+def _shared_goal(db, user, pot, visibility, name="Holiday"):
+    goal = goal_service.create_goal(
+        db,
+        user=user,
+        name=name,
+        account=pot,
+        target_amount=Decimal("500000"),
+        visibility=visibility,
+    )
+    db.commit()
+    return goal
+
+
+def test_a_shared_goal_is_visible_to_the_household(db, user, other_user, family, pot):
+    _shared_goal(db, user, pot, Visibility.SHARED)
+    seen = goal_service.list_goals(db, user=other_user, context="family")
+    assert [g["name"] for g in seen] == ["Holiday"]
+
+
+def test_a_family_visible_goal_is_visible_to_the_household(db, user, other_user, family, pot):
+    _shared_goal(db, user, pot, Visibility.FAMILY_VISIBLE)
+    assert len(goal_service.list_goals(db, user=other_user, context="family")) == 1
+
+
+def test_a_private_goal_stays_out_of_the_household_view(db, user, other_user, family, pot):
+    _goal(db, user, pot)
+    assert goal_service.list_goals(db, user=other_user, context="family") == []
+
+
+def test_someone_outside_the_household_sees_nothing(db, user, third_user, family, pot):
+    _shared_goal(db, user, pot, Visibility.SHARED)
+    assert goal_service.list_goals(db, user=third_user, context="family") == []
+
+
+def test_sharing_without_a_household_is_refused(db, user, pot):
+    with pytest.raises(ValidationFailed):
+        goal_service.create_goal(
+            db,
+            user=user,
+            name="Nowhere",
+            account=pot,
+            target_amount=Decimal("1000"),
+            visibility=Visibility.SHARED,
+        )
+
+
+def test_a_goal_can_be_shared_after_it_is_made(db, user, other_user, family, pot):
+    """The common case: you start something, then decide the household should
+    see it. Without this it would have to be recreated."""
+    goal = _goal(db, user, pot)
+    assert goal_service.list_goals(db, user=other_user, context="family") == []
+
+    goal_service.set_visibility(db, user=user, goal=goal, visibility=Visibility.SHARED)
+    db.commit()
+    assert len(goal_service.list_goals(db, user=other_user, context="family")) == 1
+
+
+def test_a_goal_can_be_taken_back_to_private(db, user, other_user, family, pot):
+    goal = _shared_goal(db, user, pot, Visibility.SHARED)
+    assert len(goal_service.list_goals(db, user=other_user, context="family")) == 1
+
+    goal_service.set_visibility(db, user=user, goal=goal, visibility=Visibility.PRIVATE)
+    db.commit()
+    assert goal_service.list_goals(db, user=other_user, context="family") == []

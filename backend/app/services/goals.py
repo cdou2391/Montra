@@ -279,6 +279,25 @@ def refresh_status(db: DbSession, goal: Goal) -> Goal:
     return goal
 
 
+def set_visibility(
+    db: DbSession, *, user: User, goal: Goal, visibility: Visibility
+) -> Goal:
+    """Share a goal with the household, or take it back.
+
+    Derived from the caller's own membership rather than a family_id in the
+    request, so a client cannot share a goal into a household it is not in.
+    Taking it back to private clears the household link with it.
+    """
+    from app.services.accounts import _resolve_sharing
+
+    goal.family_id = _resolve_sharing(
+        db, user=user, visibility=visibility, family_id=goal.family_id
+    )
+    goal.visibility = visibility
+    db.flush()
+    return goal
+
+
 def archive_goal(db: DbSession, goal: Goal) -> Goal:
     if goal.status is GoalStatus.ARCHIVED:
         raise Conflict("Goal is already archived.", code="GOAL_ALREADY_ARCHIVED")

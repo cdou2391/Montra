@@ -25,6 +25,7 @@ class GoalUpdate(MontraModel):
     target_date: date | None = None
     # None means "not supplied"; this says "remove the one that is there".
     clear_target_date: bool = False
+    visibility: Visibility | None = None
 
     _v_target = amount_validator("target_amount")
 

@@ -72,6 +72,8 @@ def update_goal(
         target_date=payload.target_date,
         clear_target_date=payload.clear_target_date,
     )
+    if payload.visibility is not None:
+        goal_service.set_visibility(db, user=user, goal=goal, visibility=payload.visibility)
     # The target may have moved past or below what is already saved.
     goal_service.refresh_status(db, goal)
     db.commit()

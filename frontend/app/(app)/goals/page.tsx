@@ -207,6 +207,7 @@ export default function Goals() {
   // The date is the user's decision, so it is off until they say otherwise
   // rather than defaulting to some month and pretending they chose it.
   const [dated, setDated] = useState(false);
+  const [visibility, setVisibility] = useState("PRIVATE");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -237,6 +238,7 @@ export default function Goals() {
         account_id: form.account_id,
         target_amount: form.target_amount,
         target_date: dated && form.target_date ? form.target_date : null,
+        visibility,
       });
       setAdding(false);
       setDated(false);
@@ -328,6 +330,26 @@ export default function Goals() {
                 </div>
               )}
             </div>
+
+
+            {/* Only where there is a household to share with: the API refuses
+                otherwise, and an option that always errors is worse than no
+                option. Same words the Household page uses. */}
+            {family && (
+              <Field
+                label="Who can see it"
+                hint="Shared means the household can add to it too."
+              >
+                <Select
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value)}
+                >
+                  <option value="PRIVATE">Only me</option>
+                  <option value="FAMILY_VISIBLE">Household can see</option>
+                  <option value="SHARED">Shared</option>
+                </Select>
+              </Field>
+            )}
 
             <Button
               type="submit"
