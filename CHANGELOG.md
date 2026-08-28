@@ -10,6 +10,23 @@ displays it.
 
 ---
 
+## 0.3.0
+
+**Goals.** An amount to save into an account, optionally by a date. A goal
+keeps no tally: a contribution is a real transfer tagged with the goal, so
+progress is summed from movements that actually happened and cannot drift from
+the ledger. That is also what lets several goals share one savings account.
+
+A dated goal reports what it takes each month to arrive on time; an undated one
+says nothing about pace rather than inventing a deadline. Reaching the target
+marks the goal achieved and notifies, and the money stays where it is until you
+move it — taking it back out un-marks it.
+
+Spending from a goal's account without tagging it cannot be prevented on the
+write path, so it is measured daily instead: at 06:45 every goal's status is
+brought in line with the ledger, and an account whose goals claim more than it
+holds raises a notification. Once, not every morning.
+
 ## 0.2.0
 
 **Budgets.** A monthly spending ceiling per category. Progress is derived from

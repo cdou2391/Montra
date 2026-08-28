@@ -8,6 +8,7 @@ from app.api.v1 import (
     cards,
     currencies,
     families,
+    goals,
     health,
     loans,
     planning,
@@ -28,3 +29,4 @@ api_router.include_router(reports.router)
 api_router.include_router(attachments.router)
 api_router.include_router(currencies.router)
 api_router.include_router(budgets.router)
+api_router.include_router(goals.router)

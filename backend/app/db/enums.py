@@ -84,6 +84,14 @@ class CategoryStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
+class GoalStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    # Reached its target. It stays visible until the owner archives it: the
+    # money is still in the account, and a goal is a plan rather than a vault.
+    ACHIEVED = "ACHIEVED"
+    ARCHIVED = "ARCHIVED"
+
+
 class BudgetStatus(StrEnum):
     ACTIVE = "ACTIVE"
     ARCHIVED = "ARCHIVED"
@@ -159,6 +167,7 @@ class RecurringStatus(StrEnum):
 
 class ReminderEntity(StrEnum):
     PLANNED_TRANSACTION = "PLANNED_TRANSACTION"
+    GOAL = "GOAL"
     LOAN = "LOAN"
     CREDIT_CARD = "CREDIT_CARD"
     FAMILY_INVITATION = "FAMILY_INVITATION"
@@ -177,6 +186,10 @@ class NotificationType(StrEnum):
     CARD_PAYMENT_DUE = "CARD_PAYMENT_DUE"
     CARD_EXPIRING = "CARD_EXPIRING"
     LOAN_DUE = "LOAN_DUE"
+    GOAL_ACHIEVED = "GOAL_ACHIEVED"
+    # The goals on an account claim more than the account holds, which happens
+    # when money is spent from it without being tagged against a goal.
+    GOAL_SHORTFALL = "GOAL_SHORTFALL"
     SYSTEM = "SYSTEM"
 
 

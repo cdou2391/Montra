@@ -29,6 +29,7 @@ from app.db.enums import (
     CategoryStatus,
     CategoryType,
     Direction,
+    GoalStatus,
     InstitutionType,
     OwnershipType,
     TransactionStatus,
@@ -156,6 +157,54 @@ class Category(UUIDPrimaryKey, Timestamped, Base):
     )
 
 
+class Goal(UUIDPrimaryKey, Timestamped, Base):
+    """An amount to accumulate in one account, optionally by a date.
+
+    Holds no money and keeps no tally. Progress is the sum of the transfers
+    tagged against it, so it is derived from movements that really happened —
+    the same relationship a fee has to the charge it was taken on.
+
+    That is also what lets several goals share one savings account: each
+    contribution says which goal it belongs to, so they can be told apart
+    without giving any of them a balance of its own.
+    """
+
+    __tablename__ = "goals"
+
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    family_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), index=True)
+    # Where the money for this goal actually sits. The daily check compares
+    # what the goals on an account claim against what it holds.
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    target_amount: Mapped[Decimal] = mapped_column(AMOUNT, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    # Optional: an emergency fund is a real goal with no deadline. Without one
+    # there is no pace to report, and the screen says less rather than
+    # inventing a date.
+    target_date: Mapped[date | None] = mapped_column(Date)
+    visibility: Mapped[Visibility] = mapped_column(
+        SAEnum(Visibility, name="visibility", create_type=False),
+        default=Visibility.PRIVATE,
+        nullable=False,
+    )
+    status: Mapped[GoalStatus] = mapped_column(
+        SAEnum(GoalStatus, name="goal_status"), default=GoalStatus.ACTIVE, nullable=False
+    )
+    achieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    account: Mapped[Account] = relationship()
+
+    __table_args__ = (CheckConstraint("target_amount > 0", name="goal_target_positive"),)
+
+
 class Budget(UUIDPrimaryKey, Timestamped, Base):
     """A ceiling on spending in one category, per period.
 
@@ -232,6 +281,11 @@ class Transfer(UUIDPrimaryKey, Timestamped, Base):
         SAEnum(TransferStatus, name="transfer_status"),
         default=TransferStatus.COMPLETED,
         nullable=False,
+    )
+    # What this movement was for, when it was money going into or out of a
+    # goal. The transfer is the contribution; this only says which goal.
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("goals.id", ondelete="SET NULL"), index=True
     )
     idempotency_key: Mapped[str | None] = mapped_column(String(255), index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(

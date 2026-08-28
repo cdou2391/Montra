@@ -65,6 +65,13 @@ celery_app.conf.beat_schedule = {
         "task": "montra.refresh_exchange_rates",
         "schedule": crontab(hour=7, minute=0),
     },
+    # Goals cannot be kept honest on the write path: spending from a goal's
+    # account without tagging it is a normal thing to do. So the gap is
+    # measured once a day instead, early enough to be waiting.
+    "reconcile-goals": {
+        "task": "montra.reconcile_goals",
+        "schedule": crontab(hour=6, minute=45),
+    },
 }
 
 
@@ -171,3 +178,22 @@ def refresh_exchange_rates() -> int:
         db.commit()
     logger.info("refreshed %s market rates", updated)
     return updated
+
+
+@celery_app.task(name="montra.reconcile_goals")
+def reconcile_goals() -> dict:
+    """Bring goal statuses in line with the ledger, and report any shortfall.
+
+    Two jobs in one pass because they read the same figures: a goal reached by
+    a transfer made anywhere still notices, and an account whose goals claim
+    more than it holds raises a notice.
+    """
+    from app.db.session import SessionLocal
+    from app.services import goals as goal_service
+
+    with SessionLocal() as db:
+        refreshed = goal_service.refresh_all(db)
+        sent = goal_service.notify_shortfalls(db)
+        db.commit()
+    logger.info("reconciled %s goals, %s shortfall notices", refreshed, sent)
+    return {"goals": refreshed, "shortfalls": sent}
