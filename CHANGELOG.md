@@ -10,6 +10,22 @@ displays it.
 
 ---
 
+## 0.4.5
+
+**Loading states shaped like what replaces them.** Every page showed a single
+grey slab of an arbitrary height — h-32, h-48, h-64, picked by eye — and then
+rearranged into something structurally unrelated. Home stood one 128px block
+in for a net-worth card, a two-column metric grid, an account carousel, a
+chart and two lists.
+
+Home, Accounts, Budgets and Goals now preview their real structure: a card
+where a card goes, a scrolling row where tiles go, repeated lines where a list
+goes.
+
+The header was part of it. Accounts rendered a bare title while loading and
+then grew an Add button and the privacy toggle, so the top bar moved too.
+Neither depends on the data, so every state now renders the same header.
+
 ## 0.4.4
 
 **Restore rejected the backups this version produces.** The client checked the

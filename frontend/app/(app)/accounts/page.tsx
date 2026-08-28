@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Account, Transaction, montra } from "@/lib/api";
 import { ContextSwitch, useFinancialContext } from "@/components/context";
+import { AccountsSkeleton, SkeletonRows } from "@/components/skeletons";
 import { PageHeader } from "@/components/shell";
 import { BalancePrivacyToggle, useBalancePrivacy } from "@/components/balance-privacy";
 import { MoneyValue, TransactionRow } from "@/components/financial";
@@ -17,7 +18,7 @@ import {
   CarouselTrack,
   useCarousel,
 } from "@/components/carousel";
-import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
+import { Button, Card, EmptyState } from "@/components/ui";
 
 const RECENT_LIMIT = 6;
 
@@ -71,13 +72,33 @@ export default function Accounts() {
     [accounts, index, select],
   );
 
+  // The same header in every state: its title and actions do not depend on
+  // the data, so rendering a lesser one first only makes the bar rearrange.
+  const header = (
+    <PageHeader
+      title="Accounts"
+      icon="wallet"
+      action={
+        <>
+          <Link href="/accounts/new">
+            <Button>
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">New account</span>
+            </Button>
+          </Link>
+          {/* Last in the action slot, so it sits immediately left of the bell
+              — the same place Home puts it. */}
+          <BalancePrivacyToggle />
+        </>
+      }
+    />
+  );
+
   if (accounts === null) {
     return (
       <>
-        <PageHeader title="Accounts"
-        icon="wallet" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="mt-6 h-64 w-full" />
+        {header}
+        <AccountsSkeleton />
       </>
     );
   }
@@ -85,8 +106,7 @@ export default function Accounts() {
   if (accounts.length === 0) {
     return (
       <>
-        <PageHeader title="Accounts"
-        icon="wallet" />
+        {header}
         <EmptyState
           title="No accounts yet"
           message="Add a bank account, cash, mobile money or a card to get started."
@@ -106,23 +126,7 @@ export default function Accounts() {
     <>
       {family && <ContextSwitch className="mb-5" />}
 
-      <PageHeader
-        title="Accounts"
-        icon="wallet"
-        action={
-          <>
-            <Link href="/accounts/new">
-              <Button>
-                <span className="sm:hidden">Add</span>
-                <span className="hidden sm:inline">New account</span>
-              </Button>
-            </Link>
-            {/* Last in the action slot, so it sits immediately left of the
-                bell — the same place Home puts it. */}
-            <BalancePrivacyToggle />
-          </>
-        }
-      />
+      {header}
 
       {/* ---------------------------------------------- mobile + tablet: carousel */}
       <div className="lg:hidden">
@@ -294,7 +298,7 @@ function ActivitySection({
       )}
 
       {rows === undefined && loading ? (
-        <Skeleton className="h-40 w-full" />
+        <SkeletonRows rows={4} />
       ) : !rows || rows.length === 0 ? (
         <EmptyState
           title="Nothing here yet"

@@ -12,6 +12,7 @@ import { useSession } from "@/components/session";
 import { AccountTile, MetricCard, TransactionRow } from "@/components/financial";
 import { InsightList } from "@/components/insights";
 import { ForecastChart } from "@/components/forecast-chart";
+import { HomeSkeleton } from "@/components/skeletons";
 import { formatMoney } from "@/lib/format";
 import { Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { ProfileAvatarLink } from "@/components/avatar";
@@ -102,7 +103,7 @@ export default function Home() {
       />
 
       {accounts === null ? (
-        <Skeleton className="h-32 w-full" />
+        <HomeSkeleton />
       ) : (
         <>
           <Card className="mb-4">

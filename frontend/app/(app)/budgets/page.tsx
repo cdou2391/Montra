@@ -15,8 +15,8 @@ import {
   ErrorNotice,
   Field,
   Select,
-  Skeleton,
 } from "@/components/ui";
+import { ListSkeleton } from "@/components/skeletons";
 import { formatMoney } from "@/lib/format";
 
 /**
@@ -152,7 +152,7 @@ export default function Budgets() {
     return (
       <>
         <PageHeader title="Budgets" icon="scale" />
-        <Skeleton className="h-48 w-full" />
+        <ListSkeleton />
       </>
     );
   }

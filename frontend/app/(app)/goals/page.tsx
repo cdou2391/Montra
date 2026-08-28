@@ -16,9 +16,9 @@ import {
   Field,
   Input,
   Select,
-  Skeleton,
   StatusChip,
 } from "@/components/ui";
+import { ListSkeleton } from "@/components/skeletons";
 import { formatDate, formatMoney } from "@/lib/format";
 
 /**
@@ -265,7 +265,7 @@ export default function Goals() {
     return (
       <>
         <PageHeader title="Goals" icon="piggyBank" />
-        <Skeleton className="h-48 w-full" />
+        <ListSkeleton />
       </>
     );
   }
