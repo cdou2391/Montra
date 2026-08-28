@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Base UI primitives (Implementation Plan Phase 1).
+ * Base UI primitives.
  * Everything reads design tokens; no component hardcodes a hex value.
  */
 
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
+
+import { Icon } from "@/components/icons";
 
 export function Card({
   children,
@@ -85,6 +87,43 @@ const inputClass =
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
+}
+
+/**
+ * A password field that can be read back.
+ *
+ * Typing a passphrase blind on a phone keyboard is how people end up locked
+ * out of their own money, so the field can be revealed. It starts hidden, and
+ * the toggle is a button rather than a checkbox so it never submits the form
+ * it sits in.
+ */
+export function PasswordInput({
+  className = "",
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        {...props}
+        type={shown ? "text" : "password"}
+        // Room for the button, so a long password never runs under it.
+        className={`pr-12 ${className}`}
+      />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        // Disabled with the field: revealing a password while the form is
+        // submitting achieves nothing and the input is already frozen.
+        disabled={props.disabled}
+        aria-label={shown ? "Hide password" : "Show password"}
+        title={shown ? "Hide password" : "Show password"}
+        className="pressable absolute inset-y-0 right-0 flex w-12 items-center justify-center text-content-secondary disabled:opacity-40"
+      >
+        <Icon name={shown ? "eyeOff" : "eye"} size={18} />
+      </button>
+    </div>
+  );
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {

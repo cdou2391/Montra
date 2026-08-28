@@ -7,7 +7,7 @@ import { FormEvent, useState } from "react";
 import { MontraApiError, montra } from "@/lib/api";
 import { Logo } from "@/components/logo";
 import { SPLASH_FLAG } from "@/components/splash";
-import { Button, Card, ErrorNotice, Field, Input } from "@/components/ui";
+import { Button, Card, ErrorNotice, Field, Input, PasswordInput } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,11 +27,14 @@ export default function LoginPage() {
       window.sessionStorage.setItem(SPLASH_FLAG, "1");
       router.push("/");
       router.refresh();
+      // Deliberately still busy. Navigation is asynchronous, so clearing it
+      // here put the button back to "Sign in" while the next screen was still
+      // being fetched — a dead-looking pause that invites a second tap. This
+      // page unmounts when Home mounts, which is the right moment to stop.
     } catch (err) {
       setError(
         err instanceof MontraApiError ? err.message : "Could not sign in. Try again.",
       );
-    } finally {
       setBusy(false);
     }
   }
@@ -66,15 +69,16 @@ export default function LoginPage() {
               value={email}
               autoComplete="email"
               required
+              disabled={busy}
               onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
           <Field label="Password">
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               autoComplete="current-password"
               required
+              disabled={busy}
               onChange={(e) => setPassword(e.target.value)}
             />
           </Field>

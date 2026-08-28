@@ -6,7 +6,15 @@ import { FormEvent, useState } from "react";
 
 import { MontraApiError, montra } from "@/lib/api";
 import { Logo } from "@/components/logo";
-import { Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ErrorNotice,
+  Field,
+  Input,
+  PasswordInput,
+  Select,
+} from "@/components/ui";
 
 const CURRENCIES = ["RWF", "USD", "EUR", "GBP", "KES", "UGX", "TZS"];
 
@@ -38,6 +46,9 @@ export default function RegisterPage() {
       // Phase 3: land in onboarding, which asks for the first account.
       router.push("/accounts/new?onboarding=1");
       router.refresh();
+      // Still busy on purpose: navigation is asynchronous, and clearing it
+      // here put the button back while the next screen was still loading.
+      return;
     } catch (err) {
       if (err instanceof MontraApiError) {
         setError(err.message);
@@ -49,7 +60,6 @@ export default function RegisterPage() {
       } else {
         setError("Could not create your account. Try again.");
       }
-    } finally {
       setBusy(false);
     }
   }
@@ -82,7 +92,7 @@ export default function RegisterPage() {
           {error && <ErrorNotice message={error} />}
           <Field label="Name">
             <Input
-              value={form.display_name}
+              disabled={busy}              value={form.display_name}
               onChange={(e) => update("display_name", e.target.value)}
             />
           </Field>
@@ -91,6 +101,7 @@ export default function RegisterPage() {
               type="email"
               required
               autoComplete="email"
+              disabled={busy}
               value={form.email}
               onChange={(e) => update("email", e.target.value)}
             />
@@ -100,17 +111,17 @@ export default function RegisterPage() {
             hint="At least 12 characters. A few words you will remember beats a short one with symbols in it."
             error={fieldErrors.password}
           >
-            <Input
-              type="password"
+            <PasswordInput
               required
               autoComplete="new-password"
+              disabled={busy}
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
             />
           </Field>
           <Field label="Base currency" hint="Used for net worth and totals.">
             <Select
-              value={form.base_currency}
+              disabled={busy}              value={form.base_currency}
               onChange={(e) => update("base_currency", e.target.value)}
             >
               {CURRENCIES.map((c) => (

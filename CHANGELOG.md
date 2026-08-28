@@ -10,6 +10,20 @@ displays it.
 
 ---
 
+## 0.4.9
+
+**Sign in.** The password can be revealed, the fields freeze while the request
+is in flight, and the button keeps saying "Signing in…" until Home actually
+appears.
+
+It used to stop early: the busy flag was cleared in a finally block that ran
+the moment navigation was requested, not when it finished, so the button went
+back to "Sign in" while the next screen was still loading — a dead pause that
+invites a second tap.
+
+Register had all three of the same faults and gets the same fixes. A failed
+submit still re-enables the form.
+
 ## 0.4.8
 
 **One loading state on refresh, not two.** The session guard replaced the whole
