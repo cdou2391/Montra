@@ -10,6 +10,20 @@ displays it.
 
 ---
 
+## 0.4.11
+
+**A signing-out screen.** Clearing the session is a request and a navigation,
+and for two or three seconds neither had shown anything — the screen sat there
+still displaying the account being signed out of, which reads as a tap that
+did not land.
+
+The overlay goes up the moment the button is pressed and stays until the login
+page replaces it. Shared by all three ways out — the profile card, the desktop
+sidebar and the More sheet — which all had the same pause.
+
+A failed request still lands on the login page. The session may be gone at the
+server regardless, and staying put is the worse guess.
+
 ## 0.4.10
 
 **A make target for UAT, because deploying half of it showed a stale version.**

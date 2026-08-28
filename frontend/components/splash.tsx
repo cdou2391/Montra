@@ -16,7 +16,10 @@
  * see the app — skeletons and all — rather than holding the door shut.
  */
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+import { montra } from "@/lib/api";
 
 import { Logo } from "@/components/logo";
 import { useBalancePrivacy } from "@/components/balance-privacy";
@@ -87,4 +90,60 @@ export function SignInSplash() {
       </div>
     </div>
   );
+}
+
+
+/**
+ * Signing out, and the wait that follows it.
+ *
+ * Clearing the session is a request and a navigation, and neither is instant.
+ * Without this the screen simply sat there for a couple of seconds still
+ * showing the account being signed out of, which reads as a tap that did not
+ * land — and invites a second one.
+ *
+ * Simpler than the sign-in splash: there is nothing to wait for readiness on.
+ * It appears when the button is pressed and stops existing when the login page
+ * replaces the page it was rendered from.
+ */
+export function SigningOut() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background-primary"
+    >
+      <Logo size={72} />
+      <p className="mt-5 text-title text-content-primary">Signing out…</p>
+      <div className="mt-8 h-1 w-24 overflow-hidden rounded-full bg-line/10">
+        <div className="h-full w-1/3 animate-splash-sweep rounded-full bg-accent" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The sign-out action, and whether it is under way.
+ *
+ * Shared so every way out of the app behaves the same: the profile card, the
+ * desktop sidebar and the More sheet all showed the same dead pause.
+ */
+export function useSignOut() {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    // Set first: the overlay has to be up before the request starts, or it
+    // covers nothing.
+    setSigningOut(true);
+    try {
+      await montra.logout();
+    } finally {
+      // Even a failed request should land on the login page — the session may
+      // be gone at the server regardless, and staying put is the worse guess.
+      router.push("/login");
+      router.refresh();
+    }
+  }
+
+  return { signOut, signingOut };
 }

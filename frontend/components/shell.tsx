@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
 
 import { montra } from "@/lib/api";
@@ -16,6 +16,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { Icon, IconName } from "@/components/icons";
 import { Logo } from "@/components/logo";
 import { BottomSheet } from "@/components/sheet";
+import { SigningOut, useSignOut } from "@/components/splash";
 
 const NAV: { href: string; label: string; icon: IconName; primary?: boolean }[] = [
   { href: "/", label: "Home", icon: "home" },
@@ -81,14 +82,11 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { signOut, signingOut } = useSignOut();
 
-  async function signOut() {
-    await montra.logout();
-    router.push("/login");
-    router.refresh();
-  }
+
+  if (signingOut) return <SigningOut />;
 
   return (
     <div className="min-h-dvh lg:flex">

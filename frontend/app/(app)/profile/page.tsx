@@ -16,6 +16,7 @@ import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
 import { SkeletonCounts, SkeletonDetail } from "@/components/skeletons";
+import { SigningOut, useSignOut } from "@/components/splash";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -27,6 +28,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Profile() {
+  const { signOut, signingOut } = useSignOut();
   const { user } = useSession();
   const router = useRouter();
   const [resetOpen, setResetOpen] = useState(false);
@@ -120,11 +122,8 @@ export default function Profile() {
     }
   }
 
-  async function signOut() {
-    await montra.logout();
-    router.push("/login");
-    router.refresh();
-  }
+
+  if (signingOut) return <SigningOut />;
 
   if (!user) {
     return (
