@@ -10,6 +10,19 @@ displays it.
 
 ---
 
+## 0.4.4
+
+**Restore rejected the backups this version produces.** The client checked the
+format version against a hardcoded 1 before letting the file through, and 0.4.1
+moved the format to 2 without updating it. Every fresh backup was refused with
+"that file is not a Montra backup this version can read" — a file the server
+would have accepted.
+
+The client no longer holds a copy of the number. It checks only that the file
+is a Montra backup at all, so an obviously wrong one is still rejected before
+a password is typed, and leaves whether the version is readable to the server,
+which owns it.
+
 ## 0.4.3
 
 **A UAT environment.** The production images and topology, running on plain

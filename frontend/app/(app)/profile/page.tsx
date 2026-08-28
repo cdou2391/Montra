@@ -47,11 +47,13 @@ export default function Profile() {
     setRestorePassword("");
     try {
       const parsed = JSON.parse(await file.text()) as BackupFile;
-      // Checked here too, so an obviously wrong file is rejected before the
-      // user types a password. The server checks again regardless.
-      if (parsed?.montra_backup_version !== 1) {
+      // Only that it is a Montra backup at all, so an obviously wrong file is
+      // rejected before the user types a password. Whether this version can
+      // read that version is the server's judgement — it owns the number, and
+      // a copy of it here silently went stale the first time it changed.
+      if (typeof parsed?.montra_backup_version !== "number") {
         setPending(null);
-        setRestoreError("That file is not a Montra backup this version can read.");
+        setRestoreError("That file is not a Montra backup.");
       } else {
         setPending(parsed);
       }
