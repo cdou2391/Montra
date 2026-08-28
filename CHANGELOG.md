@@ -10,6 +10,21 @@ displays it.
 
 ---
 
+## 0.4.13
+
+**Recurring payments left out your loan instalments.** The figure counts what
+leaves every month "before anything else", and it was reading only recurring
+rules. Loan instalments come from each loan's own schedule and never become
+rules, so the two largest fixed payments were missing. On real data it read
+RWF 292,500 where the answer was 1,049,513.
+
+Payable instalments now count, receivables do not, and the detail line says
+how many are loans — the number jumps otherwise and a loan is not something
+most people file under subscriptions.
+
+The same figure also added foreign amounts raw, so a ten dollar subscription
+counted as ten francs. It converts now.
+
 ## 0.4.12
 
 **The More sheet can be dragged shut.** The handle at the top has always looked

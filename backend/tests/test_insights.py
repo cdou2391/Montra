@@ -324,3 +324,169 @@ def test_family_insights_never_see_private_spending(db, user, other_user, family
     rows = insights.generate(db, user=user, context="family")
     blob = str(rows)
     assert "900000" not in blob
+
+
+# ------------------------------------------------- what a commitment includes
+
+
+def _recurring_insight(db, user):
+    from app.services.insights import generate
+
+    return next(
+        (i for i in generate(db, user=user) if i["code"] == "recurring_total"), None
+    )
+
+
+def test_a_loan_instalment_is_a_recurring_payment(db, user, bank_account):
+    """The figure claims to be what leaves "before anything else", and a loan
+    instalment is exactly that. It does not appear as a recurring rule, so
+    counting only the rules left it out."""
+    from datetime import date
+    from decimal import Decimal
+
+    from app.db.enums import Frequency, LoanDirection
+    from app.services.loans import create_loan
+
+    create_loan(
+        db,
+        user=user,
+        direction=LoanDirection.PAYABLE,
+        name="Car",
+        currency="RWF",
+        original_principal=Decimal("2000000"),
+        opening_outstanding_principal=Decimal("2000000"),
+        start_date=date(2026, 8, 1),
+        expected_payment_amount=Decimal("187344"),
+        payment_frequency=Frequency.MONTHLY,
+    )
+    db.commit()
+
+    insight = _recurring_insight(db, user)
+    assert insight is not None
+    assert insight["value"] == "187344.00"
+    assert "1 loan instalment" in insight["detail"]
+
+
+def test_money_owed_to_you_is_not_a_payment_you_make(db, user, bank_account):
+    from datetime import date
+    from decimal import Decimal
+
+    from app.db.enums import Frequency, LoanDirection
+    from app.services.loans import create_loan
+
+    create_loan(
+        db,
+        user=user,
+        direction=LoanDirection.RECEIVABLE,
+        name="Lent to a friend",
+        currency="RWF",
+        original_principal=Decimal("500000"),
+        opening_outstanding_principal=Decimal("500000"),
+        start_date=date(2026, 8, 1),
+        expected_payment_amount=Decimal("100000"),
+        payment_frequency=Frequency.MONTHLY,
+    )
+    db.commit()
+
+    assert _recurring_insight(db, user) is None
+
+
+def test_rules_and_instalments_are_added_together(db, user, bank_account):
+    from datetime import date
+    from decimal import Decimal
+
+    from app.db.enums import Frequency, LoanDirection, PlannedType
+    from app.services import planning as planning_service
+    from app.services.loans import create_loan
+
+    planning_service.create_rule(
+        db,
+        user=user,
+        name="Streaming",
+        planned_type=PlannedType.EXPENSE,
+        account_id=bank_account.id,
+        amount=Decimal("15500"),
+        frequency=Frequency.MONTHLY,
+        start_date=date(2026, 8, 1),
+    )
+    create_loan(
+        db,
+        user=user,
+        direction=LoanDirection.PAYABLE,
+        name="Personal",
+        currency="RWF",
+        original_principal=Decimal("5000000"),
+        opening_outstanding_principal=Decimal("5000000"),
+        start_date=date(2026, 8, 1),
+        expected_payment_amount=Decimal("569669"),
+        payment_frequency=Frequency.MONTHLY,
+    )
+    db.commit()
+
+    insight = _recurring_insight(db, user)
+    assert insight["value"] == "585169.00"   # 15,500 + 569,669
+    assert insight["count"] == 2
+
+
+def test_a_foreign_subscription_is_converted_first(db, user, bank_account):
+    """It used to add the raw number, so a ten dollar subscription counted as
+    ten francs."""
+    from datetime import UTC, date, datetime
+    from decimal import Decimal
+
+    from app.db.enums import AccountType, Frequency, PlannedType, Visibility
+    from app.services import planning as planning_service
+    from app.services.accounts import create_account
+    from app.services.currency import set_rate
+
+    set_rate(db, user=user, base_currency="USD", quote_currency="RWF", rate=Decimal("1400"))
+    usd = create_account(
+        db,
+        user=user,
+        name="Dollars",
+        account_type=AccountType.CHECKING,
+        currency="USD",
+        opening_balance=Decimal("500"),
+        opening_balance_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+        visibility=Visibility.PRIVATE,
+    )
+    planning_service.create_rule(
+        db,
+        user=user,
+        name="A dollar subscription",
+        planned_type=PlannedType.EXPENSE,
+        account_id=usd.id,
+        amount=Decimal("10"),
+        frequency=Frequency.MONTHLY,
+        start_date=date(2026, 8, 1),
+    )
+    db.commit()
+
+    assert _recurring_insight(db, user)["value"] == "14000.00"
+
+
+def test_a_settled_loan_stops_counting(db, user, bank_account):
+    from datetime import date
+    from decimal import Decimal
+
+    from app.db.enums import Frequency, LoanDirection, LoanStatus
+    from app.services.loans import create_loan
+
+    loan = create_loan(
+        db,
+        user=user,
+        direction=LoanDirection.PAYABLE,
+        name="Nearly done",
+        currency="RWF",
+        original_principal=Decimal("100000"),
+        opening_outstanding_principal=Decimal("100000"),
+        start_date=date(2026, 8, 1),
+        expected_payment_amount=Decimal("50000"),
+        payment_frequency=Frequency.MONTHLY,
+    )
+    db.commit()
+    assert _recurring_insight(db, user) is not None
+
+    loan.status = LoanStatus.SETTLED
+    db.commit()
+    assert _recurring_insight(db, user) is None

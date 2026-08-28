@@ -20,6 +20,8 @@ from app.core.money import format_money, serialize
 from app.db.enums import (
     AccountType,
     Frequency,
+    LoanDirection,
+    LoanStatus,
     PlannedType,
     RecurringStatus,
     TransactionStatus,
@@ -159,6 +161,27 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
         )
 
     # --- recurring commitments -------------------------------------------
+    #
+    # What leaves every month whether or not you do anything. A loan instalment
+    # is exactly that, and it does not appear as a recurring rule: instalments
+    # come from each loan's own schedule, which is why the upcoming screen has
+    # to merge two sources. Counting only the rules left the two largest fixed
+    # payments out of a figure whose whole claim is "before anything else".
+    #
+    # Receivables stay out: money owed to you is not a payment you make.
+    from app.services import currency as currency_service
+    from app.services.reporting import _loans_in_scope
+
+    converter = currency_service.converter_for(db, user=user)
+
+    def _monthly(amount, frequency, interval, code) -> Decimal | None:
+        """One cadence's worth, per month, in the base currency."""
+        if amount is None or frequency is None:
+            return None
+        each = Decimal(amount) * PER_MONTH.get(frequency, Decimal("1")) / (interval or 1)
+        # Converted, not added raw: a dollar subscription is not one franc.
+        return converter.convert(each, code)
+
     rules = list(
         db.scalars(
             select(RecurringRule).where(
@@ -168,23 +191,43 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
             )
         )
     )
-    if rules:
-        monthly = sum(
-            (
-                Decimal(r.amount)
-                * PER_MONTH.get(r.frequency, Decimal("1"))
-                / (r.interval_value or 1)
-                for r in rules
-            ),
-            ZERO,
+    commitments = [
+        value
+        for r in rules
+        if (value := _monthly(r.amount, r.frequency, r.interval_value, r.currency)) is not None
+    ]
+
+    instalments = [
+        value
+        for loan in _loans_in_scope(db, access, context)
+        if loan.direction is LoanDirection.PAYABLE
+        and loan.status is LoanStatus.ACTIVE
+        and (
+            value := _monthly(
+                loan.expected_payment_amount, loan.payment_frequency, 1, loan.currency
+            )
         )
+        is not None
+    ]
+
+    if commitments or instalments:
+        monthly = sum(commitments, ZERO) + sum(instalments, ZERO)
+        count = len(commitments) + len(instalments)
+        detail = f"About {format_money(monthly, currency)} a month before anything else."
+        if instalments:
+            # Named, because a loan instalment is not something most people
+            # think of as a subscription, and the number jumps without it.
+            detail += (
+                f" Includes {len(instalments)} loan "
+                f"{'instalments' if len(instalments) != 1 else 'instalment'}."
+            )
         insights.append(
             _insight(
                 "recurring_total",
-                f"{len(rules)} recurring payment{'s' if len(rules) != 1 else ''}",
-                f"About {format_money(monthly, currency)} a month before anything else.",
+                f"{count} recurring payment{'s' if count != 1 else ''}",
+                detail,
                 value=serialize(monthly),
-                count=len(rules),
+                count=count,
                 currency=currency,
             )
         )

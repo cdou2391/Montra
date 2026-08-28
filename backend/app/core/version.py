@@ -15,4 +15,4 @@ A number nobody can map back to a change is just a number.
 """
 
 APP_NAME = "Montra"
-APP_VERSION = "0.4.12"
+APP_VERSION = "0.4.13"
