@@ -43,3 +43,7 @@ frontend/.pnpm-store/
 # The specification set. Kept locally as the source of truth for behaviour,
 # deliberately not published.
 docs/
+
+# Planning documents for the Flutter port. Local for the same reason: they
+# describe the auth model, what is missing, and what is coming next.
+mobile/
