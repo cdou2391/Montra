@@ -28,6 +28,7 @@ backend/celerybeat.pid
 .env.*
 !.env.example
 !.env.production.example
+!.env.uat.example
 
 # Editor / OS
 .DS_Store

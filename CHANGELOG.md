@@ -10,6 +10,24 @@ displays it.
 
 ---
 
+## 0.4.3
+
+**A UAT environment.** The production images and topology, running on plain
+HTTP so they can be used locally without a certificate.
+
+MONTRA_ENV is what separates them, and it governs exactly three things:
+production refuses to start on an unsafe setting, sends HSTS, and forces the
+session cookie to Secure whatever the file says. On http:// that last one
+means the browser never keeps a session, which is why the earlier attempt
+started but could not sign in.
+
+HSTS is the reason this is not simply "production with a self-signed cert on
+localhost": it pins a hostname, not a port, so a production stack on localhost
+would send the development stack on :8080 to HTTPS for a year.
+
+The production compose no longer fixes its container names, so UAT and
+development run side by side under different project names.
+
 ## 0.4.2
 
 **Reconciliation tests.** Whole scenarios played through the real services,

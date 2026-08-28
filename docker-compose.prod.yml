@@ -16,6 +16,14 @@
 #
 #   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 #
+# The same file runs UAT — the production images and topology with an
+# environment that permits plain HTTP:
+#
+#   docker compose -p montra-uat --env-file .env.uat -f docker-compose.prod.yml up -d --build
+#
+# Nothing here names its containers, so the two can run side by side under
+# different project names.
+#
 # --env-file is not optional. Compose interpolates ${...} in this file from the
 # default .env, which is the development one; without it Postgres would be
 # initialised with the development password while the API used the production
@@ -30,7 +38,6 @@ x-logging: &logging
 services:
   postgres:
     image: postgres:18
-    container_name: montra-postgres
     restart: unless-stopped
     logging: *logging
     environment:
@@ -49,7 +56,6 @@ services:
 
   redis:
     image: redis:7
-    container_name: montra-redis
     restart: unless-stopped
     logging: *logging
     volumes:
@@ -62,7 +68,6 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    container_name: montra-minio
     restart: unless-stopped
     logging: *logging
     command: server /data --console-address ":9001"
@@ -86,11 +91,10 @@ services:
       context: ./backend
       target: runner
     image: montra-api:prod
-    container_name: montra-migrate
     restart: "no"
     logging: *logging
     command: alembic upgrade head
-    env_file: .env.production
+    env_file: ${MONTRA_ENV_FILE:-.env.production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,11 +104,10 @@ services:
       context: ./backend
       target: runner
     image: montra-api:prod
-    container_name: montra-api
     restart: unless-stopped
     logging: *logging
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-    env_file: .env.production
+    env_file: ${MONTRA_ENV_FILE:-.env.production}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -124,11 +127,10 @@ services:
       context: ./backend
       target: runner
     image: montra-api:prod
-    container_name: montra-worker
     restart: unless-stopped
     logging: *logging
     command: celery -A app.worker.celery_app worker --loglevel=info
-    env_file: .env.production
+    env_file: ${MONTRA_ENV_FILE:-.env.production}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -146,11 +148,10 @@ services:
       context: ./backend
       target: runner
     image: montra-api:prod
-    container_name: montra-scheduler
     restart: unless-stopped
     logging: *logging
     command: celery -A app.worker.celery_app beat --loglevel=info
-    env_file: .env.production
+    env_file: ${MONTRA_ENV_FILE:-.env.production}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -166,7 +167,6 @@ services:
         # whichever origin served it.
         NEXT_PUBLIC_API_BASE_URL: /api/v1
     image: montra-web:prod
-    container_name: montra-web
     restart: unless-stopped
     logging: *logging
     environment:
@@ -179,7 +179,6 @@ services:
   # from inside this network.
   proxy:
     image: nginx:1.27-alpine
-    container_name: montra-proxy
     restart: unless-stopped
     logging: *logging
     ports:
