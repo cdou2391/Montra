@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -13,7 +12,7 @@ import {
 import { PageHeader } from "@/components/shell";
 import { useSession } from "@/components/session";
 import { Avatar } from "@/components/avatar";
-import { Button, Card, ErrorNotice, Field, Input, Skeleton, Toggle } from "@/components/ui";
+import { Button, Card, ErrorNotice, Field, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
 
@@ -148,6 +147,18 @@ export default function Profile() {
             </p>
             <p className="mt-0.5 truncate text-sm text-content-secondary">{user.email}</p>
           </div>
+          {/* Beside the name it signs out of: the only thing on this card that
+              acts rather than describes. Labelled, since an icon alone says
+              nothing to a screen reader. */}
+          <button
+            type="button"
+            onClick={signOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="pressable pressable-tint ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-content-secondary"
+          >
+            <Icon name="logOut" size={18} />
+          </button>
         </div>
       </Card>
 
@@ -160,32 +171,6 @@ export default function Profile() {
           Changing your name, currency or timezone is not available yet.
         </p>
       </Card>
-
-      {/* Everything about how the app behaves lives on its own page; this
-          card is the way there. Profile stays what it says: you, and your
-          records. */}
-      <Link href="/settings" className="pressable pressable-surface mb-4 block">
-        <Card>
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-muted text-accent">
-              <Icon name="settings" size={18} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-content-primary">App settings</p>
-              <p className="mt-0.5 text-xs text-content-secondary">
-                Appearance, privacy, notifications and exchange rates.
-              </p>
-            </div>
-            <span className="ml-auto shrink-0 text-content-muted">
-              <Icon name="chevronRight" size={18} />
-            </span>
-          </div>
-        </Card>
-      </Link>
-
-      <Button variant="secondary" onClick={signOut}>
-        Sign out
-      </Button>
 
       <Card className="mt-8">
         <p className="text-xs uppercase tracking-wide text-content-muted">Backup</p>
