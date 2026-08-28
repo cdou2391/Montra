@@ -57,6 +57,12 @@ class RecurringRule(UUIDPrimaryKey, Timestamped, Base):
     destination_account_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE")
     )
+    # A recurring contribution to a goal. Carried onto each occurrence this
+    # rule generates, and from there onto the transfer that completing it
+    # posts — without which the money would arrive and count towards nothing.
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("goals.id", ondelete="SET NULL"), index=True
+    )
     planned_type: Mapped[PlannedType] = mapped_column(
         SAEnum(PlannedType, name="planned_type"), nullable=False
     )
@@ -113,6 +119,11 @@ class PlannedTransaction(UUIDPrimaryKey, Timestamped, Base):
     # Only set for TRANSFER items; account_id is the source.
     destination_account_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE")
+    )
+    # Which goal this is for, if any. Set on a one-off contribution too, not
+    # only on the ones a rule generates.
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("goals.id", ondelete="SET NULL"), index=True
     )
     planned_type: Mapped[PlannedType] = mapped_column(
         SAEnum(PlannedType, name="planned_type"), nullable=False

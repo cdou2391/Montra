@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { Account, Goal, MontraApiError, montra } from "@/lib/api";
@@ -182,6 +183,15 @@ function GoalCard({
             >
               Add money
             </button>
+          )}
+          {/* Starting a schedule from here is the natural place: the goal and
+              its account are already chosen, so the form opens knowing both. */}
+          {!achieved && (
+            <Link href="/planning/recurring/new" className="pressable pressable-tint rounded-full">
+              <span className="inline-flex min-h-[36px] items-center rounded-full border border-line/10 px-3 text-xs text-content-secondary">
+                Set up monthly
+              </span>
+            </Link>
           )}
           <button
             type="button"

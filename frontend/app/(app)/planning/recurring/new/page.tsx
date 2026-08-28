@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { Account, Category, MontraApiError, montra } from "@/lib/api";
+import { Account, Category, Goal, MontraApiError, montra } from "@/lib/api";
 import { PageHeader } from "@/components/shell";
 import { AmountInput, Button, Card, ErrorNotice, Field, Input, Select } from "@/components/ui";
 
@@ -20,6 +20,7 @@ export default function NewRule() {
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [form, setForm] = useState({
     account_id: "",
     amount: "",
@@ -30,11 +31,24 @@ export default function NewRule() {
     end_date: "",
     category_id: "",
     destination_account_id: "",
+    goal_id: "",
     occurrence_hour: "9",
     reminder_days_before: "2",
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A contribution has to land in the goal's own account, so only goals saving
+  // into the chosen destination are offered.
+  const matchingGoals = goals.filter((g) => g.account.id === form.destination_account_id);
+
+  useEffect(() => {
+    // Only unfinished ones: a reached goal needs no more money.
+    montra
+      .goals()
+      .then((list) => setGoals(list.filter((g) => g.status === "ACTIVE")))
+      .catch(() => setGoals([]));
+  }, []);
 
   useEffect(() => {
     montra.accounts().then((list) => {
@@ -69,6 +83,9 @@ export default function NewRule() {
         account_id: form.account_id,
         destination_account_id:
           type === "TRANSFER" ? form.destination_account_id : null,
+        // Only a transfer can be a contribution, and only into the goal's own
+        // account — the tag has to describe where the money actually lands.
+        goal_id: type === "TRANSFER" && form.goal_id ? form.goal_id : null,
         amount: form.amount,
         name: form.name,
         frequency: form.frequency,
@@ -171,7 +188,27 @@ export default function NewRule() {
                   ))}
               </Select>
             </Field>
-          ) : (
+          ) : null}
+
+          {/* Tagging is what makes a recurring transfer count towards a goal
+              rather than merely moving money into the account it sits in. */}
+          {type === "TRANSFER" && matchingGoals.length > 0 && (
+            <Field
+              label="Towards a goal"
+              hint="Optional. Tagged contributions count towards the goal's progress."
+            >
+              <Select value={form.goal_id} onChange={(e) => update("goal_id", e.target.value)}>
+                <option value="">Not for a goal</option>
+                {matchingGoals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {type !== "TRANSFER" && (
             <Field label="Category">
               <Select
                 value={form.category_id}

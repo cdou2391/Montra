@@ -10,6 +10,22 @@ displays it.
 
 ---
 
+## 0.4.0
+
+**Recurring contributions to a goal.** A recurring transfer can now name the
+goal it is for. The tag travels from the rule to each occurrence it generates,
+and from there onto the transfer that completing one posts — so a monthly
+standing contribution counts towards the goal instead of merely moving money
+into the account it sits in.
+
+Without it the failure was quiet: the balance would rise every month while the
+goal sat at zero, and nothing would say why. A one-off planned transfer can
+carry the tag too.
+
+The picker appears only on a transfer, and only lists goals saving into the
+account the money is going to — a contribution has to land where the goal
+lives. A goal card links straight to the form.
+
 ## 0.3.1
 
 **Shared budgets and goals.** Both create forms now offer who can see it, where

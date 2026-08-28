@@ -99,6 +99,7 @@ def create_planned(
         notes=payload.notes,
         reminder_days_before=payload.reminder_days_before,
         destination_account_id=parse_uuid(payload.destination_account_id, "destination_account_id"),
+        goal_id=parse_uuid(payload.goal_id, "goal_id"),
     )
     today = _today(user)
     db.commit()
@@ -282,6 +283,7 @@ def create_rule(
         occurrence_hour=payload.occurrence_hour,
         reminder_days_before=payload.reminder_days_before,
         destination_account_id=parse_uuid(payload.destination_account_id, "destination_account_id"),
+        goal_id=parse_uuid(payload.goal_id, "goal_id"),
     )
     # Populate the window immediately so the series is visible without waiting
     # for the next scheduler run.

@@ -18,6 +18,8 @@ class PlannedCreate(MontraModel):
     reminder_days_before: int | None = Field(default=None, ge=0, le=60)
     # TRANSFER only: where the money goes. account_id is the source.
     destination_account_id: str | None = None
+    # A one-off contribution towards a goal, tagged so completing it counts.
+    goal_id: str | None = None
 
     _v_amount = amount_validator("amount")
 
@@ -64,6 +66,9 @@ class RecurringRuleCreate(MontraModel):
     occurrence_hour: int = Field(default=9, ge=0, le=23)
     reminder_days_before: int | None = Field(default=None, ge=0, le=60)
     destination_account_id: str | None = None
+    # A recurring contribution: each occurrence this generates is tagged, so
+    # completing one counts towards the goal rather than merely moving money.
+    goal_id: str | None = None
 
     _v_amount = amount_validator("amount")
 

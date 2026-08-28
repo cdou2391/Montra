@@ -441,3 +441,172 @@ def test_a_goal_can_be_taken_back_to_private(db, user, other_user, family, pot):
     goal_service.set_visibility(db, user=user, goal=goal, visibility=Visibility.PRIVATE)
     db.commit()
     assert goal_service.list_goals(db, user=other_user, context="family") == []
+
+
+# -------------------------------------------------- recurring contributions
+
+
+def _rule(db, user, goal, source, amount="100000", start=None):
+    from app.db.enums import Frequency, PlannedType
+    from app.services import planning as planning_service
+
+    rule = planning_service.create_rule(
+        db,
+        user=user,
+        name=f"Monthly to {goal.name}",
+        planned_type=PlannedType.TRANSFER,
+        account_id=source.id,
+        destination_account_id=goal.account_id,
+        amount=Decimal(amount),
+        frequency=Frequency.MONTHLY,
+        start_date=start or date(2026, 8, 1),
+        goal_id=goal.id,
+    )
+    db.commit()
+    return rule
+
+
+def test_a_recurring_rule_tags_the_occurrences_it_generates(db, user, pot, wallet):
+    from app.services import planning as planning_service
+
+    goal = _goal(db, user, pot, target="600000")
+    rule = _rule(db, user, goal, wallet)
+    planning_service.generate_occurrences(
+        db, rule, owner=user, today=date(2026, 8, 1), window_days=90
+    )
+    db.commit()
+
+    from sqlalchemy import select
+
+    from app.models.planning import PlannedTransaction
+
+    occurrences = list(
+        db.scalars(
+            select(PlannedTransaction).where(
+                PlannedTransaction.recurring_rule_id == rule.id
+            )
+        )
+    )
+    assert occurrences
+    assert all(o.goal_id == goal.id for o in occurrences)
+
+
+def test_completing_a_recurring_occurrence_counts_towards_the_goal(db, user, pot, wallet):
+    """The whole point. Without the tag the money arrives and the goal sits
+    still, which is the failure this feature exists to prevent."""
+    from sqlalchemy import select
+
+    from app.models.planning import PlannedTransaction
+    from app.services import planning as planning_service
+
+    goal = _goal(db, user, pot, target="600000")
+    rule = _rule(db, user, goal, wallet)
+    planning_service.generate_occurrences(
+        db, rule, owner=user, today=date(2026, 8, 1), window_days=40
+    )
+    db.commit()
+
+    first = db.scalar(
+        select(PlannedTransaction)
+        .where(PlannedTransaction.recurring_rule_id == rule.id)
+        .order_by(PlannedTransaction.occurrence_date)
+    )
+    planning_service.complete_planned(db, user=user, planned_id=first.id)
+    db.commit()
+
+    assert _row(db, user)["saved"] == "100000.00"
+    assert PostingService(db).balance_of(pot) == Decimal("100000")
+
+
+def test_completing_the_same_occurrence_twice_counts_once(db, user, pot, wallet):
+    from sqlalchemy import select
+
+    from app.models.planning import PlannedTransaction
+    from app.services import planning as planning_service
+
+    goal = _goal(db, user, pot, target="600000")
+    rule = _rule(db, user, goal, wallet)
+    planning_service.generate_occurrences(
+        db, rule, owner=user, today=date(2026, 8, 1), window_days=40
+    )
+    db.commit()
+
+    first = db.scalar(
+        select(PlannedTransaction)
+        .where(PlannedTransaction.recurring_rule_id == rule.id)
+        .order_by(PlannedTransaction.occurrence_date)
+    )
+    planning_service.complete_planned(db, user=user, planned_id=first.id)
+    db.commit()
+    with pytest.raises(Conflict):
+        planning_service.complete_planned(db, user=user, planned_id=first.id)
+
+    assert _row(db, user)["saved"] == "100000.00"
+
+
+def test_a_recurring_contribution_can_reach_the_target(db, user, pot, wallet):
+    from sqlalchemy import select
+
+    from app.models.planning import PlannedTransaction
+    from app.services import planning as planning_service
+
+    goal = _goal(db, user, pot, target="200000")
+    rule = _rule(db, user, goal, wallet)
+    planning_service.generate_occurrences(
+        db, rule, owner=user, today=date(2026, 8, 1), window_days=70
+    )
+    db.commit()
+
+    occurrences = list(
+        db.scalars(
+            select(PlannedTransaction)
+            .where(PlannedTransaction.recurring_rule_id == rule.id)
+            .order_by(PlannedTransaction.occurrence_date)
+        )
+    )
+    for occurrence in occurrences[:2]:
+        planning_service.complete_planned(db, user=user, planned_id=occurrence.id)
+    db.commit()
+
+    db.refresh(goal)
+    assert goal.status is GoalStatus.ACHIEVED
+
+
+def test_an_untagged_recurring_transfer_is_still_not_progress(db, user, pot, wallet):
+    """The old behaviour, kept honest: money into the account with no tag
+    moves the balance and nothing else."""
+    from sqlalchemy import select
+
+    from app.db.enums import Frequency, PlannedType
+    from app.models.planning import PlannedTransaction
+    from app.services import planning as planning_service
+
+    # Created so _row can find it; the rule deliberately does not name it.
+    _goal(db, user, pot, target="600000")
+    rule = planning_service.create_rule(
+        db,
+        user=user,
+        name="Untagged",
+        planned_type=PlannedType.TRANSFER,
+        account_id=wallet.id,
+        destination_account_id=pot.id,
+        amount=Decimal("100000"),
+        frequency=Frequency.MONTHLY,
+        start_date=date(2026, 8, 1),
+    )
+    db.commit()
+    planning_service.generate_occurrences(
+        db, rule, owner=user, today=date(2026, 8, 1), window_days=40
+    )
+    db.commit()
+
+    first = db.scalar(
+        select(PlannedTransaction)
+        .where(PlannedTransaction.recurring_rule_id == rule.id)
+        .order_by(PlannedTransaction.occurrence_date)
+    )
+    planning_service.complete_planned(db, user=user, planned_id=first.id)
+    db.commit()
+
+    assert PostingService(db).balance_of(pot) == Decimal("100000")
+    assert _row(db, user)["saved"] == "0.00"

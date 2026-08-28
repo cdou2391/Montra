@@ -179,6 +179,7 @@ def create_planned(
     notes: str | None = None,
     reminder_days_before: int | None = None,
     destination_account_id: uuid.UUID | None = None,
+    goal_id: uuid.UUID | None = None,
 ) -> PlannedTransaction:
     account = get_transactable_account(db, account_id, user)
     destination = _resolve_destination(
@@ -197,6 +198,7 @@ def create_planned(
     planned = PlannedTransaction(
         account_id=account.id,
         destination_account_id=destination.id if destination else None,
+        goal_id=goal_id,
         planned_type=planned_type,
         amount=amount,
         currency=account.currency,
@@ -277,7 +279,18 @@ def complete_planned(
             actor_id=user.id,
             notes=locked.description,
         )
+        # Carry the goal across. Without this the money arrives and counts
+        # towards nothing: the balance moves and the goal sits still.
+        transfer.goal_id = locked.goal_id
         locked.completed_transfer_id = transfer.id
+        if locked.goal_id is not None:
+            from app.models.finance import Goal
+            from app.services.goals import refresh_status
+
+            db.flush()
+            goal = db.get(Goal, locked.goal_id)
+            if goal is not None:
+                refresh_status(db, goal)
     else:
         record = (
             posting.record_income
@@ -477,6 +490,7 @@ def create_rule(
     occurrence_hour: int = 9,
     reminder_days_before: int | None = None,
     destination_account_id: uuid.UUID | None = None,
+    goal_id: uuid.UUID | None = None,
 ) -> RecurringRule:
     account = get_transactable_account(db, account_id, user)
     destination = _resolve_destination(
@@ -498,6 +512,7 @@ def create_rule(
     rule = RecurringRule(
         account_id=account.id,
         destination_account_id=destination.id if destination else None,
+        goal_id=goal_id,
         planned_type=planned_type,
         amount=amount,
         currency=account.currency,
@@ -566,6 +581,7 @@ def generate_occurrences(
         planned = PlannedTransaction(
             account_id=rule.account_id,
             destination_account_id=rule.destination_account_id,
+            goal_id=rule.goal_id,
             planned_type=rule.planned_type,
             amount=rule.amount,
             currency=rule.currency,
