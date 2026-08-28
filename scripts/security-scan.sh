@@ -15,6 +15,10 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$CACHE"
 
+echo "== Version =="
+"$(dirname "$0")/check-version.sh"
+
+echo
 echo "== Python dependencies (pip-audit) =="
 docker compose exec -T api pip-audit --progress-spinner off
 
