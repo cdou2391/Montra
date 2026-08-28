@@ -31,10 +31,13 @@ echo "-- refreshing base images"
 docker pull -q python:3.12-slim >/dev/null
 docker pull -q node:22-slim >/dev/null
 
-for image in montra-api montra-web; do
+# The production images are what ships, so they are what a scan is about. The
+# development ones are listed too because they are what runs on this machine.
+for image in montra-api:prod montra-web:prod montra-api:latest montra-web:latest; do
   echo "-- $image"
-  docker save "$image:latest" -o "$TMP/image.tar" 2>/dev/null || {
-    echo "   image not built; run: docker compose build"
+  docker save "$image" -o "$TMP/image.tar" 2>/dev/null || {
+    echo "   not built; run: docker compose build   (or, for :prod)"
+    echo "   docker compose --env-file .env.production -f docker-compose.prod.yml build"
     continue
   }
   docker run --rm \
@@ -50,17 +53,10 @@ for image in montra-api montra-web; do
 done
 
 echo
-echo "Note: both images ship a package manager, and what remains is inside it."
+echo "The :prod images should report nothing. They are multi-stage: the runtime"
+echo "carries the built virtualenv or the Next standalone server and no package"
+echo "manager, which is where every finding used to live. They also apply the"
+echo "Debian security updates published since their base was last rebuilt."
 echo
-echo "  montra-api  2 HIGH, both from pip's own vendored tree. pip bundles a"
-echo "              private copy of msgpack, and declares setuptools in the SBOM"
-echo "              at pip/_vendor/bom.cdx.json that trivy reads. Neither is on"
-echo "              the application's import path, and pip 26.2.1 -- the newest"
-echo "              there is -- still vendors them, so there is nothing to bump."
-echo "              The installed (non-vendored) copies are current and clean."
-echo
-echo "  montra-web  findings inside pnpm itself, same shape."
-echo
-echo "The Phase 31 multi-stage build removes both: install into a virtualenv in a"
-echo "builder stage, copy only the venv into the runtime image, and no package"
-echo "manager is left to be scanned."
+echo "The :latest images are the development ones. They ship pip, pnpm and the"
+echo "test tooling on purpose, so findings inside those are expected there."

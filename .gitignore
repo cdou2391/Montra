@@ -23,6 +23,11 @@ backend/celerybeat.pid
 .env
 .env.local
 .env.*.local
+# Every environment file except the checked-in templates. .env.production
+# holds real credentials and must never be committed.
+.env.*
+!.env.example
+!.env.production.example
 
 # Editor / OS
 .DS_Store

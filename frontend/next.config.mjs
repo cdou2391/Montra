@@ -9,6 +9,9 @@ const apiOrigin = process.env.API_ORIGIN ?? "http://api:8000";
 
 const nextConfig = {
   reactStrictMode: true,
+  // Emits a self-contained server with only the modules the build actually
+  // reached, so the production image needs no package manager.
+  output: "standalone",
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiOrigin}/api/:path*` }];
   },

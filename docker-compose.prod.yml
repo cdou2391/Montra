@@ -1,0 +1,196 @@
+# Production stack.
+#
+# Differs from the development compose in four ways that matter:
+#
+#   * The image is the artifact. No bind mounts, no --reload, no dev server —
+#     what was tested is what runs.
+#   * Only the proxy publishes a port. Postgres, Redis and MinIO are reachable
+#     on the internal network and from nowhere else, which is the single-host
+#     equivalent of the plan's firewall rule.
+#   * Migrations run as their own one-shot job before the API starts, rather
+#     than by hand afterwards.
+#   * Containers restart on their own, and their logs are capped so a noisy
+#     one cannot fill the disk.
+#
+# Usage:
+#
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+#
+# --env-file is not optional. Compose interpolates ${...} in this file from the
+# default .env, which is the development one; without it Postgres would be
+# initialised with the development password while the API used the production
+# one, and every connection would fail authentication.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: montra-postgres
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Deliberately no `ports`. Nothing outside this network reaches the
+    # database, so it cannot be probed from the host or the internet.
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: montra-redis
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: montra-minio
+    restart: unless-stopped
+    logging: *logging
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Runs once and exits. The API waits for it to succeed, so the schema is
+  # never behind the code that expects it — and a failed migration stops the
+  # deploy instead of leaving a half-migrated database serving traffic.
+  migrate:
+    build:
+      context: ./backend
+      target: runner
+    image: montra-api:prod
+    container_name: montra-migrate
+    restart: "no"
+    logging: *logging
+    command: alembic upgrade head
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+      target: runner
+    image: montra-api:prod
+    container_name: montra-api
+    restart: unless-stopped
+    logging: *logging
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build:
+      context: ./backend
+      target: runner
+    image: montra-api:prod
+    container_name: montra-worker
+    restart: unless-stopped
+    logging: *logging
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.worker.celery_app", "inspect", "ping", "-d", "celery@$${HOSTNAME}"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  scheduler:
+    build:
+      context: ./backend
+      target: runner
+    image: montra-api:prod
+    container_name: montra-scheduler
+    restart: unless-stopped
+    logging: *logging
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      target: runner
+      args:
+        # Inlined into the bundle at build time. Relative, so the client calls
+        # whichever origin served it.
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+    image: montra-web:prod
+    container_name: montra-web
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      API_ORIGIN: http://api:8000
+      NODE_ENV: production
+    depends_on:
+      - api
+
+  # The only service that publishes a port. Everything else is reachable only
+  # from inside this network.
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: montra-proxy
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${PROXY_PORT:-8080}:80"
+    volumes:
+      - ./infra/nginx/montra.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

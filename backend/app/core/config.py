@@ -102,6 +102,11 @@ class Settings(BaseSettings):
             problems.append("CORS_ORIGINS contains a plain-HTTP origin.")
         if self.s3_secret_key == "montra-dev-secret":
             problems.append("S3_SECRET_KEY is still the development default.")
+        # The URL carries the password, so this checks the credential actually
+        # in use rather than a separate variable that may not be the one wired
+        # into the connection string.
+        if "://montra:montra@" in self.database_url:
+            problems.append("DATABASE_URL still uses the development password.")
         return problems
 
 
