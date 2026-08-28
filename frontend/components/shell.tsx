@@ -59,6 +59,12 @@ const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[
     hint: "Monthly limits, and what is left",
   },
   {
+    href: "/goals",
+    label: "Goals",
+    icon: "piggyBank",
+    hint: "What you are saving towards",
+  },
+  {
     href: "/planning/forecast",
     label: "Forecast",
     icon: "trendingUp",

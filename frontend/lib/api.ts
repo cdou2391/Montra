@@ -249,6 +249,27 @@ export type AppMeta = {
   version: string;
 };
 
+/** A goal with its progress summed from the transfers tagged to it. */
+export type Goal = {
+  id: string;
+  name: string;
+  target_amount: string;
+  saved: string;
+  /** Never negative: past the target you are done, not "minus 5,000 to go". */
+  remaining: string;
+  progress_percent: string;
+  currency: string;
+  /** Optional by design; an emergency fund has no deadline. */
+  target_date: string | null;
+  /** What it takes each month to arrive on time. Null with no date, or once
+   *  the target is reached. */
+  required_monthly: string | null;
+  account: { id: string; name: string };
+  status: "ACTIVE" | "ACHIEVED" | "ARCHIVED";
+  achieved_at: string | null;
+  visibility: string;
+};
+
 /** A budget with this period's spending derived against it. */
 export type BudgetRow = {
   id: string;
@@ -795,6 +816,19 @@ export const montra = {
   markNotificationRead: (id: string) => api.post<void>(`/notifications/${id}/read`),
   markAllNotificationsRead: () => api.post<void>("/notifications/read-all"),
 
+  goals: (context = "personal") =>
+    api.get<Collection<Goal>>(`/goals?context=${context}`).then((r) => r.data),
+  createGoal: (payload: Record<string, unknown>) =>
+    api.post<Envelope<Goal>>("/goals", payload).then((r) => r.data),
+  updateGoal: (id: string, payload: Record<string, unknown>) =>
+    api.patch<Envelope<Goal>>(`/goals/${id}`, payload).then((r) => r.data),
+  contributeToGoal: (id: string, payload: Record<string, unknown>, idempotencyKey: string) =>
+    api
+      .post<Envelope<Goal>>(`/goals/${id}/contributions`, payload, {
+        "Idempotency-Key": idempotencyKey,
+      })
+      .then((r) => r.data),
+  archiveGoal: (id: string) => api.post<Envelope<Goal>>(`/goals/${id}/archive`),
   budgets: (context = "personal") =>
     api.get<Envelope<BudgetStatus>>(`/budgets?context=${context}`).then((r) => r.data),
   createBudget: (payload: Record<string, unknown>) =>

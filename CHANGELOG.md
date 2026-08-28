@@ -27,6 +27,10 @@ write path, so it is measured daily instead: at 06:45 every goal's status is
 brought in line with the ledger, and an account whose goals claim more than it
 holds raises a notification. Once, not every morning.
 
+The screen shows progress, what is left, and — where a date was set — what to
+put aside each month. Adding money posts the tagged transfer, so contributing
+from the goal card and transferring by hand are the same operation underneath.
+
 ## 0.2.0
 
 **Budgets.** A monthly spending ceiling per category. Progress is derived from
