@@ -155,9 +155,9 @@ export default function Profile() {
             onClick={signOut}
             aria-label="Sign out"
             title="Sign out"
-            className="pressable pressable-tint ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-content-secondary"
+            className="pressable ml-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-semantic-expense/10 text-semantic-expense hover:bg-semantic-expense/15"
           >
-            <Icon name="logOut" size={18} />
+            <Icon name="logOut" size={22} />
           </button>
         </div>
       </Card>
