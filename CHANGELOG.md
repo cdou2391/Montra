@@ -10,6 +10,18 @@ displays it.
 
 ---
 
+## 0.4.12
+
+**The More sheet can be dragged shut.** The handle at the top has always looked
+draggable and was decorative; now it is the thing it looked like.
+
+It closes on a long drag or a quick flick, and springs back on a short one.
+Both, because distance alone refuses a fast short flick and speed alone closes
+on a twitch. The strip around the line is the target rather than the line
+itself, which is too thin for a thumb.
+
+Escape, the backdrop and the links inside all still work.
+
 ## 0.4.11
 
 **A signing-out screen.** Clearing the session is a request and a navigation,
