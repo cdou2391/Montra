@@ -17,6 +17,7 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.core.logging import configure_logging, request_id_ctx
+from app.core.version import APP_NAME, APP_VERSION
 
 configure_logging()
 
@@ -44,8 +45,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="Montra API",
-    version="0.1.0",
+    title=f"{APP_NAME} API",
+    version=APP_VERSION,
     description="Personal and household finance tracking.",
     openapi_url=f"{settings.api_v1_prefix}/openapi.json",
     docs_url=f"{settings.api_v1_prefix}/docs",

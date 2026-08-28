@@ -4,6 +4,8 @@ Lighter than the ledger suite by design; the invariants live in test_posting.py
 and test_transfers.py.
 """
 
+from app.core.version import APP_VERSION
+
 
 def _register(client, email="a@example.com", password="a-good-passphrase-1"):
     return client.post(
@@ -1029,3 +1031,18 @@ def test_dashboard_and_net_worth_respond_in_both_contexts(client):
     for context in ("personal", "family"):
         assert client.get(f"/api/v1/dashboard?context={context}").status_code == 200
         assert client.get(f"/api/v1/reports/net-worth?context={context}").status_code == 200
+
+
+def test_meta_names_the_build(client):
+    """The About screen needs this before it necessarily has a session, so it
+    is unauthenticated like the health endpoints beside it."""
+    response = client.get("/api/v1/meta")
+    assert response.status_code == 200
+    assert response.json() == {"name": "Montra", "version": APP_VERSION}
+
+
+def test_the_openapi_document_carries_the_same_version():
+    """One number for the running system, not one per place that shows it."""
+    from app.main import app
+
+    assert app.version == APP_VERSION

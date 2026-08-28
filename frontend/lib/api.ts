@@ -243,6 +243,12 @@ export type ParsedSms = {
   } | null;
 };
 
+/** What the running API calls itself. */
+export type AppMeta = {
+  name: string;
+  version: string;
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -539,6 +545,7 @@ export const montra = {
     api.get<Collection<Transaction>>(`/transactions${query}`),
   parseSms: (message: string) =>
     api.post<Envelope<ParsedSms>>("/transactions/parse-sms", { message }).then((r) => r.data),
+  meta: () => api.get<AppMeta>("/meta"),
   createTransaction: (payload: Record<string, unknown>) =>
     api.post<Envelope<Transaction>>("/transactions", payload).then((r) => r.data),
   transaction: (id: string) =>

@@ -1,4 +1,4 @@
-"""Liveness and readiness endpoints."""
+"""Liveness, readiness, and what this build is."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.api.deps import db_session
 from app.core.config import settings
 from app.core.errors import DependencyUnavailable
+from app.core.version import APP_NAME, APP_VERSION
 
 router = APIRouter(tags=["health"])
 
@@ -37,3 +38,14 @@ def ready(db: DbSession = Depends(db_session)) -> dict:
         raise DependencyUnavailable("Redis is unavailable.") from exc
 
     return {"status": "ready", "checks": checks}
+
+
+@router.get("/meta")
+def meta() -> dict:
+    """What this build calls itself.
+
+    Unauthenticated, like the health endpoints beside it: the name and version
+    of a running service are not a secret, and the client needs them on the
+    About screen before it necessarily has a session.
+    """
+    return {"name": APP_NAME, "version": APP_VERSION}

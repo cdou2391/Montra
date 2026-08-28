@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   BackupFile,
   MontraApiError,
-  Preferences,
   ResetPreview,
   montra,
 } from "@/lib/api";
@@ -16,9 +16,6 @@ import { Avatar } from "@/components/avatar";
 import { Button, Card, ErrorNotice, Field, Input, Skeleton, Toggle } from "@/components/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Icon } from "@/components/icons";
-import { ExchangeRates } from "@/components/exchange-rates";
-import { useBalancePrivacy } from "@/components/balance-privacy";
-import { useTheme } from "@/components/theme";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -32,22 +29,11 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function Profile() {
   const { user } = useSession();
   const router = useRouter();
-  const [prefs, setPrefs] = useState<Preferences | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
   const [resetOpen, setResetOpen] = useState(false);
   const [preview, setPreview] = useState<ResetPreview | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-
-  useEffect(() => {
-    montra
-      .preferences()
-      .then(setPrefs)
-      .catch(() => setPrefs(null));
-  }, []);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -132,29 +118,6 @@ export default function Profile() {
     }
   }
 
-  const { refresh: refreshPrivacy } = useBalancePrivacy();
-  const { theme, setTheme } = useTheme();
-
-  async function save(patch: Partial<Preferences>) {
-    if (!prefs) return;
-    // Optimistic: the control should not lag behind the tap.
-    const previous = prefs;
-    setPrefs({ ...prefs, ...patch });
-    setSaving(true);
-    setError(null);
-    try {
-      setPrefs(await montra.updatePreferences(patch));
-      // The masking lives in a provider above this page; without this it
-      // would keep the old preference until the next full load.
-      refreshPrivacy();
-    } catch (err) {
-      setPrefs(previous);
-      setError(err instanceof MontraApiError ? err.message : "Could not save that.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function signOut() {
     await montra.logout();
     router.push("/login");
@@ -198,96 +161,27 @@ export default function Profile() {
         </p>
       </Card>
 
-      <Card className="mb-4">
-        <p className="mb-1 text-xs uppercase tracking-wide text-content-muted">Preferences</p>
-        {error && (
-          <div className="mb-3">
-            <ErrorNotice message={error} />
-          </div>
-        )}
-        {prefs === null ? (
-          <Skeleton className="h-32 w-full" />
-        ) : (
-          <>
-            {/* Three states, so a segmented control rather than a switch: a
-                toggle cannot say "follow the device", and following the
-                device is what most people want. */}
-            <div className="border-b border-line/5 py-3">
-              <p className="text-sm font-medium text-content-primary">Appearance</p>
+      {/* Everything about how the app behaves lives on its own page; this
+          card is the way there. Profile stays what it says: you, and your
+          records. */}
+      <Link href="/settings" className="pressable pressable-surface mb-4 block">
+        <Card>
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-muted text-accent">
+              <Icon name="settings" size={18} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-content-primary">App settings</p>
               <p className="mt-0.5 text-xs text-content-secondary">
-                Light, dark, or whatever your device is set to.
+                Appearance, privacy, notifications and exchange rates.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 rounded-control bg-background-secondary p-1">
-                {(
-                  [
-                    ["SYSTEM", "System"],
-                    ["LIGHT", "Light"],
-                    ["DARK", "Dark"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    onClick={() => setTheme(value)}
-                    aria-pressed={theme === value}
-                    className={`pressable min-h-[38px] rounded-[10px] text-sm font-semibold transition ${
-                      theme === value
-                        ? "bg-accent-muted text-accent"
-                        : "text-content-secondary"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
             </div>
-
-            <Toggle
-              label="Hide balances by default"
-              hint="Amounts start masked when you open the app."
-              checked={prefs.hide_balances}
-              disabled={saving}
-              onChange={(v) => save({ hide_balances: v })}
-            />
-            <Toggle
-              label="Remember balance privacy"
-              hint="Keep balances hidden between sessions."
-              checked={prefs.persist_balance_privacy}
-              disabled={saving}
-              onChange={(v) => save({ persist_balance_privacy: v })}
-            />
-            <Toggle
-              label="Notifications"
-              hint="Reminders for upcoming bills and income."
-              checked={prefs.notifications_enabled}
-              disabled={saving}
-              onChange={(v) => save({ notifications_enabled: v })}
-            />
-            <div className="pt-4">
-              <Field
-                label="Default reminder"
-                hint="Days before something is due. Used when adding upcoming items."
-              >
-                <Input
-                  type="number"
-                  min={0}
-                  max={30}
-                  value={prefs.default_reminder_days ?? ""}
-                  disabled={saving}
-                  onChange={(e) =>
-                    save({
-                      default_reminder_days: e.target.value ? Number(e.target.value) : null,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          </>
-        )}
-      </Card>
-
-      <div className="mb-4">
-        <ExchangeRates />
-      </div>
+            <span className="ml-auto shrink-0 text-content-muted">
+              <Icon name="chevronRight" size={18} />
+            </span>
+          </div>
+        </Card>
+      </Link>
 
       <Button variant="secondary" onClick={signOut}>
         Sign out

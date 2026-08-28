@@ -26,7 +26,13 @@ const NAV: { href: string; label: string; icon: IconName; primary?: boolean }[] 
 
 /** The rest of the app, reached by expanding the bar rather than leaving it. */
 const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[] = [
-  { href: "/profile", label: "Profile", icon: "user", hint: "Your details and preferences" },
+  { href: "/profile", label: "Profile", icon: "user", hint: "You, and your data" },
+  {
+    href: "/settings",
+    label: "App settings",
+    icon: "settings",
+    hint: "Appearance, privacy, notifications",
+  },
   {
     href: "/notifications",
     label: "Notifications",
