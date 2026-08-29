@@ -29,6 +29,7 @@ export type IconName =
   | "transfer"
   | "chevronLeft"
   | "chevronRight"
+  | "chevronUp"
   | "logOut"
   | "handshake"
   | "download"
@@ -83,6 +84,7 @@ const PATHS: Record<IconName, string[]> = {
   transfer: ["M8 3 4 7l4 4", "M4 7h16", "m16 21 4-4-4-4", "M20 17H4"],
   chevronLeft: ["m15 18-6-6 6-6"],
   chevronRight: ["m9 18 6-6-6-6"],
+  chevronUp: ["m18 15-6-6-6 6"],
   // Lucide "handshake": lending and being repaid.
   handshake: [
     "m11 17 2 2a1 1 0 1 0 3-3",

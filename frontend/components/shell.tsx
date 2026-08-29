@@ -26,56 +26,48 @@ const NAV: { href: string; label: string; icon: IconName; primary?: boolean }[] 
 ];
 
 /** The rest of the app, reached by expanding the bar rather than leaving it. */
-const MORE_ITEMS: { href: string; label: string; icon: IconName; hint: string }[] = [
-  { href: "/profile", label: "Profile", icon: "user", hint: "You, and your data" },
+const MORE_ITEMS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/profile", label: "Profile", icon: "user" },
   {
     href: "/settings",
     label: "App settings",
     icon: "settings",
-    hint: "Appearance, privacy, notifications",
   },
   {
     href: "/notifications",
     label: "Notifications",
     icon: "bell",
-    hint: "Reminders and alerts",
   },
   {
     href: "/family",
     label: "Household",
     icon: "users",
-    hint: "Share with the people you live with",
   },
   {
     href: "/loans",
     label: "Loans",
     icon: "handshake",
-    hint: "What you owe and are owed",
   },
-  { href: "/transactions", label: "Transactions", icon: "list", hint: "Everything you have recorded" },
+  { href: "/transactions", label: "Transactions", icon: "list" },
   {
     href: "/budgets",
     label: "Budgets",
     icon: "scale",
-    hint: "Monthly limits, and what is left",
   },
   {
     href: "/goals",
     label: "Goals",
     icon: "piggyBank",
-    hint: "What you are saving towards",
   },
   {
     href: "/planning/forecast",
     label: "Forecast",
     icon: "trendingUp",
-    hint: "Where your balance is heading",
   },
   {
     href: "/planning/recurring",
     label: "Recurring",
     icon: "repeat",
-    hint: "Subscriptions and regular bills",
   },
 ];
 
@@ -136,7 +128,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           The wrapper spans the width so the bar can centre, but ignores
           pointer events — otherwise the transparent gutters beside the bar
           would swallow taps meant for the content behind them. */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+      <div
+        className={`pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden ${
+          // Above the sheet's backdrop while More is open, so the bar keeps its
+          // own colour and the two read as one stacked surface.
+          moreOpen ? "z-50" : "z-20"
+        }`}
+      >
         <nav
           className="
             pointer-events-auto mx-auto flex max-w-lg items-stretch justify-around
@@ -170,9 +168,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             ),
           )}
 
-          {/* More expands the bar in place rather than navigating away. */}
+          {/* More expands the bar in place rather than navigating away, so the
+              icon is a direction rather than a symbol: up means there is more
+              above this, down means tap to put it away. One chevron rotated
+              rather than two icons, so the change is a movement the eye can
+              follow instead of a swap it has to notice. */}
           <button
-            onClick={() => setMoreOpen(true)}
+            onClick={() => setMoreOpen((v) => !v)}
             aria-expanded={moreOpen}
             aria-haspopup="dialog"
             className={`pressable pressable-tint flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[18px] text-[11px] ${
@@ -181,58 +183,54 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : "text-content-secondary"
             }`}
           >
-            <Icon name="more" size={21} />
+            <Icon
+              name="chevronUp"
+              size={21}
+              className={`motion-safe:transition-transform motion-safe:duration-200 ${
+                moreOpen ? "rotate-180" : ""
+              }`}
+            />
             More
           </button>
         </nav>
       </div>
 
-      <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
-        <div className="space-y-1">
+      <BottomSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title="More"
+        variant="nav"
+      >
+        {/* The same tile as a bar item — icon over label, 11px, one accent
+            colour for the current page — so the panel reads as more of the
+            bar rather than a different kind of menu. Four across is what
+            keeps the tiles the width of a thumb on the narrowest phone. */}
+        <div className="grid grid-cols-4 gap-0.5">
           {MORE_ITEMS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setMoreOpen(false)}
-              className={`pressable pressable-tint pressable-surface flex items-center gap-3 rounded-control px-3 py-3 ${
-                pathname === item.href ? "bg-accent-muted" : ""
+              className={`pressable pressable-tint flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-[18px] px-1 py-2 text-center text-[11px] leading-tight ${
+                pathname === item.href ? "bg-accent-muted text-accent" : "text-content-secondary"
               }`}
             >
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  pathname === item.href
-                    ? "bg-accent text-background-primary"
-                    : "bg-line/5 text-content-secondary"
-                }`}
-              >
-                <Icon name={item.icon} size={20} />
-              </span>
-              <span className="min-w-0">
-                <span
-                  className={`block text-sm font-medium ${
-                    pathname === item.href ? "text-accent" : "text-content-primary"
-                  }`}
-                >
-                  {item.label}
-                </span>
-                <span className="mt-0.5 block text-xs text-content-secondary">
-                  {item.hint}
-                </span>
-              </span>
+              <Icon name={item.icon} size={21} />
+              {item.label}
             </Link>
           ))}
 
+          {/* Last tile rather than a row of its own: it is the same kind of
+              thing, and the colour already says it is the destructive one. */}
           <button
             onClick={() => {
               setMoreOpen(false);
               void signOut();
             }}
-            className="pressable pressable-surface mt-2 flex w-full items-center gap-3 rounded-control px-3 py-3 text-left"
+            className="pressable pressable-tint flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-[18px] px-1 py-2 text-center text-[11px] leading-tight text-semantic-expense"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-semantic-expense/15 text-semantic-expense">
-              <Icon name="logOut" size={20} />
-            </span>
-            <span className="text-sm font-medium text-semantic-expense">Sign out</span>
+            <Icon name="logOut" size={21} />
+            Sign out
           </button>
         </div>
       </BottomSheet>

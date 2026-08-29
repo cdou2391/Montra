@@ -14,11 +14,18 @@ export function BottomSheet({
   onClose,
   title,
   children,
+  variant = "default",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /**
+   * "nav" makes the panel match the floating bottom bar — same width, radius
+   * and surface — and sit directly above it, so opening it reads as the bar
+   * growing upwards rather than as a separate sheet arriving over the top.
+   */
+  variant?: "default" | "nav";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
@@ -120,6 +127,8 @@ export function BottomSheet({
 
   if (!open) return null;
 
+  const nav = variant === "nav";
+
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
       <button
@@ -132,13 +141,27 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`absolute inset-x-0 bottom-0 rounded-t-[20px] border-t border-line/10 bg-background-secondary pb-safe ${
+        className={`absolute bottom-0 ${
+          nav
+            ? // The bar is 60px tall (min-h-[60px] on its tallest child) and
+              // its wrapper holds the safe-area padding. Clearing both leaves
+              // the bar visible below this panel instead of covered by it.
+              "inset-x-0 mx-auto mb-[max(0.75rem,env(safe-area-inset-bottom))] max-w-lg translate-y-0 px-4 pb-[68px]"
+            : "inset-x-0 rounded-t-[20px] border-t border-line/10 bg-background-secondary pb-safe"
+        } ${
           // The entrance animation also moves transform, so it only runs on a
           // sheet that has not been dragged.
           dragY === 0 && !dragging ? "motion-safe:animate-[sheet_200ms_ease-out]" : ""
         } ${dragging ? "" : "motion-safe:transition-transform motion-safe:duration-200"}`}
         style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
       >
+        <div
+          className={
+            nav
+              ? "rounded-[22px] border border-line/10 bg-surface-elevated shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)]"
+              : "contents"
+          }
+        >
         {/* Grab handle. Drag it down to dismiss; the strip is the target
             rather than the line itself, which is too thin for a thumb.
             touch-action none so the browser does not claim the gesture for
@@ -153,7 +176,8 @@ export function BottomSheet({
         >
           <span aria-hidden className="h-1 w-9 rounded-full bg-line/20" />
         </div>
-        <div className="px-4 pb-4 pt-2">{children}</div>
+        <div className={nav ? "px-2 pb-3 pt-1" : "px-4 pb-4 pt-2"}>{children}</div>
+        </div>
       </div>
     </div>
   );
