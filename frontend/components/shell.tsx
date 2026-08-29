@@ -114,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <Link
           href="/add"
-          className="pressable mt-6 flex min-h-[48px] items-center justify-center rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
+          className="pressable mt-6 flex min-h-[44px] items-center justify-center rounded-control bg-accent px-4 text-sm font-semibold text-background-primary"
         >
           Add transaction
         </Link>

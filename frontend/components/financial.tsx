@@ -35,7 +35,7 @@ export function MoneyValue({
   }[tone];
   const sizes = {
     body: "text-base font-medium",
-    value: "text-[1.55rem] font-bold leading-tight sm:text-value",
+    value: "text-[1.35rem] font-bold leading-tight sm:text-value",
     "value-lg": "text-value sm:text-value-lg",
   }[size];
 

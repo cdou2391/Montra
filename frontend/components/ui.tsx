@@ -52,9 +52,10 @@ export function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      // 48px min height keeps every control inside the thumb-friendly target
-      // size from UI/UX section 3.5.
-      className={`pressable min-h-[48px] rounded-control px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${styles} ${className}`}
+      // 44px is the thumb-target floor from UI/UX section 3.5. The layout is
+      // dense, but a full-width control never goes under it — only inline
+      // chips, which are secondary by construction, sit smaller.
+      className={`pressable min-h-[44px] rounded-control px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${styles} ${className}`}
     >
       {children}
     </button>
@@ -83,7 +84,7 @@ export function Field({
 }
 
 const inputClass =
-  "w-full min-h-[48px] rounded-control border border-line/10 bg-background-secondary px-4 text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none";
+  "w-full min-h-[44px] rounded-control border border-line/10 bg-background-secondary px-4 text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
@@ -231,9 +232,12 @@ export function Toggle({
           checked ? "bg-accent" : "bg-line/15"
         }`}
       >
+        {/* The knob travels by its own width rather than a fixed pixel offset,
+            so it lands correctly at any density: the track is inset by 0.5 on
+            both sides and is exactly two knobs wide. */}
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-background-primary transition-all ${
-            checked ? "left-[22px]" : "left-0.5"
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-background-primary transition-transform ${
+            checked ? "translate-x-full" : "translate-x-0"
           }`}
         />
       </span>

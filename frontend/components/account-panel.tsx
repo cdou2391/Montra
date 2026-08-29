@@ -79,7 +79,7 @@ export function AccountPanel({
       aria-label={`${account.name} details`}
       className="pressable pressable-surface block"
     >
-      <Card className="flex min-h-[150px] flex-col justify-between transition-colors hover:bg-surface-elevated">
+      <Card className="flex min-h-[132px] flex-col justify-between transition-colors hover:bg-surface-elevated">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             {/* Restrained: the accent stays reserved for meaning, not decoration

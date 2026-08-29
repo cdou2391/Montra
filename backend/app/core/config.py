@@ -14,6 +14,13 @@ class Settings(BaseSettings):
 
     # Persistence
     database_url: str = "postgresql+psycopg://montra:montra@localhost:5432/montra"
+    # Connections are a shared, finite resource: Postgres allows 100 in total,
+    # and every process that opens an engine claims up to pool + overflow of
+    # them. The API is one process and can afford the default; a Celery worker
+    # is one process *per fork*, so it sets these much lower rather than
+    # multiplying the default by its concurrency.
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
     test_database_url: str = "postgresql+psycopg://montra:montra@localhost:5432/montra_test"
     redis_url: str = "redis://localhost:6379/0"
 

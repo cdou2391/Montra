@@ -67,7 +67,7 @@ export function HomeSkeleton() {
             a full-width block. */}
         <div className="flex gap-3 overflow-hidden">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[76px] w-44 shrink-0" />
+            <Skeleton key={i} className="h-[68px] w-44 shrink-0" />
           ))}
         </div>
       </section>
@@ -96,7 +96,7 @@ export function AccountsSkeleton() {
     <>
       <div className="mb-2 flex items-center gap-1">
         <Skeleton className="h-8 w-6 shrink-0" />
-        <Skeleton className="h-[168px] flex-1" />
+        <Skeleton className="h-[150px] flex-1" />
         <Skeleton className="h-8 w-6 shrink-0" />
       </div>
 

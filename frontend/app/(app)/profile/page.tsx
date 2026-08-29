@@ -185,7 +185,7 @@ export default function Profile() {
           <a
             href={montra.backupUrl()}
             download
-            className="pressable inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-control border border-line/15 px-5 text-sm font-semibold text-content-primary"
+            className="pressable inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-control border border-line/15 px-5 text-sm font-semibold text-content-primary"
           >
             <Icon name="download" size={18} />
             Download backup

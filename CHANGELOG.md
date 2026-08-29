@@ -10,6 +10,67 @@ displays it.
 
 ---
 
+## 0.4.15
+
+**Nothing in the production stack had a ceiling.** On a single host that means
+any container can take the database down with it, and the database is the one
+process whose death costs data rather than uptime. Every service now has a
+memory limit, a CPU limit and a process cap, sized for a shared 2-core 4 GB
+box. They are ceilings, not reservations, so they deliberately sum to more
+than the machine has; Postgres additionally gets a soft reservation so the
+kernel reclaims from something else first.
+
+**The worker was forking once per CPU.** Celery's prefork pool defaults to the
+core count, so the same image used 606 MB on a sixteen-core machine and 120 MB
+on a two-core one — and, less visibly, multiplied its database connection pool
+by the same factor. Concurrency is now pinned at 2. Five scheduled jobs a day
+do not need more.
+
+**The connection arithmetic did not add up.** The engine held pool_size=10 with
+max_overflow=20 — thirty connections per process — and a Celery fork is a
+process. Sixteen forks could demand 480 connections from a server configured
+for 100. It never happened because the jobs are short and daily, but it was
+latent and it got *worse* on a bigger host. Pool size is now configurable, and
+the worker and scheduler set it far below the API's: two forks at 2+3 is ten
+connections rather than sixty.
+
+**Redis had no memory bound.** It is Celery's broker, so the policy is
+noeviction rather than an LRU: evicting a key under pressure silently discards
+a queued task, and refusing the write surfaces the problem where it can be
+seen.
+
+Log rotation tightened from 10 MB x 5 to 5 MB x 3 per service — the old
+setting allowed 400 MB across the stack, which is real money on a 20 GB disk.
+
+---
+
+## 0.4.14
+
+**A denser layout.** Spacing and type were both a step roomier than the app
+needed, and on a phone that cost a visible row of content on most screens.
+
+Density is now a single number. `TIGHTEN` in `tailwind.config.ts` scales the
+whole spacing scale — currently 0.875, so `p-4` is 14px rather than 16 and
+`gap-3` is 10.5 rather than 12 — which means `p-4` still means the same thing
+in every file and one edit moves the entire app. The type scale is re-cut on
+the same basis, trimming line height harder than glyph size: leading is where
+the airiness sits and it costs less legibility to take back. `text-xs` stops
+at 11px, which is the floor for a hint on a phone.
+
+Touch targets deliberately sit outside that scale. They are written as pixel
+values, so density cannot shrink a thumb target: full-width controls moved
+from 48px to 44px, which is the floor from the UI/UX spec rather than a
+compromise against it, and nothing else moved at all.
+
+Two things had been written as fixed pixels against the old scale and would
+have drifted: the toggle knob travelled a hard-coded 22px along a track that
+now measures 38.5, and the skeleton blocks were measured against the old
+padding. The knob now travels by its own width — the track is exactly two
+knobs wide between its insets, at any density — and the skeletons were
+re-cut to match what they stand in for.
+
+---
+
 ## 0.4.13
 
 **Recurring payments left out your loan instalments.** The figure counts what

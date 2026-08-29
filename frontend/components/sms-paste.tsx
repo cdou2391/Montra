@@ -99,7 +99,7 @@ export function SmsPaste({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="*165*S*200000 RWF transferred to …"
-          className="min-h-[96px] w-full rounded-control border border-line/10 bg-background-secondary px-3 py-2 text-sm text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
+          className="min-h-[86px] w-full rounded-control border border-line/10 bg-background-secondary px-3 py-2 text-sm text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
         />
       </Field>
 
