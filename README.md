@@ -14,7 +14,8 @@ document set that is not published with the source.
 
 Implemented through **Phase 29** of the implementation plan — milestones
 **M1 (Platform)** through **M7 (Reporting)**, plus search, attachments,
-auditing and security hardening.
+auditing and security hardening — with budgets, goals and the production
+stack of **Phase 31** built since.
 
 | Area | What works |
 |---|---|
@@ -25,13 +26,15 @@ auditing and security hardening.
 | Debt | Loans payable and receivable, amortized schedules, principal/interest/fee splits |
 | Household | Three visibility levels, membership roles, sharing, personal/family context switch |
 | Reporting | Dashboard, net worth, 30-day cash-flow forecast, insights |
+| Budgets | Monthly limits per category, spent and remaining, a projection from the pace so far, near-limit and over-limit states |
+| Goals | What you are saving towards, progress from tagged transfers rather than a stored tally, optional target dates, recurring contributions, daily reconciliation against the account |
 | Money in | Paste a mobile-money, bank or card SMS and the form fills itself |
 | Currency | Multi-currency accounts converted to one base, with rates fetched daily |
 | Records | Receipts and proof attached to transactions, household audit trail, JSON backup and restore |
 | Interface | Installable PWA, light and dark themes, search and filters |
 
-Not built: CSV import/export, budgets, and the observability and production
-work of Phases 30-31. Backup and restore are JSON rather than CSV.
+Not built: CSV import/export, the observability of **Phase 30**, and CI/CD
+from **Phase 34** onwards. Backup and restore are JSON rather than CSV.
 
 ---
 
@@ -64,6 +67,71 @@ docker compose run --rm --no-deps api alembic upgrade head
 ```
 
 `make help` lists the shortcuts.
+
+---
+
+## Deploying
+
+The same `docker-compose.prod.yml` runs production and UAT. Only the
+environment file differs, and it decides three things TLS would otherwise be
+required for: production refuses to start on an unsafe setting, sends HSTS,
+and forces `Secure` on the session cookie whatever the file says. On plain
+HTTP that last one makes sign-in appear to fail — the cookie is set and the
+browser discards it — which is why UAT exists.
+
+```bash
+make uat                 # production images and topology, plain HTTP, port 8090
+```
+
+`--env-file` is not optional. Compose interpolates from the default `.env`
+otherwise, which is the development one, and Postgres comes up with a
+different password from the one the API uses.
+
+### Publishing images
+
+Montra builds two images: `montra-api` runs the API, the migration job, the
+Celery worker and the scheduler; `montra-web` runs Next.js. Everything else in
+the stack is an unmodified upstream image.
+
+```bash
+./scripts/prepare_images.sh      # build through compose, tag for the registry
+./scripts/push_images.sh         # refuses to push if the version and changelog disagree
+```
+
+Building goes through compose rather than `docker build` so there is one
+definition of how an image is made — the frontend takes a build argument that
+is inlined into the bundle, and duplicating that in a script would drift.
+
+### Running from published images
+
+A host needs Docker, `docker-compose.prod.yml`, `infra/nginx/montra.conf` and
+an environment file. No source, no toolchain: the migrations are inside the
+image.
+
+```bash
+./scripts/deploy.sh              # pull and run, on this machine
+./vm-deploy.sh <version>         # the same, for a host with no copy of the source
+```
+
+Both verify that the version actually being served matches the one requested,
+which is what catches a half-deploy — the stack is up, but a service is still
+on the previous image and the app misreports what it is running.
+
+`scripts/montra-tunnel.sh` installs a Cloudflare quick tunnel as a systemd
+service and re-points the app's origins at the hostname it returns. That
+hostname is random and changes on every restart, so the script is safe to
+re-run.
+
+### Resources
+
+Every service has a memory limit, a CPU limit and a process cap, sized for a
+shared 2-core host. They are ceilings rather than reservations, so they
+deliberately sum to more than the machine has — the point is that no single
+container can take the database down with it.
+
+The Celery worker pins its concurrency rather than forking once per CPU: the
+default multiplies its database connection pool by the core count, and a
+sixteen-core host would demand more connections than Postgres allows.
 
 ---
 
@@ -161,7 +229,7 @@ account's perspective.
 make test
 ```
 
-649 tests. The ledger suites
+744 tests. The ledger suites
 ([`test_posting.py`](backend/tests/test_posting.py),
 [`test_transfers.py`](backend/tests/test_transfers.py)) are the ones that matter
 most — they assert the financial invariants directly: card purchases raise debt,
