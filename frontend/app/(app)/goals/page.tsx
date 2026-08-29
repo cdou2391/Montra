@@ -209,8 +209,7 @@ function GoalCard({
 
 export default function Goals() {
   const { user } = useSession();
-  const { context, family } = useFinancialContext();
-  const [goals, setGoals] = useState<Goal[] | null>(null);
+  const { context, family } = useFinancialContext();  const [goals, setGoals] = useState<Goal[] | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", account_id: "", target_amount: "", target_date: "" });
@@ -219,6 +218,13 @@ export default function Goals() {
   const [dated, setDated] = useState(false);
   const [visibility, setVisibility] = useState("PRIVATE");
   const [error, setError] = useState<string | null>(null);
+  // Same reason as Home: the previous context's rows are not a preview of this
+  // one's. Cleared during render, so the stale set never paints.
+  const [loadedContext, setLoadedContext] = useState(context);
+  if (loadedContext !== context) {
+    setLoadedContext(context);
+    setGoals(null);
+  }
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {

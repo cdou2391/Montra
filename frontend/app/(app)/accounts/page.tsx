@@ -37,6 +37,15 @@ export default function Accounts() {
 
   const { context, family } = useFinancialContext();
 
+  // Same reason as Home: the previous context's rows are not a preview of this
+  // one's. Cleared during render, so the stale set never paints.
+  const [loadedContext, setLoadedContext] = useState(context);
+  if (loadedContext !== context) {
+    setLoadedContext(context);
+    setAccounts(null);
+    setActivity({});
+  }
+
   const loadAccounts = useCallback(() => {
     montra.accounts(context).then(setAccounts).catch(() => setAccounts([]));
   }, [context]);

@@ -33,6 +33,20 @@ export default function Home() {
   const { hidden } = useBalancePrivacy();
   const { context, family } = useFinancialContext();
 
+  // Switching context is a change of subject, not a refresh: the personal net
+  // worth is not a rough draft of the household's. Clearing during render —
+  // rather than in the effect below, which only runs after a paint — is what
+  // stops the old figure being shown under the new heading.
+  const [loadedContext, setLoadedContext] = useState(context);
+  if (loadedContext !== context) {
+    setLoadedContext(context);
+    setAccounts(null);
+    setLoans([]);
+    setForecast(null);
+    setInsights([]);
+    setRecent([]);
+  }
+
   useEffect(() => {
     montra.accounts(context).then(setAccounts).catch(() => setAccounts([]));
     // Loans are not accounts, but they are part of what you own and owe, so

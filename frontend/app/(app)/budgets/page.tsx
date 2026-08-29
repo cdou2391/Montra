@@ -101,14 +101,20 @@ function BudgetCard({ row, onChanged }: { row: BudgetRow; onChanged: () => void 
 
 export default function Budgets() {
   const { user } = useSession();
-  const { context, family } = useFinancialContext();
-  const [status, setStatus] = useState<BudgetStatus | null>(null);
+  const { context, family } = useFinancialContext();  const [status, setStatus] = useState<BudgetStatus | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [adding, setAdding] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
   const [visibility, setVisibility] = useState("PRIVATE");
   const [error, setError] = useState<string | null>(null);
+  // Same reason as Home: the previous context's rows are not a preview of this
+  // one's. Cleared during render, so the stale set never paints.
+  const [loadedContext, setLoadedContext] = useState(context);
+  if (loadedContext !== context) {
+    setLoadedContext(context);
+    setStatus(null);
+  }
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {

@@ -10,6 +10,67 @@ displays it.
 
 ---
 
+## 0.4.18
+
+**Switching to the household flashed the personal net worth first.** For a
+frame or two the old figure sat under the new heading, then jumped. It read
+like the household total settling on an answer, which is the worst possible
+reading of a number that was simply the wrong one.
+
+Nothing cleared the previous context's data. The fetch went out, the old
+accounts stayed in state, and the render in between used them. Doing the
+clearing in the effect would have been worse, not better: an effect runs after
+a paint, so the stale figure shows, then the skeleton, then the answer — two
+changes instead of one. The reset happens during render, which is React's own
+answer to this, and the stale value never reaches the screen at all.
+
+The same fix applies to Accounts, Transactions, Budgets and Goals, which all
+had the identical flash — the previous context's rows are not a preview of
+this one's.
+
+---
+
+## 0.4.17
+
+**The More button says which way it goes.** Three dots is a symbol you have
+to have learned; a chevron is a direction you can read. Up while the panel is
+shut — there is more above this — and down while it is open, which is also
+the way you would swipe it away.
+
+It is one chevron rotated rather than two icons swapped, so the change is a
+movement the eye follows rather than a substitution it has to notice, and
+reduced motion turns the rotation off without losing the direction.
+
+It is also a toggle now. Tapping More while the panel was open called
+`setMoreOpen(true)` on something already true and did nothing — invisible
+before 0.4.16, because the panel's backdrop covered the button; visible as
+soon as the bar started sitting above it.
+
+---
+
+## 0.4.16
+
+**More is part of the bar now, not a menu over it.** It opened as a
+full-width sheet with its own surface, its own rounding and rows of
+icon-in-a-circle plus a line of explanatory text — a different kind of object
+that happened to appear when you tapped the bar.
+
+The panel now matches the bar exactly: same width, same radius, same
+elevated surface, sitting directly above it. The bar keeps its own colour
+while the panel is open rather than dimming behind the backdrop, so the two
+read as one stack — which is what the code always claimed, since the comment
+on that button has said "expands the bar in place" from the start.
+
+The destinations are the bar's own tile: icon over an 11px label, four
+across, one accent colour for the current page. Sign out is the last tile
+rather than a row of its own; it is the same kind of thing, and the colour
+already says which one it is.
+
+The hints went with the rows. Ten one-line descriptions is a lot of reading
+for a menu whose entries are called Profile, Loans and Budgets.
+
+---
+
 ## 0.4.15
 
 **Nothing in the production stack had a ceiling.** On a single host that means

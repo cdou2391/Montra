@@ -24,7 +24,6 @@ import { SkeletonRows } from "@/components/skeletons";
 function Transactions() {
   const params = useSearchParams();
   const { context, family } = useFinancialContext();
-
   const [rows, setRows] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -38,6 +37,15 @@ function Transactions() {
     account_id: params.get("account") ?? "",
   });
   const [search, setSearch] = useState("");
+  // Same reason as Home: the previous context's rows are not a preview of this
+  // one's. Cleared during render, so the stale set never paints.
+  const [loadedContext, setLoadedContext] = useState(context);
+  if (loadedContext !== context) {
+    setLoadedContext(context);
+    setLoading(true);
+    setRows([]);
+    setCursor(null);
+  }
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
