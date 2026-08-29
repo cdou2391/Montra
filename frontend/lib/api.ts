@@ -406,6 +406,8 @@ export type Insight = {
   currency?: string;
   value?: string;
   account_id?: string;
+  budget_id?: string;
+  goal_id?: string;
   category?: string;
   count?: number;
   change_percent?: string;

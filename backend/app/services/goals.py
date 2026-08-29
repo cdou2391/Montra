@@ -129,12 +129,14 @@ def serialize_goal(db: DbSession, goal: Goal, *, today: date) -> dict:
     }
 
 
-def list_goals(db: DbSession, *, user: User, context: str = "personal") -> list[dict]:
+def list_goals(
+    db: DbSession, *, user: User, context: str = "personal", today: date | None = None
+) -> list[dict]:
     from app.core.timezone import to_local
     from app.db.base import utcnow
 
     access = authz.resolve(db, user)
-    today = to_local(utcnow(), user.timezone).date()
+    today = today or to_local(utcnow(), user.timezone).date()
     goals = list(db.scalars(_visible(access, context)))
     rows = [serialize_goal(db, goal, today=today) for goal in goals]
     # Achieved ones drop to the bottom: they need nothing from you.

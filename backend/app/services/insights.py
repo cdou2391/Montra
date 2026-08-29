@@ -39,6 +39,19 @@ ZERO = Decimal("0")
 SPENDING_SHIFT_THRESHOLD = Decimal("15")
 UTILIZATION_THRESHOLD = Decimal("50")
 
+# A pace divides by the days gone, so it is violent early in the month: one
+# large shop on the 2nd projects to fifteen of them. Below this many days
+# elapsed, anything derived from a rate is arithmetic rather than a forecast,
+# and saying it out loud would be a monthly false alarm.
+PACE_MIN_ELAPSED_DAYS = 7
+
+# How far past its limit a budget has to be heading before it is worth saying.
+BUDGET_OVERSHOOT_THRESHOLD = Decimal("5")
+
+# How far short of a goal's monthly requirement counts as falling behind. A
+# little under in one month is normal; this is the gap worth acting on.
+GOAL_PACE_THRESHOLD = Decimal("20")
+
 # Monthly equivalent of each cadence, for totalling subscriptions.
 PER_MONTH = {
     Frequency.DAILY: Decimal("30"),
@@ -89,15 +102,22 @@ def _insight(code: str, title: str, detail: str, tone: str = "neutral", **extra)
     return {"code": code, "title": title, "detail": detail, "tone": tone, **extra}
 
 
-def generate(db: DbSession, *, user: User, context: str = "personal") -> list[dict]:
-    """Everything worth saying about this scope, most useful first."""
+def generate(
+    db: DbSession, *, user: User, context: str = "personal", today: date | None = None
+) -> list[dict]:
+    """Everything worth saying about this scope, most useful first.
+
+    `today` is injectable because several of these turn on how much of the
+    month has gone: a run on the 3rd and a run on the 28th should be able to
+    disagree in a test without waiting three weeks to find out.
+    """
     from app.core.timezone import to_local
     from app.db.base import utcnow
-    from app.services import credit_cards, reporting
+    from app.services import budgets, credit_cards, goals, reporting
     from app.services.forecast import cash_flow
 
     access = authz.resolve(db, user)
-    today = to_local(utcnow(), user.timezone).date()
+    today = today or to_local(utcnow(), user.timezone).date()
     currency = user.base_currency
     insights: list[dict] = []
 
@@ -107,9 +127,80 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
 
     account_ids = [a.id for a in accounts]
 
-    # --- spending shift, this month against last -------------------------
     this_start, this_end = _month_range(today)
     last_start, last_end = _month_range(today, back=1)
+
+    # --- budgets under pressure -------------------------------------------
+    #
+    # One row, never one per budget. A list of every budget is the budgets
+    # screen; on the home page it crowds out everything else. The worst is
+    # named and the rest are counted.
+    #
+    # Already over beats heading over, because it is the one that has stopped
+    # being avoidable.
+    elapsed = (today - this_start).days + 1
+    budget_rows = budgets.status(db, user=user, context=context, today=today)["budgets"]
+
+    budget_named: str | None = None
+    over = [r for r in budget_rows if r["state"] == "OVER"]
+    heading = []
+    if not over and elapsed >= PACE_MIN_ELAPSED_DAYS:
+        for row in budget_rows:
+            limit = Decimal(row["amount"])
+            projected = Decimal(row["projected"])
+            if limit <= 0 or projected <= limit:
+                continue
+            if (projected - limit) / limit * 100 < BUDGET_OVERSHOOT_THRESHOLD:
+                continue
+            heading.append((row, projected - limit))
+
+    if over:
+        worst = max(over, key=lambda r: Decimal(r["spent"]) - Decimal(r["amount"]))
+        budget_named = worst["category"]["name"]
+        past = Decimal(worst["spent"]) - Decimal(worst["amount"])
+        detail = (
+            f"{format_money(Decimal(worst['spent']), currency)} against "
+            f"{format_money(Decimal(worst['amount']), currency)}."
+        )
+        others = len(over) - 1
+        if others:
+            detail += (
+                " 1 other budget is over too."
+                if others == 1
+                else f" {others} other budgets are over too."
+            )
+        insights.append(
+            _insight(
+                "budget_pressure",
+                f"{worst['category']['name']} is {format_money(past, currency)} over budget",
+                detail,
+                tone="negative",
+                budget_id=worst["id"],
+                category=worst["category"]["name"],
+                value=serialize(past),
+                currency=currency,
+            )
+        )
+    elif heading:
+        worst, _ = max(heading, key=lambda pair: pair[1])
+        budget_named = worst["category"]["name"]
+        days_left = (this_end - today).days
+        insights.append(
+            _insight(
+                "budget_pressure",
+                f"{worst['category']['name']} is on pace to go over",
+                f"About {format_money(Decimal(worst['projected']), currency)} by month end "
+                f"against {format_money(Decimal(worst['amount']), currency)}, with "
+                f"{days_left} day{'s' if days_left != 1 else ''} left.",
+                tone="warning",
+                budget_id=worst["id"],
+                category=worst["category"]["name"],
+                value=worst["projected"],
+                currency=currency,
+            )
+        )
+
+    # --- spending shift, this month against last -------------------------
     now_spend = _spend_by_category(
         db, user=user, account_ids=account_ids, start=this_start, end=this_end
     )
@@ -119,6 +210,12 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
 
     biggest = None
     for name, amount in now_spend.items():
+        # A budget row already names this one and says something sharper about
+        # it: "48,500 over" beats "192% more" when both are about Food. Two
+        # rows side by side would be one of news and one of noise, so the
+        # shift moves on to the next largest instead of repeating it.
+        if name == budget_named:
+            continue
         previous = then_spend.get(name, ZERO)
         if previous <= 0:
             continue
@@ -229,6 +326,70 @@ def generate(db: DbSession, *, user: User, context: str = "personal") -> list[di
                 value=serialize(monthly),
                 count=count,
                 currency=currency,
+            )
+        )
+
+    # --- goals that will not arrive on time -------------------------------
+    #
+    # Two kinds of news under one code. A date that has passed is a fact and is
+    # always worth saying; a pace that will not reach the date is a forecast,
+    # and waits for the same elapsed days a budget projection does, because it
+    # is measured against savings that are only month-to-date.
+    #
+    # The fact wins when both are true.
+    saved_so_far = Decimal(flows["saved"])
+    overdue: list[tuple[dict, date]] = []
+    behind: list[tuple[dict, Decimal]] = []
+
+    for row in goals.list_goals(db, user=user, context=context, today=today):
+        if row["status"] == "ACHIEVED" or Decimal(row["remaining"]) <= 0:
+            continue
+        if row["target_date"] is None:
+            continue
+        target_date = date.fromisoformat(row["target_date"])
+        if target_date < today:
+            overdue.append((row, target_date))
+            continue
+        if row["required_monthly"] is None or elapsed < PACE_MIN_ELAPSED_DAYS:
+            continue
+        # A goal keeps its own currency and what was saved is in the base one:
+        # two currencies do not compare raw any more than they add raw. An
+        # unconvertible goal is left alone rather than guessed at.
+        required = converter.convert(Decimal(row["required_monthly"]), row["currency"])
+        if required is None or required <= saved_so_far:
+            continue
+        if (required - saved_so_far) / required * 100 < GOAL_PACE_THRESHOLD:
+            continue
+        behind.append((row, required))
+
+    if overdue:
+        row, target_date = min(overdue, key=lambda pair: pair[1])
+        late = (today - target_date).days
+        insights.append(
+            _insight(
+                "goal_pace",
+                f"{row['name']} passed its date",
+                f"{format_money(Decimal(row['remaining']), row['currency'])} still to go, "
+                f"{late} day{'s' if late != 1 else ''} after {target_date:%-d %B %Y}.",
+                tone="negative",
+                goal_id=row["id"],
+                value=row["remaining"],
+                currency=row["currency"],
+            )
+        )
+    elif behind:
+        row, required = max(behind, key=lambda pair: pair[1])
+        insights.append(
+            _insight(
+                "goal_pace",
+                f"{row['name']} needs more than you are saving",
+                f"{format_money(Decimal(row['required_monthly']), row['currency'])} a month to "
+                f"arrive by {date.fromisoformat(row['target_date']):%B %Y}; you saved "
+                f"{format_money(saved_so_far, currency)} this month.",
+                tone="warning",
+                goal_id=row["id"],
+                value=row["required_monthly"],
+                currency=row["currency"],
             )
         )
 

@@ -6,10 +6,12 @@ an insight that fires on every account every month is furniture, not
 information.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from app.db.enums import AccountType, Frequency, PlannedType, Visibility
+from app.services import budgets as budget_service
+from app.services import goals as goal_service
 from app.services import insights, planning
 from app.services.posting import PostingService
 from tests.conftest import make_account
@@ -490,3 +492,218 @@ def test_a_settled_loan_stops_counting(db, user, bank_account):
     loan.status = LoanStatus.SETTLED
     db.commit()
     assert _recurring_insight(db, user) is None
+
+
+# ------------------------------------------------- budgets and goals
+#
+# These pin a date instead of using today's. Both the budget projection and the
+# goal pace turn on how much of the month has gone, so a suite run on the 3rd
+# and one run on the 28th would otherwise disagree with each other.
+
+PINNED = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+PINNED_TODAY = PINNED.date()
+
+
+def _budget(db, user, category, amount):
+    return budget_service.create_budget(
+        db, user=user, category_id=category.id, amount=Decimal(amount)
+    )
+
+
+def _income(db, user, account, amount, when):
+    PostingService(db).record_income(
+        account=account,
+        amount=Decimal(amount),
+        currency="RWF",
+        occurred_at=when,
+        actor_id=user.id,
+    )
+
+
+def test_a_budget_that_is_over_is_reported(db, user):
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="5000000")
+    food = _category(db, user, "Food")
+    _budget(db, user, food, "100000")
+    _spend(db, user, account, "150000", PINNED, food)
+    db.commit()
+
+    rows = insights.generate(db, user=user, today=PINNED_TODAY)
+    row = next(r for r in rows if r["code"] == "budget_pressure")
+    assert row["tone"] == "negative"
+    assert row["category"] == "Food"
+    assert "over budget" in row["title"]
+
+
+def test_a_budget_with_room_left_says_nothing(db, user):
+    """Under the limit and not heading past it, a budget is furniture."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="5000000")
+    food = _category(db, user, "Food")
+    _budget(db, user, food, "100000")
+    _spend(db, user, account, "20000", PINNED, food)
+    db.commit()
+
+    assert "budget_pressure" not in _codes(insights.generate(db, user=user, today=PINNED_TODAY))
+
+
+def test_only_the_worst_budget_is_named(db, user):
+    """One row, however many are over. The rest are counted, not listed."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="5000000")
+    food = _category(db, user, "Food")
+    transport = _category(db, user, "Transport")
+    _budget(db, user, food, "100000")
+    _budget(db, user, transport, "50000")
+    _spend(db, user, account, "150000", PINNED, food)
+    _spend(db, user, account, "120000", PINNED, transport)
+    db.commit()
+
+    rows = [
+        r
+        for r in insights.generate(db, user=user, today=PINNED_TODAY)
+        if r["code"] == "budget_pressure"
+    ]
+    assert len(rows) == 1
+    assert rows[0]["category"] == "Transport"  # 70,000 over beats 50,000 over
+    assert "1 other budget is over too" in rows[0]["detail"]
+
+
+def test_a_budget_on_pace_to_go_over_is_a_warning(db, user):
+    """Still inside the limit, but not for long: the version you can act on."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="5000000")
+    food = _category(db, user, "Food")
+    _budget(db, user, food, "100000")
+    _spend(db, user, account, "60000", PINNED, food)
+    db.commit()
+
+    row = next(
+        r
+        for r in insights.generate(db, user=user, today=PINNED_TODAY)
+        if r["code"] == "budget_pressure"
+    )
+    assert row["tone"] == "warning"
+    assert "on pace" in row["title"]
+
+
+def test_a_pace_is_not_guessed_at_in_the_first_days(db, user):
+    """Two days in, one large shop is not a trend worth announcing."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="5000000")
+    food = _category(db, user, "Food")
+    _budget(db, user, food, "100000")
+    _spend(db, user, account, "60000", datetime(2026, 8, 2, 12, 0, tzinfo=UTC), food)
+    db.commit()
+
+    early = insights.generate(db, user=user, today=date(2026, 8, 3))
+    assert "budget_pressure" not in _codes(early)
+
+
+def test_a_goal_past_its_date_is_reported(db, user):
+    pot = make_account(
+        db, user, "Savings", Visibility.PRIVATE, opening="0", account_type=AccountType.SAVINGS
+    )
+    goal_service.create_goal(
+        db,
+        user=user,
+        name="Laptop",
+        account=pot,
+        target_amount=Decimal("500000"),
+        target_date=date(2026, 7, 31),
+    )
+    db.commit()
+
+    row = next(
+        r for r in insights.generate(db, user=user, today=PINNED_TODAY) if r["code"] == "goal_pace"
+    )
+    assert row["tone"] == "negative"
+    assert "passed its date" in row["title"]
+
+
+def test_a_goal_you_are_keeping_up_with_says_nothing(db, user):
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="0")
+    pot = make_account(
+        db, user, "Savings", Visibility.PRIVATE, opening="0", account_type=AccountType.SAVINGS
+    )
+    _income(db, user, account, "1000000", PINNED)
+    goal_service.create_goal(
+        db,
+        user=user,
+        name="Laptop",
+        account=pot,
+        target_amount=Decimal("500000"),
+        target_date=date(2026, 12, 31),
+    )
+    db.commit()
+
+    # 125,000 a month against 1,000,000 saved: nothing to say.
+    assert "goal_pace" not in _codes(insights.generate(db, user=user, today=PINNED_TODAY))
+
+
+def test_a_goal_needing_more_than_you_save_is_a_warning(db, user):
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="0")
+    pot = make_account(
+        db, user, "Savings", Visibility.PRIVATE, opening="0", account_type=AccountType.SAVINGS
+    )
+    _income(db, user, account, "1000000", PINNED)
+    _spend(db, user, account, "900000", PINNED)
+    goal_service.create_goal(
+        db,
+        user=user,
+        name="Deposit",
+        account=pot,
+        target_amount=Decimal("5000000"),
+        target_date=date(2026, 12, 31),
+    )
+    db.commit()
+
+    row = next(
+        r for r in insights.generate(db, user=user, today=PINNED_TODAY) if r["code"] == "goal_pace"
+    )
+    assert row["tone"] == "warning"
+    assert "Deposit" in row["title"]
+
+
+def test_a_goal_without_a_date_cannot_be_behind(db, user):
+    """No date, no pace: there is nothing to be late for."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="0")
+    pot = make_account(
+        db, user, "Savings", Visibility.PRIVATE, opening="0", account_type=AccountType.SAVINGS
+    )
+    _income(db, user, account, "1000000", PINNED)
+    _spend(db, user, account, "900000", PINNED)
+    goal_service.create_goal(
+        db, user=user, name="Someday", account=pot, target_amount=Decimal("5000000")
+    )
+    db.commit()
+
+    assert "goal_pace" not in _codes(insights.generate(db, user=user, today=PINNED_TODAY))
+
+
+def test_a_budget_row_replaces_the_shift_for_that_category(db, user):
+    """Two rows about Food would be one of news and one of noise.
+
+    The budget row is the sharper of the two, so the shift steps over that
+    category and reports the next largest instead of repeating it.
+    """
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="2000000")
+    food = _category(db, user, "Food")
+    transport = _category(db, user, "Transport")
+    _budget(db, user, food, "120000")
+    _spend(db, user, account, "60000", datetime(2026, 7, 20, 12, 0, tzinfo=UTC), food)
+    _spend(db, user, account, "175400", PINNED, food)
+    _spend(db, user, account, "40000", datetime(2026, 7, 20, 12, 0, tzinfo=UTC), transport)
+    _spend(db, user, account, "84000", PINNED, transport)
+    db.commit()
+
+    rows = insights.generate(db, user=user, today=PINNED_TODAY)
+    assert next(r for r in rows if r["code"] == "budget_pressure")["category"] == "Food"
+    assert next(r for r in rows if r["code"] == "spending_shift")["category"] == "Transport"
+
+
+def test_a_budgeted_category_is_the_only_one_that_moved(db, user):
+    """Nothing left to fall through to, so the shift says nothing at all."""
+    account = make_account(db, user, "Bank", Visibility.PRIVATE, opening="2000000")
+    food = _category(db, user, "Food")
+    _budget(db, user, food, "120000")
+    _spend(db, user, account, "60000", datetime(2026, 7, 20, 12, 0, tzinfo=UTC), food)
+    _spend(db, user, account, "175400", PINNED, food)
+    db.commit()
+
+    assert "spending_shift" not in _codes(insights.generate(db, user=user, today=PINNED_TODAY))
